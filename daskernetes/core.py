@@ -55,8 +55,12 @@ class KubeCluster(object):
             self.scale_up(n_workers)
 
     @property
+    def scheduler(self):
+        return self.cluster.scheduler
+
+    @property
     def scheduler_address(self):
-        return self.cluster.scheduler_address
+        return self.scheduler.address
 
     def _make_pod(self):
         return client.V1Pod(
@@ -80,19 +84,25 @@ class KubeCluster(object):
             )
         )
 
+    def pods(self):
+        return self.api.list_namespaced_pod(
+            self.namespace,
+            label_selector=format_labels(self.worker_labels)
+        ).items
+
+    def logs(self, pod):
+        return self.api.read_namespaced_pod_log(pod.metadata.name,
+                                                pod.metadata.namespace)
 
     def scale_up(self, n, **kwargs):
         """
         Make sure we have n dask-workers available for this cluster
         """
-        pods = self.api.list_namespaced_pod(
-            self.namespace,
-            label_selector=format_labels(self.worker_labels)
-        )
-        if(len(pods.items) == n):
+        pods = self.pods()
+        if(len(pods) == n):
             # We already have the number of workers we need!
             return
-        for _ in range(n - len(pods.items)):
+        for _ in range(n - len(pods)):
             created = self.api.create_namespaced_pod(self.namespace, self._make_pod())
 
         # FIXME: Wait for this to be ready before returning!
@@ -103,14 +113,14 @@ class KubeCluster(object):
         state. Kill them when we are asked to.
         """
         # Get the existing worker pods
-        pods = self.api.list_namespaced_pod(self.namespace, label_selector=format_labels(self.worker_labels))
+        pods = self.pods()
 
         # Work out pods that we are going to delete
         # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
         # Convert this to a set of IPs
         ips = set(urlparse(worker).hostname for worker in workers)
         to_delete = [
-            p for p in pods.items
+            p for p in pods
             # Every time we run, purge any completed pods as well as the specified ones
             if p.status.phase == 'Succeeded' or p.status.pod_ip in ips
         ]
