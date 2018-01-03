@@ -8,21 +8,57 @@ Native Kubernetes integration for dask
 ### Telepresence
 
 For local development, it is often desirable to run the scheduler
-process on one's local machine & the workers on minikube. This is
-most easily done with [Telepresence](https://www.telepresence.io/)
+process on one's local machine & the workers on minikube.
 
 1. Download, set up and start `minikube`
-2. Create a namespace to spawn your worker pods in.
+2. Make it possible for your host to be able to talk to the pods
+   on minikube.
+
+   On Linux,
+   ```
+   sudo ip route add 172.17.0.0/16 via $(minikube ip)
+   ```
+
+   On OS X,
+   ```
+   sudo route -n add -net 172.17.0.0/16 $(minikube ip)
+   ```
+
+   If you get an error message like:
+
+   ```
+   RTNETLINK answers: File exists
+   ```
+
+   it most likely means you have docker running on your host using
+   the same IP range minikube is using. You can fix this by editing
+   your `/etc/docker/daemon.json` to add:
+
+   ```json
+   {
+       "bip": "172.19.1.1/16"
+   }
+   ```
+
+   If some JSON already exists in that file, make sure to just add the
+   `bip` key rather than replace it all. The final file needs to be
+   valid JSON.
+
+   Once edited, restart docker with `sudo systemctl restart docker`.
+   It should come up using a different IP range, and you can run the
+   `sudo ip route add` command again. Note that restarting docker
+   will restart all your running containers by default.
+
+3. Create a namespace to spawn your worker pods in.
 
    ```bash
    kubectl create dask-workers
    ```
    
-3. Start the scheduler. This is currently out of process, but should
-   be moved in-process soon.
+4. Run the code!
    
    ```bash
-   telepresence --expose 8736 --run python daskernetes/__init__.py --worker-image <worker-image> <cluster-name> <namespace>
+   python daskernetes/__init__.py --worker-image <worker-image> <cluster-name> <namespace>
    ```
    
    where:
@@ -33,11 +69,3 @@ most easily done with [Telepresence](https://www.telepresence.io/)
         specific cluster
       - `<namespace>` is the namespace you created in step 3
       
-5. In another terminal, start an ipython client and run the following code:
-
-   ```python
-   c = Client('0.0.0.0:8786')
-   c.submit(lambda x:  x + 1, 10).result()
-   ```
-
-   This should dynamically spin up new workers & give you the output!
