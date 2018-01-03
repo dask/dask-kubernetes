@@ -66,7 +66,7 @@ class KubeCluster(object):
                         args = [
                             'dask-worker',
                             self.scheduler_address,
-                            '--nthreads', self.threads_per_worker,
+                            '--nthreads', str(self.threads_per_worker),
                         ]
                     )
                 ]
