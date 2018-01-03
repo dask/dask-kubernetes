@@ -1,26 +1,30 @@
 import logging
 import tornado
+import socket
 import argparse
 from urllib.parse import urlparse
 
-
 from distributed import Client
-from distributed.deploy import Adaptive
+from distributed.deploy import Adaptive, LocalCluster
 from distributed.utils import LoopRunner, sync
 from distributed.scheduler import Scheduler
 from kubernetes import client, config
 
+logger = logging.getLogger(__name__)
 
 class KubeCluster(object):
     def __init__(
             self,
-            name,
-            namespace,
-            worker_image,
-            worker_labels,
-            scheduler_address
+            name='dask',
+            namespace='dask',
+            worker_image='daskdev/dask:latest',
+            worker_labels=None,
+            n_workers=0,
+            threads_per_worker=1,
+            host='0.0.0.0',
     ):
-        self.log = logging.getLogger("distributed.deploy.adaptive")
+        self.cluster = LocalCluster(ip=host or socket.gethostname(),
+                                    n_workers=0)
 
         try:
             config.load_incluster_config()
@@ -32,13 +36,20 @@ class KubeCluster(object):
         self.namespace = namespace
         self.name = name
         self.worker_image = worker_image
-        self.scheduler_address = scheduler_address
-        self.worker_labels = worker_labels.copy()
+        self.worker_labels = (worker_labels or {}).copy()
+        self.threads_per_worker = threads_per_worker
 
         # Default labels that can't be overwritten
         self.worker_labels['org.pydata.dask/cluster-name'] = name
         self.worker_labels['app'] = 'dask'
         self.worker_labels['component'] = 'dask-worker'
+
+        if n_workers:
+            self.scale_up(n_workers)
+
+    @property
+    def scheduler_address(self):
+        return self.cluster.scheduler_address
 
     def _make_pod(self):
         return client.V1Pod(
@@ -52,31 +63,10 @@ class KubeCluster(object):
                     client.V1Container(
                         name = 'dask-worker',
                         image = self.worker_image,
-                        env = [
-                            client.V1EnvVar(
-                                name = 'POD_IP',
-                                value_from = client.V1EnvVarSource(
-                                    field_ref = client.V1ObjectFieldSelector(
-                                        field_path = 'status.podIP'
-                                    )
-                                )
-                            ),
-                            client.V1EnvVar(
-                                name = 'POD_NAME',
-                                value_from = client.V1EnvVarSource(
-                                    field_ref = client.V1ObjectFieldSelector(
-                                        field_path = 'metadata.name'
-                                    )
-                                )
-                            ),
-                        ],
                         args = [
                             'dask-worker',
                             self.scheduler_address,
-                            '--nprocs', '1',
-                            '--nthreads', '1',
-                            '--host', '$(POD_IP)',
-                            '--name', '$(POD_NAME)',
+                            '--nthreads', self.threads_per_worker,
                         ]
                     )
                 ]
@@ -129,7 +119,7 @@ class KubeCluster(object):
                     self.namespace,
                     client.V1DeleteOptions()
                 )
-                self.log.info('Deleted pod: %s', pod.metadata.name)
+                logger.info('Deleted pod: %s', pod.metadata.name)
             except client.rest.ApiException as e:
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
@@ -147,17 +137,15 @@ def main():
 
     args = argparser.parse_args()
 
-    scheduler = Scheduler()
-    scheduler.start(('0.0.0.0', '8786'))
     cluster = KubeCluster(
         args.name,
         args.namespace,
         args.worker_image,
         {},
-        scheduler.address
+        n_workers=1,
     )
-    adapative_cluster = Adaptive(scheduler, cluster)
-    tornado.ioloop.IOLoop.current().start()
+    client = Client(cluster)
+    print(client.submit(lambda x: x + 1, 10).result())
 
 if __name__ == '__main__':
     main()
