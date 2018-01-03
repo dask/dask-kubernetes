@@ -4,6 +4,7 @@ from daskernetes import KubeCluster
 from dask.distributed import Client
 from distributed.utils_test import loop
 
+
 def test_basic(loop):
     with KubeCluster(loop=loop) as cluster:
         cluster.scale_up(1)
@@ -22,4 +23,3 @@ def test_logs(loop):
         a, b = cluster.pods()
         logs = cluster.logs(a)
         assert 'distributed.worker' in logs
-

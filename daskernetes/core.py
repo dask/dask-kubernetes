@@ -1,14 +1,11 @@
 import logging
-import tornado
 import socket
 import argparse
 from urllib.parse import urlparse
 from weakref import finalize
 
 from distributed import Client
-from distributed.deploy import Adaptive, LocalCluster
-from distributed.utils import LoopRunner, sync
-from distributed.scheduler import Scheduler
+from distributed.deploy import LocalCluster
 from kubernetes import client, config
 
 logger = logging.getLogger(__name__)
@@ -64,17 +61,17 @@ class KubeCluster(object):
 
     def _make_pod(self):
         return client.V1Pod(
-            metadata = client.V1ObjectMeta(
+            metadata=client.V1ObjectMeta(
                 generate_name=self.name + '-',
                 labels=self.worker_labels
             ),
-            spec = client.V1PodSpec(
-                restart_policy = 'Never',
-                containers = [
+            spec=client.V1PodSpec(
+                restart_policy='Never',
+                containers=[
                     client.V1Container(
-                        name = 'dask-worker',
-                        image = self.worker_image,
-                        args = [
+                        name='dask-worker',
+                        image=self.worker_image,
+                        args=[
                             'dask-worker',
                             self.scheduler_address,
                             '--nthreads', str(self.threads_per_worker),
@@ -103,7 +100,7 @@ class KubeCluster(object):
             # We already have the number of workers we need!
             return
         for _ in range(n - len(pods)):
-            created = self.api.create_namespaced_pod(self.namespace, self._make_pod())
+            self.api.create_namespaced_pod(self.namespace, self._make_pod())
 
         # FIXME: Wait for this to be ready before returning!
 
@@ -172,7 +169,6 @@ def format_labels(labels):
     return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
 
 
-
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('name', help='Name of the cluster')
@@ -193,6 +189,7 @@ def main():
     )
     client = Client(cluster)
     print(client.submit(lambda x: x + 1, 10).result())
+
 
 if __name__ == '__main__':
     main()
