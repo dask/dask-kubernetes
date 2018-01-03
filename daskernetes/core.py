@@ -23,9 +23,11 @@ class KubeCluster(object):
             n_workers=0,
             threads_per_worker=1,
             host='0.0.0.0',
+            port=8786,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
+                                    scheduler_port=port,
                                     n_workers=0, **kwargs)
 
         try:
@@ -130,9 +132,16 @@ class KubeCluster(object):
     def __enter__(self):
         return self
 
+    def close(self):
+        self.scale_down(self.cluster.scheduler.workers)
+        self.cluster.close()
+
     def __exit__(self, type, value, traceback):
         self.scale_down(self.cluster.scheduler.workers)
         self.cluster.__exit__(type, value, traceback)
+
+    def __del__(self):
+        self.close()  # TODO: do this more cleanly
 
 
 def main():
