@@ -63,7 +63,7 @@ class KubeCluster(object):
                     client.V1Container(
                         name = 'dask-worker',
                         image = self.worker_image,
-                        args = [
+                        command = [
                             'dask-worker',
                             self.scheduler_address,
                             '--nthreads', str(self.threads_per_worker),
