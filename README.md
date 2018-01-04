@@ -52,20 +52,20 @@ process on one's local machine & the workers on minikube.
 3. Create a namespace to spawn your worker pods in.
 
    ```bash
-   kubectl create dask-workers
+   kubectl create namespace dask-workers
    ```
-   
+
 4. Run the code!
-   
+
    ```bash
    python daskernetes/__init__.py --worker-image <worker-image> <cluster-name> <namespace>
    ```
-   
+
    where:
-   
+
       - `<worker-image>` is a docker image that has the same version of
         python and libraries installed as your host
-      - `<cluster-name>` is a identifying name that you give to this 
+      - `<cluster-name>` is a identifying name that you give to this
         specific cluster
       - `<namespace>` is the namespace you created in step 3
-      
+
