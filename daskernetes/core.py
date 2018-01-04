@@ -2,7 +2,10 @@ import logging
 import socket
 import argparse
 from urllib.parse import urlparse
-from weakref import finalize
+from weakref import finalize, ref
+
+from tornado import gen
+from tornado.ioloop import IOLoop
 
 from distributed import Client
 from distributed.deploy import LocalCluster
@@ -48,8 +51,41 @@ class KubeCluster(object):
 
         finalize(self, cleanup_pods, self.namespace, self.worker_labels)
 
+        self._cached_widget = None
+
         if n_workers:
             self.scale_up(n_workers)
+
+    def _widget(self):
+        """ Create IPython widget for display within a notebook """
+        if self._cached_widget:
+            return self._cached_widget
+        import ipywidgets
+        layout = ipywidgets.Layout(width='150px')
+        n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
+        threads = ipywidgets.IntText(1, description='Cores', layout=layout)
+        actual = ipywidgets.Text('0', description='Actual', layout=layout)
+        button = ipywidgets.Button(description='Scale', layout=layout)
+        box = ipywidgets.HBox([ipywidgets.VBox([n_workers, threads]),
+                               ipywidgets.VBox([button, actual])])
+        self._cached_widget = box
+
+        def cb(b):
+            self.threads_per_worker = threads.value
+            n = n_workers.value
+            self.scale_up(n)
+
+        button.on_click(cb)
+
+        worker_ref = ref(actual)
+        scheduler_ref = ref(self.scheduler)
+
+        IOLoop.current().add_callback(_update_worker_label, worker_ref,
+                                      scheduler_ref)
+        return box
+
+    def _ipython_display_(self, **kwargs):
+        return self._widget()._ipython_display_(**kwargs)
 
     @property
     def scheduler(self):
@@ -96,13 +132,12 @@ class KubeCluster(object):
         Make sure we have n dask-workers available for this cluster
         """
         pods = self.pods()
-        if(len(pods) == n):
-            # We already have the number of workers we need!
-            return
-        for _ in range(n - len(pods)):
-            self.api.create_namespaced_pod(self.namespace, self._make_pod())
 
-        # FIXME: Wait for this to be ready before returning!
+        out = [self.api.create_namespaced_pod(self.namespace, self._make_pod())
+               for _ in range(n - len(pods))]
+
+        return out
+        # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers):
         """
@@ -167,6 +202,24 @@ def cleanup_pods(namespace, worker_labels):
 
 def format_labels(labels):
     return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+
+
+@gen.coroutine
+def _update_worker_label(worker_ref, scheduler_ref):
+    """ Periodically check the scheduler's workers and update widget
+
+    See Also
+    --------
+    KubeCluster._widget
+    """
+    while True:
+        worker = worker_ref()
+        scheduler = scheduler_ref()
+        if worker and scheduler:
+            worker.value = str(len(scheduler.workers))
+        else:
+            return
+        yield gen.sleep(0.5)
 
 
 def main():
