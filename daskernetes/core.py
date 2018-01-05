@@ -48,6 +48,9 @@ class KubeCluster(object):
     >>> from daskernetes import KubeCluster
     >>> cluster = KubeCluster()
     >>> cluster.scale_up(10)
+
+    Alternatively have Dask allocate workers based on need
+    >>> cluster.adapt()
     """
     def __init__(
             self,
@@ -224,6 +227,14 @@ class KubeCluster(object):
 
     def __del__(self):
         self.close()  # TODO: do this more cleanly
+
+    def adapt(self):
+        """ Have cluster dynamically allocate workers based on load
+
+        http://distributed.readthedocs.io/en/latest/adaptive.html
+        """
+        from distributed.deploy import Adaptive
+        return Adaptive(cluster, cluster.scheduler)
 
 
 def cleanup_pods(namespace, worker_labels):

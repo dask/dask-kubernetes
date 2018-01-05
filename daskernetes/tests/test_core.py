@@ -63,3 +63,17 @@ def test_namespace(loop):
         assert os.environ['USER'] in cluster.name
         with KubeCluster(loop=loop, port=0) as cluster2:
             assert cluster.name != cluster2.name
+
+
+def test_adapt(loop):
+    with KubeCluster(loop=loop) as cluster:
+        cluster.adapt()
+        with Client(cluster) as client:
+            future = client.submit(inc, 10)
+            result = future.result()
+            assert result == 11
+
+        start = time()
+        while cluster.scheduler.workers:
+            sleep(0.1)
+            assert time() < start + 10
