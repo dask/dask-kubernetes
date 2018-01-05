@@ -4,6 +4,14 @@ import pytest
 from daskernetes import KubeCluster
 from dask.distributed import Client
 from distributed.utils_test import loop, inc
+from kubernetes import client, config
+
+
+try:
+    config.load_incluster_config()
+except config.ConfigException:
+    config.load_kube_config()
+api = client.CoreV1Api()
 
 
 def test_basic(loop):
@@ -54,3 +62,46 @@ def test_ipython_display(loop):
         while workers.value == 0:
             assert time() < start + 10
             sleep(0.5)
+
+
+def ns_exists(ns, api=api):
+    return any(n.metadata.name == ns for n in api.list_namespace().items)
+
+
+def test_namespace(loop):
+    assert not ns_exists('foo')
+    with KubeCluster(loop=loop, namespace='foo') as cluster:
+        assert cluster.namespace == 'foo'
+        assert ns_exists('foo', api=cluster.api)
+        with KubeCluster(loop=loop, namespace='foo', port=0) as cluster_2:
+            assert cluster_2.namespace == 'foo'
+            assert ns_exists('foo', api=cluster.api)
+
+        assert ns_exists('foo', api=cluster.api)
+
+    start = time()
+    while ns_exists('foo'):
+        sleep(0.1)
+        assert time() < start + 10
+
+
+def test_namespace_random(loop):
+    with KubeCluster(loop=loop, namespace=True) as cluster:
+        assert cluster.namespace
+        ns = cluster.namespace
+        assert ns_exists(ns)
+        assert not cluster.namespace.isalpha()
+
+    # assert not ns_exists(ns)
+    start = time()
+    while ns_exists(ns):
+        sleep(0.1)
+        assert time() < start + 10
+
+
+def test_namespace_raises(loop):
+    assert not ns_exists('foo-123')
+    with pytest.raises(ValueError):
+        with KubeCluster(loop=loop, namespace='foo-123',
+                         create_namespace=False, port=0):
+            pass
