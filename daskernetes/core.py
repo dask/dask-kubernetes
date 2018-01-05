@@ -1,7 +1,9 @@
+import getpass
 import logging
+import os
 import socket
-import argparse
 from urllib.parse import urlparse
+import uuid
 from weakref import finalize, ref
 
 from tornado import gen
@@ -15,10 +17,46 @@ logger = logging.getLogger(__name__)
 
 
 class KubeCluster(object):
+    """ Launch a Dask cluster on Kubernetes
+
+    This enables dynamically launching Dask workers on a Kubernetes cluster.
+    It starts a dask scheduler in this local process and dynamically creates
+    worker pods with Kubernetes.
+
+    Parameters
+    ----------
+    name: str
+        Name given to the pods.  Defaults to ``dask-user-random``
+    namespace: str
+        Namespace in which to launch the workers.  Defaults to current
+        namespace if available or "default"
+    worker_image: str
+        Docker image and tag
+    worker_labels: dict
+        Additional labels to add to pod
+    n_workers: int
+        Number of workers on initial launch.  Use ``scale_up`` in the future
+    threads_per_worker: int
+    host: str
+        Listen address for local scheduler.  Defaults to 0.0.0.0
+    port: int
+        Port of local scheduler
+    **kwargs: dict
+        Additional keyword arguments to pass to LocalCluster
+
+    Examples
+    --------
+    >>> from daskernetes import KubeCluster
+    >>> cluster = KubeCluster()
+    >>> cluster.scale_up(10)
+
+    Alternatively have Dask allocate workers based on need
+    >>> cluster.adapt()
+    """
     def __init__(
             self,
-            name='dask',
-            namespace='dask',
+            name=None,
+            namespace=None,
             worker_image='daskdev/dask:latest',
             worker_labels=None,
             n_workers=0,
@@ -38,8 +76,14 @@ class KubeCluster(object):
 
         self.api = client.CoreV1Api()
 
+        if namespace is None:
+            namespace = _namespace_default()
+
+        if name is None:
+            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
+
         self.namespace = namespace
-        self.name = name  # TODO: should this be unique by default?
+        self.name = name
         self.worker_image = worker_image
         self.worker_labels = (worker_labels or {}).copy()
         self.threads_per_worker = threads_per_worker
@@ -185,6 +229,14 @@ class KubeCluster(object):
     def __del__(self):
         self.close()  # TODO: do this more cleanly
 
+    def adapt(self):
+        """ Have cluster dynamically allocate workers based on load
+
+        http://distributed.readthedocs.io/en/latest/adaptive.html
+        """
+        from distributed.deploy import Adaptive
+        return Adaptive(cluster, cluster.scheduler)
+
 
 def cleanup_pods(namespace, worker_labels):
     api = client.CoreV1Api()
@@ -220,6 +272,22 @@ def _update_worker_label(worker_ref, scheduler_ref):
         else:
             return
         yield gen.sleep(0.5)
+
+
+def _namespace_default():
+    """
+    Get current namespace if running in a k8s cluster
+
+    If not in a k8s cluster with service accounts enabled, default to
+    'default'
+
+    Taken from https://github.com/jupyterhub/kubespawner/blob/master/kubespawner/spawner.py#L125
+    """
+    ns_path = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'
+    if os.path.exists(ns_path):
+        with open(ns_path) as f:
+            return f.read().strip()
+    return 'default'
 
 
 def main():

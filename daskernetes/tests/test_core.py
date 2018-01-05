@@ -1,3 +1,4 @@
+import getpass
 from time import sleep, time
 
 import pytest
@@ -54,3 +55,25 @@ def test_ipython_display(loop):
         while workers.value == 0:
             assert time() < start + 10
             sleep(0.5)
+
+
+def test_namespace(loop):
+    with KubeCluster(loop=loop) as cluster:
+        assert 'dask' in cluster.name
+        assert getpass.getuser() in cluster.name
+        with KubeCluster(loop=loop, port=0) as cluster2:
+            assert cluster.name != cluster2.name
+
+
+def test_adapt(loop):
+    with KubeCluster(loop=loop) as cluster:
+        cluster.adapt()
+        with Client(cluster) as client:
+            future = client.submit(inc, 10)
+            result = future.result()
+            assert result == 11
+
+        start = time()
+        while cluster.scheduler.workers:
+            sleep(0.1)
+            assert time() < start + 10
