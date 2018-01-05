@@ -235,7 +235,7 @@ class KubeCluster(object):
         http://distributed.readthedocs.io/en/latest/adaptive.html
         """
         from distributed.deploy import Adaptive
-        return Adaptive(cluster, cluster.scheduler)
+        return Adaptive(self.scheduler, self)
 
 
 def cleanup_pods(namespace, worker_labels):
