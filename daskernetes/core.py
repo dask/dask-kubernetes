@@ -1,7 +1,8 @@
 import logging
+import os
 import socket
-import argparse
 from urllib.parse import urlparse
+import uuid
 from weakref import finalize, ref
 
 from tornado import gen
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 class KubeCluster(object):
     def __init__(
             self,
-            name='dask',
-            namespace='dask',
+            name=None,
+            namespace=None,
             worker_image='daskdev/dask:latest',
             worker_labels=None,
             n_workers=0,
@@ -38,8 +39,14 @@ class KubeCluster(object):
 
         self.api = client.CoreV1Api()
 
+        if namespace is None:
+            namespace = _namespace_default()
+
+        if name is None:
+            name = 'dask-%s-%s' % (os.environ['USER'], str(uuid.uuid4())[:10])
+
         self.namespace = namespace
-        self.name = name  # TODO: should this be unique by default?
+        self.name = name
         self.worker_image = worker_image
         self.worker_labels = (worker_labels or {}).copy()
         self.threads_per_worker = threads_per_worker
@@ -220,6 +227,22 @@ def _update_worker_label(worker_ref, scheduler_ref):
         else:
             return
         yield gen.sleep(0.5)
+
+
+def _namespace_default():
+    """
+    Get current namespace if running in a k8s cluster
+
+    If not in a k8s cluster with service accounts enabled, default to
+    'default'
+
+    Taken from https://github.com/jupyterhub/kubespawner/blob/master/kubespawner/spawner.py#L125
+    """
+    ns_path = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'
+    if os.path.exists(ns_path):
+        with open(ns_path) as f:
+            return f.read().strip()
+    return 'default'
 
 
 def main():

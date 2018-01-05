@@ -1,3 +1,4 @@
+import os
 from time import sleep, time
 
 import pytest
@@ -54,3 +55,11 @@ def test_ipython_display(loop):
         while workers.value == 0:
             assert time() < start + 10
             sleep(0.5)
+
+
+def test_namespace(loop):
+    with KubeCluster(loop=loop) as cluster:
+        assert 'dask' in cluster.name
+        assert os.environ['USER'] in cluster.name
+        with KubeCluster(loop=loop, port=0) as cluster2:
+            assert cluster.name != cluster2.name
