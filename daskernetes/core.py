@@ -16,6 +16,39 @@ logger = logging.getLogger(__name__)
 
 
 class KubeCluster(object):
+    """ Launch a Dask cluster on Kubernetes
+
+    This enables dynamically launching Dask workers on a Kubernetes cluster.
+    It starts a dask scheduler in this local process and dynamically creates
+    worker pods with Kubernetes.
+
+    Parameters
+    ----------
+    name: str
+        Name given to the pods.  Defaults to ``dask-user-random``
+    namespace: str
+        Namespace in which to launch the workers.  Defaults to current
+        namespace if available or "default"
+    worker_image: str
+        Docker image and tag
+    worker_labels: dict
+        Additional labels to add to pod
+    n_workers: int
+        Number of workers on initial launch.  Use ``scale_up`` in the future
+    threads_per_worker: int
+    host: str
+        Listen address for local scheduler.  Defaults to 0.0.0.0
+    port: int
+        Port of local scheduler
+    **kwargs: dict
+        Additional keyword arguments to pass to LocalCluster
+
+    Examples
+    --------
+    >>> from daskernetes import KubeCluster
+    >>> cluster = KubeCluster()
+    >>> cluster.scale_up(10)
+    """
     def __init__(
             self,
             name=None,
