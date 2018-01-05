@@ -1,3 +1,4 @@
+import getpass
 import logging
 import os
 import socket
@@ -79,7 +80,7 @@ class KubeCluster(object):
             namespace = _namespace_default()
 
         if name is None:
-            name = 'dask-%s-%s' % (os.environ['USER'], str(uuid.uuid4())[:10])
+            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
 
         self.namespace = namespace
         self.name = name
