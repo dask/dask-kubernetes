@@ -2,6 +2,7 @@ import logging
 import socket
 import argparse
 from urllib.parse import urlparse
+import uuid
 from weakref import finalize, ref
 
 from tornado import gen
@@ -18,13 +19,14 @@ class KubeCluster(object):
     def __init__(
             self,
             name='dask',
-            namespace='dask',
+            namespace=True,
             worker_image='daskdev/dask:latest',
             worker_labels=None,
             n_workers=0,
             threads_per_worker=1,
             host='0.0.0.0',
             port=8786,
+            create_namespace=True,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
@@ -37,6 +39,23 @@ class KubeCluster(object):
             config.load_kube_config()
 
         self.api = client.CoreV1Api()
+
+        if namespace is True:
+            namespace = 'dask-' + str(uuid.uuid4())
+
+        self._created_namespace = False
+        if not any(ns.metadata.name == namespace for ns in
+                   self.api.list_namespace().items):
+            if create_namespace:
+                ns = client.V1Namespace(
+                        spec=client.V1NamespaceSpec(),
+                        metadata=client.V1ObjectMeta(name=namespace)
+                    )
+                self.api.create_namespace(ns)
+                finalize(self, _delete_namespace, namespace)
+                self._created_namespace = True
+            else:
+                raise ValueError("Namespace %s not found" % namespace)
 
         self.namespace = namespace
         self.name = name  # TODO: should this be unique by default?
@@ -62,7 +81,7 @@ class KubeCluster(object):
             return self._cached_widget
         import ipywidgets
         layout = ipywidgets.Layout(width='150px')
-        n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
+        n_workers = ipywidgets.IntText(len(self.pods()), description='Workers', layout=layout)
         threads = ipywidgets.IntText(1, description='Cores', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
@@ -175,11 +194,13 @@ class KubeCluster(object):
         return self
 
     def close(self):
-        self.scale_down(self.cluster.scheduler.workers)
+        cleanup_pods(self.namespace, self.worker_labels)
         self.cluster.close()
+        if self._created_namespace:
+            _delete_namespace(self.namespace)
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.worker_labels)
+        self.close()
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
@@ -220,6 +241,16 @@ def _update_worker_label(worker_ref, scheduler_ref):
         else:
             return
         yield gen.sleep(0.5)
+
+
+def _delete_namespace(ns):
+    """ Delete a Kubernetes namespace
+
+    Parameters
+    ----------
+    ns: str
+    """
+    client.CoreV1Api().delete_namespace(ns, body=client.V1DeleteOptions())
 
 
 def main():
