@@ -159,15 +159,12 @@ class KubeCluster(object):
         import ipywidgets
         layout = ipywidgets.Layout(width='150px')
         n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
-        threads = ipywidgets.IntText(1, description='Cores', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
-        box = ipywidgets.HBox([ipywidgets.VBox([n_workers, threads]),
-                               ipywidgets.VBox([button, actual])])
+        box = ipywidgets.VBox([n_workers, actual, button])
         self._cached_widget = box
 
         def cb(b):
-            self.threads_per_worker = threads.value
             n = n_workers.value
             self.scale_up(n)
 
