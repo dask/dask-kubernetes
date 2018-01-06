@@ -88,7 +88,7 @@ class KubeCluster(object):
             labels=None,
             n_workers=0,
             host='0.0.0.0',
-            port=8786,
+            port=0,
             env={},
             **kwargs,
     ):
