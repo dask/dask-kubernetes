@@ -5,15 +5,24 @@ import socket
 from urllib.parse import urlparse
 import uuid
 from weakref import finalize, ref
+import yaml
 
 from tornado import gen
 from tornado.ioloop import IOLoop
 
 from distributed import Client
 from distributed.deploy import LocalCluster
-from kubernetes import client, config
+import kubernetes
+from kubernetes import client
 
 logger = logging.getLogger(__name__)
+
+config_fn = os.path.expanduser('~/.daskernetes.yaml')
+if os.path.exists(config_fn):
+    with open(config_fn) as f:
+        config = yaml.load(f)
+else:
+    config = {}
 
 
 def make_worker_spec(image='daskdev/dask:latest',
@@ -100,7 +109,11 @@ class KubeCluster(object):
         self.labels = labels
 
         if worker_spec is None:
-            worker_spec = make_worker_spec()
+            try:
+                worker_spec = config['worker']['spec']
+            except KeyError:
+                worker_spec = make_worker_spec()
+
         worker_spec = deserialize(worker_spec, client.V1PodSpec)
         self.worker_spec = copy_kub(worker_spec)
 
@@ -110,9 +123,9 @@ class KubeCluster(object):
         )
 
         try:
-            config.load_incluster_config()
-        except config.ConfigException:
-            config.load_kube_config()
+            kubernetes.config.load_incluster_config()
+        except kubernetes.config.ConfigException:
+            kubernetes.config.load_kube_config()
 
         self.api = client.CoreV1Api()
 
@@ -374,4 +387,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

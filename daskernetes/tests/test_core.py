@@ -4,6 +4,7 @@ from time import sleep, time
 import yaml
 
 import pytest
+import daskernetes
 from daskernetes import KubeCluster
 from daskernetes.core import deserialize
 from dask.distributed import Client
@@ -119,3 +120,17 @@ def test_deserialize():
         pod3 = deserialize(fn, client.V1Pod)
         assert type(pod3) == type(pod)
         assert pod3.to_dict() == pod.to_dict()
+
+
+def test_config(loop):
+    spec = client.V1PodSpec(containers=[
+                client.V1Container(
+                    name='dask-worker',
+                    image='foo:latest')
+                ])
+    if 'worker' not in daskernetes.config:
+        daskernetes.config['worker'] = {}
+    daskernetes.config['worker']['spec'] = spec.to_dict()
+
+    with KubeCluster(loop=loop) as cluster:
+        assert cluster.worker_spec.containers[0].image == 'foo:latest'
