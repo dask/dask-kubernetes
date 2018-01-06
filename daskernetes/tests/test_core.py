@@ -6,7 +6,7 @@ import yaml
 import pytest
 import daskernetes
 from daskernetes import KubeCluster
-from daskernetes.core import deserialize
+from daskernetes.core import deserialize, deserialize_pod_spec
 from dask.distributed import Client
 from distributed.utils import tmpfile
 from distributed.utils_test import loop, inc
@@ -134,3 +134,23 @@ def test_config(loop):
 
     with KubeCluster(loop=loop) as cluster:
         assert cluster.worker_spec.containers[0].image == 'foo:latest'
+
+
+def test_deserialize_pod_spec_with_security():
+    spec = {
+      'containers': [
+        {'args': ['dask-worker', '--nthreads', '1', '--no-bokeh'],
+         'env': [{'name': 'EXTRA_PIP_PACKAGES',
+                  'value': 'git+https://github.com/dask/distributed'}],
+         'image': 'daskdev/pangeo-worker:latest',
+                  'name': 'dask-worker',
+         'security_context': {'capabilities': {'add': ['SYS_ADMIN']},
+                              'privileged': True},
+         'volume_mounts': [{'mountPath': '/dev/fuse', 'name': 'fuse'}]}
+        ],
+      'restart_policy': 'Never'
+    }
+    k_spec = deserialize_pod_spec(spec)
+    spec2 = k_spec.to_dict()
+    assert spec2['containers'][0]['security_context']['privileged']
+

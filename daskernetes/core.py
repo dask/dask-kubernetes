@@ -114,7 +114,7 @@ class KubeCluster(object):
             except KeyError:
                 worker_spec = make_worker_spec()
 
-        worker_spec = deserialize(worker_spec, client.V1PodSpec)
+        worker_spec = deserialize_pod_spec(worker_spec)
         self.worker_spec = copy_kub(worker_spec)
 
         self.worker_meta = client.V1ObjectMeta(
@@ -357,6 +357,16 @@ def deserialize(x, cls):
     if isinstance(x, dict):
         x = client.ApiClient().deserialize(_FakeResponse(x), cls)
     return x
+
+
+def deserialize_pod_spec(x):
+    """ Special version of deserialize that handles special cases """
+    spec = deserialize(x, client.V1PodSpec)
+    if isinstance(x, dict):
+        for c, spec_c in zip(x['containers'], spec.containers):
+            if c.get('security_context'):
+                spec_c.security_context = deserialize(c['security_context'], client.V1SecurityContext)
+    return spec
 
 
 def copy_kub(obj):
