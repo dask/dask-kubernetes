@@ -1,11 +1,16 @@
 import getpass
 import os
 from time import sleep, time
+import yaml
 
 import pytest
 from daskernetes import KubeCluster
+from daskernetes.core import deserialize_pod
 from dask.distributed import Client
+from distributed.utils import tmpfile
 from distributed.utils_test import loop, inc
+
+from kubernetes import client
 
 
 def test_basic(loop):
@@ -88,3 +93,29 @@ def test_env(loop):
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v['ABC'] == 'DEF' for v in env.values())
+
+
+def test_deserialize_pod():
+    pod = client.V1Pod(
+            metadata=client.V1ObjectMeta(name='foo', labels={}),
+            spec=client.V1PodSpec(containers=[
+                client.V1Container(
+                    name='dask-worker',
+                    image='foo:latest')
+                ])
+    )
+    assert deserialize_pod(pod) is pod
+
+    d = pod.to_dict()
+
+    pod2 = deserialize_pod(d)
+    assert type(pod2) == type(pod)
+    assert pod2.to_dict() == pod.to_dict()
+
+    with tmpfile() as fn:
+        with open(fn, 'w') as f:
+            yaml.dump(d, f)
+
+        pod3 = deserialize_pod(fn)
+        assert type(pod3) == type(pod)
+        assert pod3.to_dict() == pod.to_dict()

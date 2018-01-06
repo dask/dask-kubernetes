@@ -294,6 +294,39 @@ def _namespace_default():
     return 'default'
 
 
+class _FakeResponse(object):
+    """ Kubernetes public API expects a response object """
+    def __init__(self, data):
+        self._data = data
+
+    @property
+    def data(self):
+        import json
+        return json.dumps(self._data)
+
+
+def deserialize_pod(x):
+    """ Deserialize object to a Kubernetes V1Pod object
+
+    Parameters
+    ----------
+    x: object
+        Either a Pod, a dictionary definition, or a filename to a
+        yaml-deserializable definition.
+
+    Returns
+    -------
+    kubernetes.client.V1Pod
+    """
+    if isinstance(x, str):
+        import yaml
+        with open(x) as f:
+            x = yaml.load(f)
+    if isinstance(x, dict):
+        x = client.ApiClient().deserialize(_FakeResponse(x), client.V1Pod)
+    return x
+
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('name', help='Name of the cluster')
