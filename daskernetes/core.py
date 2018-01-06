@@ -16,6 +16,27 @@ from kubernetes import client, config
 logger = logging.getLogger(__name__)
 
 
+def make_worker_spec(image='daskdev/dask:latest',
+                     threads_per_worker=1,
+                     env={}):
+    return client.V1PodSpec(
+        restart_policy='Never',
+        containers=[
+            client.V1Container(
+                name='dask-worker',
+                image=image,
+                args=[
+                    'dask-worker',
+                    '--nthreads', str(threads_per_worker),
+                    '--no-bokeh',
+                ],
+                env=[client.V1EnvVar(name=k, value=v)
+                     for k, v in env.items()],
+            )
+        ]
+    )
+
+
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
 
@@ -30,13 +51,10 @@ class KubeCluster(object):
     namespace: str
         Namespace in which to launch the workers.  Defaults to current
         namespace if available or "default"
-    worker_image: str
-        Docker image and tag
-    worker_labels: dict
+    labels: dict
         Additional labels to add to pod
     n_workers: int
         Number of workers on initial launch.  Use ``scale_up`` in the future
-    threads_per_worker: int
     host: str
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
@@ -55,20 +73,41 @@ class KubeCluster(object):
     """
     def __init__(
             self,
+            worker_spec=None,
             name=None,
             namespace=None,
-            worker_image='daskdev/dask:latest',
-            worker_labels=None,
+            labels=None,
             n_workers=0,
-            threads_per_worker=1,
             host='0.0.0.0',
             port=8786,
             env={},
             **kwargs,
     ):
-        self.cluster = LocalCluster(ip=host or socket.gethostname(),
-                                    scheduler_port=port,
-                                    n_workers=0, **kwargs)
+        if namespace is None:
+            namespace = _namespace_default()
+        self.namespace = namespace
+
+        if name is None:
+            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
+
+        labels = dict(labels or {})
+        env = dict(env)
+
+        # Default labels that can't be overwritten
+        labels['org.pydata.dask/cluster-name'] = name
+        labels['app'] = 'dask'
+        labels['component'] = 'dask-worker'
+        self.labels = labels
+
+        if worker_spec is None:
+            worker_spec = make_worker_spec()
+        worker_spec = deserialize(worker_spec, client.V1PodSpec)
+        self.worker_spec = copy_kub(worker_spec)
+
+        self.worker_meta = client.V1ObjectMeta(
+                generate_name=name + '-',
+                labels=labels
+        )
 
         try:
             config.load_incluster_config()
@@ -77,30 +116,28 @@ class KubeCluster(object):
 
         self.api = client.CoreV1Api()
 
-        if namespace is None:
-            namespace = _namespace_default()
+        self.cluster = LocalCluster(ip=host or socket.gethostname(),
+                                    scheduler_port=port,
+                                    n_workers=0, **kwargs)
 
-        if name is None:
-            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
+        # update env
+        env['DASK_SCHEDULER_ADDRESS'] = self.cluster.scheduler.address
+        for container in self.worker_spec.containers:
+            if container.env is None:
+                container.env = []
+            for k, v in env.items():
+                container.env.append(client.V1EnvVar(name=k, value=v))
 
-        self.namespace = namespace
-        self.name = name
-        self.worker_image = worker_image
-        self.worker_labels = (worker_labels or {}).copy()
-        self.threads_per_worker = threads_per_worker
-        self.env = dict(env)
-
-        # Default labels that can't be overwritten
-        self.worker_labels['org.pydata.dask/cluster-name'] = name
-        self.worker_labels['app'] = 'dask'
-        self.worker_labels['component'] = 'dask-worker'
-
-        finalize(self, cleanup_pods, self.namespace, self.worker_labels)
+        finalize(self, cleanup_pods, self.namespace, self.labels)
 
         self._cached_widget = None
 
         if n_workers:
             self.scale_up(n_workers)
+
+    @property
+    def _worker_pod(self):
+        return client.V1Pod(metadata=self.worker_meta, spec=self.worker_spec)
 
     def _widget(self):
         """ Create IPython widget for display within a notebook """
@@ -141,34 +178,10 @@ class KubeCluster(object):
     def scheduler_address(self):
         return self.scheduler.address
 
-    def _make_pod(self):
-        return client.V1Pod(
-            metadata=client.V1ObjectMeta(
-                generate_name=self.name + '-',
-                labels=self.worker_labels
-            ),
-            spec=client.V1PodSpec(
-                restart_policy='Never',
-                containers=[
-                    client.V1Container(
-                        name='dask-worker',
-                        image=self.worker_image,
-                        args=[
-                            'dask-worker',
-                            self.scheduler_address,
-                            '--nthreads', str(self.threads_per_worker),
-                        ],
-                        env=[client.V1EnvVar(name=k, value=v)
-                             for k, v in self.env.items()],
-                    )
-                ]
-            )
-        )
-
     def pods(self):
         return self.api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.worker_labels)
+            label_selector=format_labels(self.labels)
         ).items
 
     def logs(self, pod):
@@ -181,7 +194,7 @@ class KubeCluster(object):
         """
         pods = self.pods()
 
-        out = [self.api.create_namespaced_pod(self.namespace, self._make_pod())
+        out = [self.api.create_namespaced_pod(self.namespace, self._worker_pod)
                for _ in range(n - len(pods))]
 
         return out
@@ -227,7 +240,7 @@ class KubeCluster(object):
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.worker_labels)
+        cleanup_pods(self.namespace, self.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
@@ -242,9 +255,9 @@ class KubeCluster(object):
         return Adaptive(self.scheduler, self)
 
 
-def cleanup_pods(namespace, worker_labels):
+def cleanup_pods(namespace, labels):
     api = client.CoreV1Api()
-    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(worker_labels))
+    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(pod.metadata.name, namespace,
@@ -305,14 +318,20 @@ class _FakeResponse(object):
         return json.dumps(self._data)
 
 
-def deserialize_pod(x):
-    """ Deserialize object to a Kubernetes V1Pod object
+def deserialize(x, cls):
+    """ Deserialize object to a Kubernetes object
 
     Parameters
     ----------
     x: object
         Either a Pod, a dictionary definition, or a filename to a
         yaml-deserializable definition.
+    cls: type
+        kubernetes.client type like V1PodSpec
+
+    Examples
+    --------
+    >>> deserialize({...}, client.V1PodSpec)
 
     Returns
     -------
@@ -323,8 +342,12 @@ def deserialize_pod(x):
         with open(x) as f:
             x = yaml.load(f)
     if isinstance(x, dict):
-        x = client.ApiClient().deserialize(_FakeResponse(x), client.V1Pod)
+        x = client.ApiClient().deserialize(_FakeResponse(x), cls)
     return x
+
+
+def copy_kub(obj):
+    return deserialize(obj.to_dict(), type(obj))
 
 
 def main():
@@ -351,3 +374,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

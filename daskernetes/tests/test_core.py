@@ -5,7 +5,7 @@ import yaml
 
 import pytest
 from daskernetes import KubeCluster
-from daskernetes.core import deserialize_pod
+from daskernetes.core import deserialize
 from dask.distributed import Client
 from distributed.utils import tmpfile
 from distributed.utils_test import loop, inc
@@ -95,7 +95,7 @@ def test_env(loop):
             assert all(v['ABC'] == 'DEF' for v in env.values())
 
 
-def test_deserialize_pod():
+def test_deserialize():
     pod = client.V1Pod(
             metadata=client.V1ObjectMeta(name='foo', labels={}),
             spec=client.V1PodSpec(containers=[
@@ -104,11 +104,11 @@ def test_deserialize_pod():
                     image='foo:latest')
                 ])
     )
-    assert deserialize_pod(pod) is pod
+    assert deserialize(pod, client.V1Pod) is pod
 
     d = pod.to_dict()
 
-    pod2 = deserialize_pod(d)
+    pod2 = deserialize(d, client.V1Pod)
     assert type(pod2) == type(pod)
     assert pod2.to_dict() == pod.to_dict()
 
@@ -116,6 +116,6 @@ def test_deserialize_pod():
         with open(fn, 'w') as f:
             yaml.dump(d, f)
 
-        pod3 = deserialize_pod(fn)
+        pod3 = deserialize(fn, client.V1Pod)
         assert type(pod3) == type(pod)
         assert pod3.to_dict() == pod.to_dict()
