@@ -63,6 +63,7 @@ class KubeCluster(object):
             threads_per_worker=1,
             host='0.0.0.0',
             port=8786,
+            env={},
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
@@ -87,6 +88,7 @@ class KubeCluster(object):
         self.worker_image = worker_image
         self.worker_labels = (worker_labels or {}).copy()
         self.threads_per_worker = threads_per_worker
+        self.env = dict(env)
 
         # Default labels that can't be overwritten
         self.worker_labels['org.pydata.dask/cluster-name'] = name
@@ -155,7 +157,9 @@ class KubeCluster(object):
                             'dask-worker',
                             self.scheduler_address,
                             '--nthreads', str(self.threads_per_worker),
-                        ]
+                        ],
+                        env=[client.V1EnvVar(name=k, value=v)
+                             for k, v in self.env.items()],
                     )
                 ]
             )

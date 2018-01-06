@@ -1,4 +1,5 @@
 import getpass
+import os
 from time import sleep, time
 
 import pytest
@@ -77,3 +78,13 @@ def test_adapt(loop):
         while cluster.scheduler.workers:
             sleep(0.1)
             assert time() < start + 10
+
+
+def test_env(loop):
+    with KubeCluster(loop=loop, env={'ABC': 'DEF'}) as cluster:
+        cluster.scale_up(1)
+        with Client(cluster) as client:
+            while not cluster.scheduler.workers:
+                sleep(0.1)
+            env = client.run(lambda: dict(os.environ))
+            assert all(v['ABC'] == 'DEF' for v in env.values())
