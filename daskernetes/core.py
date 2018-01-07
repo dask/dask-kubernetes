@@ -158,10 +158,17 @@ class KubeCluster(object):
             return self._cached_widget
         import ipywidgets
         layout = ipywidgets.Layout(width='150px')
+
+        # Construct Bokeh dashboard link
+        # TODO: this currently assumes running within JupyterHub
+        # TODO: this code is entirely untested
+        link = '%sproxy/%d/status' % (os.environ['JUPYTERHUB_SERVICE_PREFIX'],
+                                      self.scheduler.services['bokeh'].port)
+        link = ipywidgets.HTML('<b>Dashboard:</b> <a href="%s" target="_blank">%s</a>' % (link, link))
         n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
-        box = ipywidgets.VBox([n_workers, actual, button])
+        box = ipywidgets.VBox([link, n_workers, actual, button])
         self._cached_widget = box
 
         def cb(b):
