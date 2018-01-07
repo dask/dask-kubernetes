@@ -153,4 +153,4 @@ def test_deserialize_pod_spec_with_security():
     k_spec = deserialize_pod_spec(spec)
     spec2 = k_spec.to_dict()
     assert spec2['containers'][0]['security_context']['privileged']
-
+    assert spec2['restart_policy'] == 'Never'

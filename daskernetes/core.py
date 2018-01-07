@@ -363,6 +363,7 @@ def deserialize_pod_spec(x):
         for c, spec_c in zip(x['containers'], spec.containers):
             if c.get('security_context'):
                 spec_c.security_context = deserialize(c['security_context'], client.V1SecurityContext)
+    spec.restart_policy = x['restart_policy']
     return spec
 
 
