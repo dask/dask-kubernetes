@@ -115,7 +115,7 @@ class KubeCluster(object):
                 worker_spec = make_worker_spec()
 
         worker_spec = deserialize_pod_spec(worker_spec)
-        self.worker_spec = copy_kub(worker_spec)
+        self.worker_spec = worker_spec
 
         self.worker_meta = client.V1ObjectMeta(
                 generate_name=name + '-',
