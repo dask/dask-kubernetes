@@ -1,11 +1,17 @@
 import getpass
 import os
 from time import sleep, time
+import yaml
 
 import pytest
+import daskernetes
 from daskernetes import KubeCluster
+from daskernetes.core import deserialize, deserialize_pod_spec
 from dask.distributed import Client
+from distributed.utils import tmpfile
 from distributed.utils_test import loop, inc
+
+from kubernetes import client
 
 
 def test_basic(loop):
@@ -88,3 +94,63 @@ def test_env(loop):
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v['ABC'] == 'DEF' for v in env.values())
+
+
+def test_deserialize():
+    pod = client.V1Pod(
+            metadata=client.V1ObjectMeta(name='foo', labels={}),
+            spec=client.V1PodSpec(containers=[
+                client.V1Container(
+                    name='dask-worker',
+                    image='foo:latest')
+                ])
+    )
+    assert deserialize(pod, client.V1Pod) is pod
+
+    d = pod.to_dict()
+
+    pod2 = deserialize(d, client.V1Pod)
+    assert type(pod2) == type(pod)
+    assert pod2.to_dict() == pod.to_dict()
+
+    with tmpfile() as fn:
+        with open(fn, 'w') as f:
+            yaml.dump(d, f)
+
+        pod3 = deserialize(fn, client.V1Pod)
+        assert type(pod3) == type(pod)
+        assert pod3.to_dict() == pod.to_dict()
+
+
+def test_config(loop):
+    spec = client.V1PodSpec(containers=[
+                client.V1Container(
+                    name='dask-worker',
+                    image='foo:latest')
+                ])
+    if 'worker' not in daskernetes.config:
+        daskernetes.config['worker'] = {}
+    daskernetes.config['worker']['spec'] = spec.to_dict()
+
+    with KubeCluster(loop=loop) as cluster:
+        assert cluster.worker_spec.containers[0].image == 'foo:latest'
+
+
+def test_deserialize_pod_spec_with_security():
+    spec = {
+      'containers': [
+        {'args': ['dask-worker', '--nthreads', '1', '--no-bokeh'],
+         'env': [{'name': 'EXTRA_PIP_PACKAGES',
+                  'value': 'git+https://github.com/dask/distributed'}],
+         'image': 'daskdev/pangeo-worker:latest',
+                  'name': 'dask-worker',
+         'security_context': {'capabilities': {'add': ['SYS_ADMIN']},
+                              'privileged': True},
+         'volume_mounts': [{'mountPath': '/dev/fuse', 'name': 'fuse'}]}
+        ],
+      'restart_policy': 'Never'
+    }
+    k_spec = deserialize_pod_spec(spec)
+    spec2 = k_spec.to_dict()
+    assert spec2['containers'][0]['security_context']['privileged']
+    assert spec2['restart_policy'] == 'Never'
