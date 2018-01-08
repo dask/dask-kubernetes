@@ -165,7 +165,7 @@ class KubeCluster(object):
         link = '%sproxy/%d/status' % (os.environ['JUPYTERHUB_SERVICE_PREFIX'],
                                       self.scheduler.services['bokeh'].port)
         link = ipywidgets.HTML('<b>Dashboard:</b> <a href="%s" target="_blank">%s</a>' % (link, link))
-        n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
+        n_workers = ipywidgets.IntText(0, description='Requested', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
         box = ipywidgets.VBox([link, n_workers, actual, button])
