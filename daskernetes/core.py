@@ -53,9 +53,9 @@ class KubeCluster(object):
     namespace: str
         Namespace in which to launch the workers.  Defaults to current
         namespace if available or "default"
-    worker_image: str
+    image: str
         Docker image and tag
-    worker_labels: dict
+    labels: dict
         Additional labels to add to pod
     n_workers: int
         Number of workers on initial launch.  Use ``scale_up`` in the future
@@ -80,8 +80,8 @@ class KubeCluster(object):
             self,
             name=None,
             namespace=None,
-            worker_image='daskdev/dask:latest',
-            worker_labels=None,
+            image='daskdev/dask:latest',
+            labels=None,
             n_workers=0,
             threads_per_worker=1,
             host='0.0.0.0',
@@ -110,19 +110,19 @@ class KubeCluster(object):
 
         self.namespace = namespace
         self.name = name
-        self.worker_image = worker_image
-        self.worker_labels = (worker_labels or {}).copy()
+        self.image = image
+        self.labels = (labels or {}).copy()
         self.threads_per_worker = threads_per_worker
         self.env = dict(env)
         self.extra_pod_config = extra_pod_config
         self.extra_container_config = extra_container_config
 
         # Default labels that can't be overwritten
-        self.worker_labels['org.pydata.dask/cluster-name'] = name
-        self.worker_labels['app'] = 'dask'
-        self.worker_labels['component'] = 'dask-worker'
+        self.labels['org.pydata.dask/cluster-name'] = name
+        self.labels['app'] = 'dask'
+        self.labels['component'] = 'dask-worker'
 
-        finalize(self, cleanup_pods, self.namespace, self.worker_labels)
+        finalize(self, cleanup_pods, self.namespace, self.labels)
 
         self._cached_widget = None
 
@@ -172,14 +172,14 @@ class KubeCluster(object):
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 generate_name=self.name + '-',
-                labels=self.worker_labels
+                labels=self.labels
             ),
             spec=client.V1PodSpec(
                 restart_policy='Never',
                 containers=[
                     client.V1Container(
                         name='dask-worker',
-                        image=self.worker_image,
+                        image=self.image,
                         args=[
                             'dask-worker',
                             self.scheduler_address,
@@ -258,7 +258,7 @@ class KubeCluster(object):
     def pods(self):
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.worker_labels)
+            label_selector=format_labels(self.labels)
         ).items
 
     def logs(self, pod):
@@ -319,7 +319,7 @@ class KubeCluster(object):
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.worker_labels)
+        cleanup_pods(self.namespace, self.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
@@ -334,9 +334,9 @@ class KubeCluster(object):
         return Adaptive(self.scheduler, self)
 
 
-def cleanup_pods(namespace, worker_labels):
+def cleanup_pods(namespace, labels):
     api = client.CoreV1Api()
-    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(worker_labels))
+    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(pod.metadata.name, namespace,
