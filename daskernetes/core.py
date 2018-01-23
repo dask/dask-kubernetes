@@ -62,7 +62,7 @@ class KubeCluster(object):
             n_workers=0,
             threads_per_worker=1,
             host='0.0.0.0',
-            port=8786,
+            port=0,
             env={},
             **kwargs,
     ):
@@ -91,7 +91,7 @@ class KubeCluster(object):
         self.env = dict(env)
 
         # Default labels that can't be overwritten
-        self.worker_labels['org.pydata.dask/cluster-name'] = name
+        self.worker_labels['dask.pydata.org/cluster-name'] = name
         self.worker_labels['app'] = 'dask'
         self.worker_labels['component'] = 'dask-worker'
 
