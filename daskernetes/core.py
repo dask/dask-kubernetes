@@ -138,7 +138,7 @@ class KubeCluster(object):
         self.extra_container_config = extra_container_config
 
         # Default labels that can't be overwritten
-        self.labels['org.pydata.dask/cluster-name'] = name
+        self.labels['dask.pydata.org/cluster-name'] = name
         self.labels['app'] = 'dask'
         self.labels['component'] = 'dask-worker'
 
