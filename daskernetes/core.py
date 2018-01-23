@@ -15,6 +15,29 @@ from kubernetes import client, config
 
 logger = logging.getLogger(__name__)
 
+def merge_dictionaries(a, b, path=None, update=True):
+    """
+    Merge two dictionaries recursively.
+
+    From https://stackoverflow.com/a/25270947
+    """
+    if path is None: path = []
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key], path + [str(key)])
+            elif a[key] == b[key]:
+                pass # same leaf value
+            elif isinstance(a[key], list) and isinstance(b[key], list):
+                for idx, val in enumerate(b[key]):
+                    a[key][idx] = merge(a[key][idx], b[key][idx], path + [str(key), str(idx)], update=update)
+            elif update:
+                a[key] = b[key]
+            else:
+                raise Exception('Conflict at %s' % '.'.join(path + [str(key)]))
+        else:
+            a[key] = b[key]
+    return a
 
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
@@ -64,6 +87,8 @@ class KubeCluster(object):
             host='0.0.0.0',
             port=8786,
             env={},
+            extra_container_config={},
+            extra_pod_config={},
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
@@ -75,7 +100,7 @@ class KubeCluster(object):
         except config.ConfigException:
             config.load_kube_config()
 
-        self.api = client.CoreV1Api()
+        self.core_api = client.CoreV1Api()
 
         if namespace is None:
             namespace = _namespace_default()
@@ -89,6 +114,8 @@ class KubeCluster(object):
         self.worker_labels = (worker_labels or {}).copy()
         self.threads_per_worker = threads_per_worker
         self.env = dict(env)
+        self.extra_pod_config = extra_pod_config
+        self.extra_container_config = extra_container_config
 
         # Default labels that can't be overwritten
         self.worker_labels['org.pydata.dask/cluster-name'] = name
@@ -142,7 +169,7 @@ class KubeCluster(object):
         return self.scheduler.address
 
     def _make_pod(self):
-        return client.V1Pod(
+        pod = client.V1Pod(
             metadata=client.V1ObjectMeta(
                 generate_name=self.name + '-',
                 labels=self.worker_labels
@@ -165,15 +192,78 @@ class KubeCluster(object):
             )
         )
 
+        for key, value in self.extra_container_config.items():
+            self._set_k8s_attribute(
+                pod.spec.containers[0],
+                key,
+                value
+            )
+
+        for key, value in self.extra_pod_config.items():
+            self._set_k8s_attribute(
+                pod.spec,
+                key,
+                value
+            )
+        return pod
+
+    def _set_k8s_attribute(self, obj, attribute, value):
+        """
+        Set a specific value on a kubernetes object's attribute
+
+        obj
+          an object from Kubernetes Python API client
+        attribute
+          Either be name of a python client class attribute (api_client)
+          or attribute name from JSON Kubernetes API (apiClient)
+        value
+          Can be anything (string, list, dict, k8s objects) that can be
+          accepted by the k8s python client
+        """
+        # FIXME: We should be doing a recursive merge here
+
+        current_value = None
+        attribute_name = None
+        # All k8s python client objects have an 'attribute_map' property
+        # which has as keys python style attribute names (api_client)
+        # and as values the kubernetes JSON API style attribute names
+        # (apiClient). We want to allow this to use either.
+        for python_attribute, json_attribute in obj.attribute_map.items():
+            if json_attribute == attribute or python_attribute == attribute:
+                attribute_name = python_attribute
+                break
+        else:
+            raise ValueError('Attribute must be one of {}'.format(obj.attribute_map.values()))
+
+        if hasattr(obj, attribute_name):
+            current_value = getattr(obj, python_attribute)
+
+        if current_value is not None:
+            # This will ensure that current_value is something JSONable,
+            # so a dict, list, or scalar
+            current_value = self.core_api.api_client.sanitize_for_serialization(
+                current_value
+            )
+
+        if isinstance(current_value, dict):
+            # Deep merge our dictionaries!
+            setattr(obj, attribute_name, merge_dictionaries(current_value, value))
+        elif isinstance(current_value, list):
+            # Just append lists
+            setattr(obj, attribute_name, current_value + value)
+        else:
+            # Replace everything else
+            setattr(obj, attribute_name, value)
+
     def pods(self):
-        return self.api.list_namespaced_pod(
+        return self.core_api.list_namespaced_pod(
             self.namespace,
             label_selector=format_labels(self.worker_labels)
         ).items
 
     def logs(self, pod):
-        return self.api.read_namespaced_pod_log(pod.metadata.name,
-                                                pod.metadata.namespace)
+        return self.core_api.read_namespaced_pod_log(pod.metadata.name,
+                                                     pod.metadata.namespace)
 
     def scale_up(self, n, **kwargs):
         """
@@ -181,8 +271,10 @@ class KubeCluster(object):
         """
         pods = self.pods()
 
-        out = [self.api.create_namespaced_pod(self.namespace, self._make_pod())
-               for _ in range(n - len(pods))]
+        out = [
+            self.core_api.create_namespaced_pod(self.namespace, self._make_pod())
+            for _ in range(n - len(pods))
+        ]
 
         return out
         # fixme: wait for this to be ready before returning!
@@ -208,7 +300,7 @@ class KubeCluster(object):
             return
         for pod in to_delete:
             try:
-                self.api.delete_namespaced_pod(
+                self.core_api.delete_namespaced_pod(
                     pod.metadata.name,
                     self.namespace,
                     client.V1DeleteOptions()
