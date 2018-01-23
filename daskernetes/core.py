@@ -97,7 +97,7 @@ class KubeCluster(object):
             n_workers=0,
             threads_per_worker=1,
             host='0.0.0.0',
-            port=8786,
+            port=0,
             env={},
             extra_container_config={},
             extra_pod_config={},
