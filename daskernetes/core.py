@@ -64,6 +64,18 @@ class KubeCluster(object):
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
         Port of local scheduler
+    extra_container_config: dict
+        Dict of properties to be deep merged into container spec
+    extra_pod_config: dict
+        Dict of properties to be deep merged into the pod spec
+    memory_limit: str
+        Max amount of memory *each* dask worker can use
+    memory_request: str
+        Min amount of memory *each* dask worker should be guaranteed
+    cpu_limit: str
+        Max amount of CPU cores each dask worker can use
+    cpu_request: str
+        Min amount of CPU cores each dask worker should be guaranteed
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -89,6 +101,10 @@ class KubeCluster(object):
             env={},
             extra_container_config={},
             extra_pod_config={},
+            memory_limit=None,
+            memory_request=None,
+            cpu_limit=None,
+            cpu_request=None,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
@@ -114,6 +130,10 @@ class KubeCluster(object):
         self.labels = (labels or {}).copy()
         self.threads_per_worker = threads_per_worker
         self.env = dict(env)
+        self.cpu_limit = cpu_limit
+        self.memory_limit = memory_limit
+        self.cpu_request = cpu_request
+        self.memory_request = memory_request
         self.extra_pod_config = extra_pod_config
         self.extra_container_config = extra_container_config
 
@@ -191,6 +211,21 @@ class KubeCluster(object):
                 ]
             )
         )
+
+
+        resources = client.V1ResourceRequirements(limits={}, requests={})
+
+        if self.cpu_request:
+            resources.requests['cpu'] = self.cpu_request
+        if self.memory_request:
+            resources.requests['memory'] = self.memory_request
+
+        if self.cpu_limit:
+            resources.limits['cpu'] = self.cpu_limit
+        if self.memory_limit:
+            resources.limits['memory'] = self.memory_limit
+
+        pod.spec.containers[0].resources = resources
 
         for key, value in self.extra_container_config.items():
             self._set_k8s_attribute(
