@@ -2,6 +2,7 @@ import getpass
 import logging
 import os
 import socket
+import copy
 from urllib.parse import urlparse
 import uuid
 from weakref import finalize, ref
@@ -15,29 +16,6 @@ from kubernetes import client, config
 
 logger = logging.getLogger(__name__)
 
-def merge_dictionaries(a, b, path=None, update=True):
-    """
-    Merge two dictionaries recursively.
-
-    From https://stackoverflow.com/a/25270947
-    """
-    if path is None: path = []
-    for key in b:
-        if key in a:
-            if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge(a[key], b[key], path + [str(key)])
-            elif a[key] == b[key]:
-                pass # same leaf value
-            elif isinstance(a[key], list) and isinstance(b[key], list):
-                for idx, val in enumerate(b[key]):
-                    a[key][idx] = merge(a[key][idx], b[key][idx], path + [str(key), str(idx)], update=update)
-            elif update:
-                a[key] = b[key]
-            else:
-                raise Exception('Conflict at %s' % '.'.join(path + [str(key)]))
-        else:
-            a[key] = b[key]
-    return a
 
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
@@ -53,10 +31,6 @@ class KubeCluster(object):
     namespace: str
         Namespace in which to launch the workers.  Defaults to current
         namespace if available or "default"
-    image: str
-        Docker image and tag
-    labels: dict
-        Additional labels to add to pod
     n_workers: int
         Number of workers on initial launch.  Use ``scale_up`` in the future
     threads_per_worker: int
@@ -64,18 +38,6 @@ class KubeCluster(object):
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
         Port of local scheduler
-    extra_container_config: dict
-        Dict of properties to be deep merged into container spec
-    extra_pod_config: dict
-        Dict of properties to be deep merged into the pod spec
-    memory_limit: str
-        Max amount of memory *each* dask worker can use
-    memory_request: str
-        Min amount of memory *each* dask worker should be guaranteed
-    cpu_limit: str
-        Max amount of CPU cores each dask worker can use
-    cpu_request: str
-        Min amount of CPU cores each dask worker should be guaranteed
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -90,26 +52,22 @@ class KubeCluster(object):
     """
     def __init__(
             self,
+            worker_pod_template,
             name=None,
             namespace=None,
-            image='daskdev/dask:latest',
-            labels=None,
             n_workers=0,
-            threads_per_worker=1,
             host='0.0.0.0',
             port=0,
-            env={},
-            extra_container_config={},
-            extra_pod_config={},
-            memory_limit=None,
-            memory_request=None,
-            cpu_limit=None,
-            cpu_request=None,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
+        if name is None:
+            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
+
+        self.name = name
+
 
         try:
             config.load_incluster_config()
@@ -126,23 +84,15 @@ class KubeCluster(object):
 
         self.namespace = namespace
         self.name = name
-        self.image = image
-        self.labels = (labels or {}).copy()
-        self.threads_per_worker = threads_per_worker
-        self.env = dict(env)
-        self.cpu_limit = cpu_limit
-        self.memory_limit = memory_limit
-        self.cpu_request = cpu_request
-        self.memory_request = memory_request
-        self.extra_pod_config = extra_pod_config
-        self.extra_container_config = extra_container_config
 
         # Default labels that can't be overwritten
-        self.labels['dask.pydata.org/cluster-name'] = name
-        self.labels['app'] = 'dask'
-        self.labels['component'] = 'dask-worker'
+        worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        worker_pod_template.metadata.labels['app'] = 'dask'
+        worker_pod_template.metadata.labels['component'] = 'dask-worker'
 
-        finalize(self, cleanup_pods, self.namespace, self.labels)
+        self.worker_pod_template = worker_pod_template
+
+        finalize(self, cleanup_pods, self.namespace, worker_pod_template.metadata.labels)
 
         self._cached_widget = None
 
@@ -189,111 +139,18 @@ class KubeCluster(object):
         return self.scheduler.address
 
     def _make_pod(self):
-        pod = client.V1Pod(
-            metadata=client.V1ObjectMeta(
-                generate_name=self.name + '-',
-                labels=self.labels
-            ),
-            spec=client.V1PodSpec(
-                restart_policy='Never',
-                containers=[
-                    client.V1Container(
-                        name='dask-worker',
-                        image=self.image,
-                        args=[
-                            'dask-worker',
-                            self.scheduler_address,
-                            '--nthreads', str(self.threads_per_worker),
-                        ],
-                        env=[client.V1EnvVar(name=k, value=v)
-                             for k, v in self.env.items()],
-                    )
-                ]
-            )
+        pod = copy.deepcopy(self.worker_pod_template)
+        pod.spec.containers[0].env.append(
+            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
         )
-
-
-        resources = client.V1ResourceRequirements(limits={}, requests={})
-
-        if self.cpu_request:
-            resources.requests['cpu'] = self.cpu_request
-        if self.memory_request:
-            resources.requests['memory'] = self.memory_request
-
-        if self.cpu_limit:
-            resources.limits['cpu'] = self.cpu_limit
-        if self.memory_limit:
-            resources.limits['memory'] = self.memory_limit
-
-        pod.spec.containers[0].resources = resources
-
-        for key, value in self.extra_container_config.items():
-            self._set_k8s_attribute(
-                pod.spec.containers[0],
-                key,
-                value
-            )
-
-        for key, value in self.extra_pod_config.items():
-            self._set_k8s_attribute(
-                pod.spec,
-                key,
-                value
-            )
+        pod.metadata.generate_name = self.name
         return pod
 
-    def _set_k8s_attribute(self, obj, attribute, value):
-        """
-        Set a specific value on a kubernetes object's attribute
-
-        obj
-          an object from Kubernetes Python API client
-        attribute
-          Either be name of a python client class attribute (api_client)
-          or attribute name from JSON Kubernetes API (apiClient)
-        value
-          Can be anything (string, list, dict, k8s objects) that can be
-          accepted by the k8s python client
-        """
-        # FIXME: We should be doing a recursive merge here
-
-        current_value = None
-        attribute_name = None
-        # All k8s python client objects have an 'attribute_map' property
-        # which has as keys python style attribute names (api_client)
-        # and as values the kubernetes JSON API style attribute names
-        # (apiClient). We want to allow this to use either.
-        for python_attribute, json_attribute in obj.attribute_map.items():
-            if json_attribute == attribute or python_attribute == attribute:
-                attribute_name = python_attribute
-                break
-        else:
-            raise ValueError('Attribute must be one of {}'.format(obj.attribute_map.values()))
-
-        if hasattr(obj, attribute_name):
-            current_value = getattr(obj, python_attribute)
-
-        if current_value is not None:
-            # This will ensure that current_value is something JSONable,
-            # so a dict, list, or scalar
-            current_value = self.core_api.api_client.sanitize_for_serialization(
-                current_value
-            )
-
-        if isinstance(current_value, dict):
-            # Deep merge our dictionaries!
-            setattr(obj, attribute_name, merge_dictionaries(current_value, value))
-        elif isinstance(current_value, list):
-            # Just append lists
-            setattr(obj, attribute_name, current_value + value)
-        else:
-            # Replace everything else
-            setattr(obj, attribute_name, value)
 
     def pods(self):
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.labels)
+            label_selector=format_labels(self.worker_pod_template.metadata.labels)
         ).items
 
     def logs(self, pod):
@@ -354,7 +211,7 @@ class KubeCluster(object):
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.labels)
+        cleanup_pods(self.namespace, self.worker_pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):

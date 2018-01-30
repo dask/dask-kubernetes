@@ -1,37 +1,44 @@
 import pytest
 from daskernetes import KubeCluster
+from daskernetes.objects import make_pod_spec
 from distributed.utils_test import loop
 
 
-def test_extra_pod_config(loop):
+def test_extra_pod_config(image_name, loop):
     """
     Test that our pod config merging process works fine
     """
     cluster = KubeCluster(
+        make_pod_spec(
+            image_name,
+            extra_pod_config={
+                'automountServiceAccountToken': False
+            }
+        ),
         loop=loop,
         n_workers=0,
-        extra_pod_config={
-            'automountServiceAccountToken': False
-        }
     )
 
     pod = cluster._make_pod()
 
     assert pod.spec.automount_service_account_token == False
 
-def test_extra_container_config(loop):
+def test_extra_container_config(image_name, loop):
     """
     Test that our container config merging process works fine
     """
     cluster = KubeCluster(
+        make_pod_spec(
+            image_name,
+            extra_container_config={
+                'imagePullPolicy': 'IfNotReady',
+                'securityContext': {
+                    'runAsUser': 0
+                }
+            }
+        ),
         loop=loop,
         n_workers=0,
-        extra_container_config={
-            'imagePullPolicy': 'IfNotReady',
-            'securityContext': {
-                'runAsUser': 0
-            }
-        }
     )
 
     pod = cluster._make_pod()
@@ -41,16 +48,19 @@ def test_extra_container_config(loop):
         'runAsUser': 0
     }
 
-def test_container_resources_config(loop):
+def test_container_resources_config(image_name, loop):
     """
     Test container resource requests / limits being set properly
     """
     cluster = KubeCluster(
+        make_pod_spec(
+            image_name,
+            memory_request="1G",
+            memory_limit="2G",
+            cpu_limit="2"
+        ),
         loop=loop,
         n_workers=0,
-        memory_request="1G",
-        memory_limit="2G",
-        cpu_limit="2"
     )
 
     pod = cluster._make_pod()
@@ -60,18 +70,21 @@ def test_container_resources_config(loop):
     assert pod.spec.containers[0].resources.limits['cpu'] == '2'
     assert "cpu" not in pod.spec.containers[0].resources.requests
 
-def test_extra_container_config_merge(loop):
+def test_extra_container_config_merge(image_name, loop):
     """
     Test that our container config merging process works recursively fine
     """
     cluster = KubeCluster(
+        make_pod_spec(
+            image_name,
+            extra_container_config={
+                "env": [ {"name": "BOO", "value": "FOO" } ],
+                "args": ["last-item"]
+            }
+        ),
         loop=loop,
         n_workers=0,
         env={"TEST": "HI"},
-        extra_container_config={
-            "env": [ {"name": "BOO", "value": "FOO" } ],
-            "args": ["last-item"]
-        }
     )
 
     pod = cluster._make_pod()
@@ -84,25 +97,29 @@ def test_extra_container_config_merge(loop):
     assert pod.spec.containers[0].args[-1] == "last-item"
 
 
-def test_extra_container_config_merge(loop):
+def test_extra_container_config_merge(image_name, loop):
     """
     Test that our container config merging process works recursively fine
     """
     cluster = KubeCluster(
+        make_pod_spec(
+            image_name,
+            env={"TEST": "HI"},
+            extra_container_config={
+                "env": [ {"name": "BOO", "value": "FOO" } ],
+                "args": ["last-item"]
+            }
+        ),
         loop=loop,
         n_workers=0,
-        env={"TEST": "HI"},
-        extra_container_config={
-            "env": [ {"name": "BOO", "value": "FOO" } ],
-            "args": ["last-item"]
-        }
     )
 
     pod = cluster._make_pod()
 
-    assert pod.spec.containers[0].env == [
+    for e in [
         { "name": "TEST", "value": "HI"},
         { "name": "BOO", "value": "FOO"}
-    ]
+    ]:
+        assert e in pod.spec.containers[0].env
 
     assert pod.spec.containers[0].args[-1] == "last-item"
