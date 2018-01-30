@@ -140,6 +140,8 @@ class KubeCluster(object):
 
     def _make_pod(self):
         pod = copy.deepcopy(self.worker_pod_template)
+        if pod.spec.containers[0].env is None:
+            pod.spec.containers[0].env = []
         pod.spec.containers[0].env.append(
             client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
         )

@@ -1,4 +1,12 @@
+"""
+Convenience functions for creating pod templates.
+"""
 from kubernetes import client
+import json
+try:
+    import yaml
+except ImportError:
+    yaml = False
 
 def _set_k8s_attribute(obj, attribute, value):
     """
@@ -84,6 +92,9 @@ def make_pod_spec(
         cpu_limit=None,
         cpu_request=None,
 ):
+    """
+    Create a pod template from various parameters passed in.
+    """
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(
             labels=labels
@@ -135,3 +146,22 @@ def make_pod_spec(
             value
         )
     return pod
+
+
+class _FakeResponse:
+    def __init__(self, data):
+        self.data = json.dumps(data)
+def make_pod_from_yaml(filepath):
+    if not yaml:
+        raise ImportError("PyYaml is required to use yaml functionality, please install!")
+
+    apiclient = client.ApiClient()
+    with open(filepath) as f:
+        # FIXME: We can't use the 'deserialize' function since
+        # that expects a response object!
+        pod_template = apiclient.deserialize(
+            _FakeResponse(yaml.safe_load(f)),
+            client.V1Pod
+        )
+
+    return pod_template
