@@ -85,12 +85,11 @@ class KubeCluster(object):
         self.namespace = namespace
         self.name = name
 
+        self.worker_pod_template = copy.deepcopy(worker_pod_template)
         # Default labels that can't be overwritten
-        worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
-        worker_pod_template.metadata.labels['app'] = 'dask'
-        worker_pod_template.metadata.labels['component'] = 'dask-worker'
-
-        self.worker_pod_template = worker_pod_template
+        self.worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        self.worker_pod_template.metadata.labels['app'] = 'dask'
+        self.worker_pod_template.metadata.labels['component'] = 'dask-worker'
 
         finalize(self, cleanup_pods, self.namespace, worker_pod_template.metadata.labels)
 
