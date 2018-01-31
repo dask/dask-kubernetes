@@ -7,6 +7,10 @@ from urllib.parse import urlparse
 import uuid
 from weakref import finalize, ref
 
+try:
+    import yaml
+except ImportError:
+    yaml = False
 from tornado import gen
 from tornado.ioloop import IOLoop
 
@@ -14,7 +18,10 @@ from distributed import Client
 from distributed.deploy import LocalCluster
 from kubernetes import client, config
 
+from daskernetes.objects import make_pod_from_dict
+
 logger = logging.getLogger(__name__)
+
 
 
 class KubeCluster(object):
@@ -97,6 +104,17 @@ class KubeCluster(object):
 
         if n_workers:
             self.scale_up(n_workers)
+
+    @classmethod
+    def from_dict(cls, pod_spec, **kwargs):
+        return cls(make_pod_from_dict(pod_spec), **kwargs)
+
+    @classmethod
+    def from_yaml(cls, yaml_path, **kwargs):
+        if not yaml:
+            raise ImportError("PyYaml is required to use yaml functionality, please install it!")
+        with open(yaml_path) as f:
+            return cls.from_dict(yaml.safe_load(f))
 
     def _widget(self):
         """ Create IPython widget for display within a notebook """

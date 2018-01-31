@@ -1,6 +1,8 @@
 import getpass
 import os
 from time import sleep, time
+import yaml
+import tempfile
 
 import pytest
 from daskernetes import KubeCluster
@@ -89,3 +91,52 @@ def test_env(image_name, loop):
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v['ABC'] == 'DEF' for v in env.values())
+
+def test_pod_from_yaml(image_name, loop):
+    test_yaml = {
+        "kind": "Pod",
+        "metadata": {
+            "labels": {
+            "app": "dask",
+            "component": "dask-worker"
+            }
+        },
+        "spec": {
+            "containers": [
+            {
+                "args": [
+                    "dask-worker",
+                    "$(DASK_SCHEDULER_ADDRESS)",
+                    "--nthreads",
+                    "1"
+                ],
+                "image": image_name,
+                "name": "dask-worker"
+            }
+            ]
+        }
+    }
+
+    with tempfile.NamedTemporaryFile('w') as f:
+        yaml.safe_dump(test_yaml, f)
+        f.flush()
+        cluster = KubeCluster.from_yaml(
+            f.name,
+            loop=loop,
+            n_workers=0,
+        )
+
+    cluster.scale_up(2)
+    with Client(cluster) as client:
+        future = client.submit(inc, 10)
+        result = future.result()
+        assert result == 11
+
+        while len(cluster.scheduler.workers) < 2:
+            sleep(0.1)
+
+        # Ensure that inter-worker communication works well
+        futures = client.map(inc, range(10))
+        total = client.submit(sum, futures)
+        assert total.result() == sum(map(inc, range(10)))
+        assert all(client.has_what().values())

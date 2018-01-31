@@ -2,11 +2,18 @@
 Convenience functions for creating pod templates.
 """
 from kubernetes import client
+from collections import namedtuple
 import json
+
 try:
     import yaml
 except ImportError:
     yaml = False
+
+# FIXME: ApiClient provides us serialize / deserialize methods,
+# but unfortunately also starts a threadpool for no reason! This
+# takes up resources, so we try to not make too many.
+SERIALIZATION_API_CLIENT = client.ApiClient()
 
 def _set_k8s_attribute(obj, attribute, value):
     """
@@ -148,20 +155,12 @@ def make_pod_spec(
     return pod
 
 
-class _FakeResponse:
-    def __init__(self, data):
-        self.data = json.dumps(data)
-def make_pod_from_yaml(filepath):
-    if not yaml:
-        raise ImportError("PyYaml is required to use yaml functionality, please install!")
+_FakeResponse = namedtuple('_FakeResponse', ['data'])
 
-    apiclient = client.ApiClient()
-    with open(filepath) as f:
-        # FIXME: We can't use the 'deserialize' function since
-        # that expects a response object!
-        pod_template = apiclient.deserialize(
-            _FakeResponse(yaml.safe_load(f)),
-            client.V1Pod
-        )
-
-    return pod_template
+def make_pod_from_dict(dict_):
+    # FIXME: We can't use the 'deserialize' function since
+    # that expects a response object!
+    return SERIALIZATION_API_CLIENT.deserialize(
+        _FakeResponse(data=json.dumps(dict_)),
+        client.V1Pod
+    )

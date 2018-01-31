@@ -3,7 +3,7 @@ from time import sleep
 import yaml
 import tempfile
 from daskernetes import KubeCluster
-from daskernetes.objects import make_pod_spec, make_pod_from_yaml
+from daskernetes.objects import make_pod_spec
 from distributed.utils_test import loop, inc
 from dask.distributed import Client
 
@@ -129,51 +129,3 @@ def test_extra_container_config_merge(image_name, loop):
     assert pod.spec.containers[0].args[-1] == "last-item"
 
 
-def test_pod_from_yaml(image_name, loop):
-    test_yaml = {
-        "kind": "Pod",
-        "metadata": {
-            "labels": {
-            "app": "dask",
-            "component": "dask-worker"
-            }
-        },
-        "spec": {
-            "containers": [
-            {
-                "args": [
-                    "dask-worker",
-                    "$(DASK_SCHEDULER_ADDRESS)",
-                    "--nthreads",
-                    "1"
-                ],
-                "image": image_name,
-                "name": "dask-worker"
-            }
-            ]
-        }
-    }
-
-    with tempfile.NamedTemporaryFile('w') as f:
-        yaml.safe_dump(test_yaml, f)
-        f.flush()
-        cluster = KubeCluster(
-            make_pod_from_yaml(f.name),
-            loop=loop,
-            n_workers=0,
-        )
-
-    cluster.scale_up(2)
-    with Client(cluster) as client:
-        future = client.submit(inc, 10)
-        result = future.result()
-        assert result == 11
-
-        while len(cluster.scheduler.workers) < 2:
-            sleep(0.1)
-
-        # Ensure that inter-worker communication works well
-        futures = client.map(inc, range(10))
-        total = client.submit(sum, futures)
-        assert total.result() == sum(map(inc, range(10)))
-        assert all(client.has_what().values())
