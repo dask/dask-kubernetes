@@ -49,7 +49,7 @@ def _set_k8s_attribute(obj, attribute, value):
     if current_value is not None:
         # This will ensure that current_value is something JSONable,
         # so a dict, list, or scalar
-        current_value = client.ApiClient().sanitize_for_serialization(
+        current_value = SERIALIZATION_API_CLIENT.sanitize_for_serialization(
             current_value
         )
 
