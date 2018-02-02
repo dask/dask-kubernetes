@@ -3,7 +3,7 @@ from time import sleep
 import yaml
 import tempfile
 from daskernetes import KubeCluster
-from daskernetes.objects import make_pod_spec
+from daskernetes.objects import make_pod_spec, make_pod_from_dict
 from distributed.utils_test import loop, inc
 from dask.distributed import Client
 
@@ -129,3 +129,36 @@ def test_extra_container_config_merge(image_name, loop):
     assert pod.spec.containers[0].args[-1] == "last-item"
 
 
+def test_make_pod_from_dict():
+    d = {
+        "kind": "Pod",
+        "metadata": {
+            "labels": {
+            "app": "dask",
+            "component": "dask-worker"
+            }
+        },
+        "spec": {
+            "containers": [
+            {
+                "args": [
+                    "dask-worker",
+                    "$(DASK_SCHEDULER_ADDRESS)",
+                    "--nthreads",
+                    "1"
+                ],
+                "image": "image-name",
+                "name": "dask-worker",
+                "security_context": {"capabilities": {"add": ["SYS_ADMIN"]},
+                                     "privileged": True},
+            }
+            ],
+            "restart_policy": "Never",
+        }
+    }
+
+    pod = make_pod_from_dict(d)
+
+    assert pod.spec.restart_policy == 'Never'
+    assert pod.spec.containers[0].security_context.privileged
+    assert pod.spec.containers[0].security_context.capabilities['add'] == 'SYS_ADMIN'
