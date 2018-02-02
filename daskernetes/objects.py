@@ -71,7 +71,7 @@ def merge_dictionaries(a, b, path=None, update=True):
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
-                merge(a[key], b[key], path + [str(key)])
+                merge_dictionaries(a[key], b[key], path + [str(key)])
             elif a[key] == b[key]:
                 pass # same leaf value
             elif isinstance(a[key], list) and isinstance(b[key], list):
