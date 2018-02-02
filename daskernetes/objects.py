@@ -78,7 +78,7 @@ def merge_dictionaries(a, b, path=None, update=True):
                 pass # same leaf value
             elif isinstance(a[key], list) and isinstance(b[key], list):
                 for idx, val in enumerate(b[key]):
-                    a[key][idx] = merge(a[key][idx], b[key][idx], path + [str(key), str(idx)], update=update)
+                    a[key][idx] = merge_dictionaries(a[key][idx], b[key][idx], path + [str(key), str(idx)], update=update)
             elif update:
                 a[key] = b[key]
             else:

@@ -149,11 +149,11 @@ def test_make_pod_from_dict():
                 ],
                 "image": "image-name",
                 "name": "dask-worker",
-                "security_context": {"capabilities": {"add": ["SYS_ADMIN"]},
+                "securityContext": {"capabilities": {"add": ["SYS_ADMIN"]},
                                      "privileged": True},
             }
             ],
-            "restart_policy": "Never",
+            "restartPolicy": "Never",
         }
     }
 
@@ -161,4 +161,4 @@ def test_make_pod_from_dict():
 
     assert pod.spec.restart_policy == 'Never'
     assert pod.spec.containers[0].security_context.privileged
-    assert pod.spec.containers[0].security_context.capabilities['add'] == 'SYS_ADMIN'
+    assert pod.spec.containers[0].security_context.capabilities.add == ['SYS_ADMIN']
