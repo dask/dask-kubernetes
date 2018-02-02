@@ -22,29 +22,27 @@ def _set_k8s_attribute(obj, attribute, value):
     obj
         an object from Kubernetes Python API client
     attribute
-        Either be name of a python client class attribute (api_client)
-        or attribute name from JSON Kubernetes API (apiClient)
+        Should be a Kubernetes API style attribute (with camelCase)
     value
         Can be anything (string, list, dict, k8s objects) that can be
         accepted by the k8s python client
     """
-    # FIXME: We should be doing a recursive merge here
-
     current_value = None
     attribute_name = None
     # All k8s python client objects have an 'attribute_map' property
     # which has as keys python style attribute names (api_client)
     # and as values the kubernetes JSON API style attribute names
-    # (apiClient). We want to allow this to use either.
+    # (apiClient). We want to allow users to use the JSON API style attribute
+    # names only.
     for python_attribute, json_attribute in obj.attribute_map.items():
-        if json_attribute == attribute or python_attribute == attribute:
+        if json_attribute == attribute:
             attribute_name = python_attribute
             break
     else:
         raise ValueError('Attribute must be one of {}'.format(obj.attribute_map.values()))
 
     if hasattr(obj, attribute_name):
-        current_value = getattr(obj, python_attribute)
+        current_value = getattr(obj, attribute_name)
 
     if current_value is not None:
         # This will ensure that current_value is something JSONable,
