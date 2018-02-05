@@ -15,6 +15,7 @@ except ImportError:
 # takes up resources, so we try to not make too many.
 SERIALIZATION_API_CLIENT = client.ApiClient()
 
+
 def _set_k8s_attribute(obj, attribute, value):
     """
     Set a specific value on a kubernetes object's attribute
@@ -61,13 +62,15 @@ def _set_k8s_attribute(obj, attribute, value):
         # Replace everything else
         setattr(obj, attribute_name, value)
 
+
 def merge_dictionaries(a, b, path=None, update=True):
     """
     Merge two dictionaries recursively.
 
     From https://stackoverflow.com/a/25270947
     """
-    if path is None: path = []
+    if path is None:
+        path = []
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
@@ -76,7 +79,10 @@ def merge_dictionaries(a, b, path=None, update=True):
                 pass # same leaf value
             elif isinstance(a[key], list) and isinstance(b[key], list):
                 for idx, val in enumerate(b[key]):
-                    a[key][idx] = merge_dictionaries(a[key][idx], b[key][idx], path + [str(key), str(idx)], update=update)
+                    a[key][idx] = merge_dictionaries(a[key][idx],
+                                                     b[key][idx],
+                                                     path + [str(key), str(idx)],
+                                                     update=update)
             elif update:
                 a[key] = b[key]
             else:
@@ -84,6 +90,7 @@ def merge_dictionaries(a, b, path=None, update=True):
         else:
             a[key] = b[key]
     return a
+
 
 def make_pod_spec(
         image,
@@ -161,6 +168,7 @@ def make_pod_spec(
 
 
 _FakeResponse = namedtuple('_FakeResponse', ['data'])
+
 
 def make_pod_from_dict(dict_):
     # FIXME: We can't use the 'deserialize' function since

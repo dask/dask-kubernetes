@@ -14,7 +14,6 @@ except ImportError:
 from tornado import gen
 from tornado.ioloop import IOLoop
 
-from distributed import Client
 from distributed.deploy import LocalCluster
 from kubernetes import client, config
 
@@ -345,29 +344,3 @@ def _namespace_default():
         with open(ns_path) as f:
             return f.read().strip()
     return 'default'
-
-
-def main():
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument('name', help='Name of the cluster')
-    argparser.add_argument('namespace', help='Namespace to spawn cluster in')
-    argparser.add_argument(
-        '--worker-image',
-        default='daskdev/dask:latest',
-        help='Worker pod image. Should have same version of python as client')
-
-    args = argparser.parse_args()
-
-    cluster = KubeCluster(
-        args.name,
-        args.namespace,
-        args.worker_image,
-        {},
-        n_workers=1,
-    )
-    client = Client(cluster)
-    print(client.submit(lambda x: x + 1, 10).result())
-
-
-if __name__ == '__main__':
-    main()

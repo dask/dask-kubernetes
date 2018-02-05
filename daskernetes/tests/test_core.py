@@ -8,7 +8,7 @@ import pytest
 from daskernetes import KubeCluster
 from daskernetes.objects import make_pod_spec
 from dask.distributed import Client
-from distributed.utils_test import loop, inc
+from distributed.utils_test import loop, inc  # noqa: F401
 
 
 @pytest.fixture
@@ -103,13 +103,12 @@ def test_pod_from_yaml(image_name, loop):
         "kind": "Pod",
         "metadata": {
             "labels": {
-            "app": "dask",
-            "component": "dask-worker"
+                "app": "dask",
+                "component": "dask-worker"
             }
         },
         "spec": {
-            "containers": [
-            {
+            "containers": [{
                 "args": [
                     "dask-worker",
                     "$(DASK_SCHEDULER_ADDRESS)",
@@ -118,8 +117,7 @@ def test_pod_from_yaml(image_name, loop):
                 ],
                 "image": image_name,
                 "name": "dask-worker"
-            }
-            ]
+            }]
         }
     }
 
@@ -146,6 +144,7 @@ def test_pod_from_yaml(image_name, loop):
 def test_pod_from_dict(image_name, loop):
     spec = {
         'metadata': {},
+        'restartPolicy': 'Never',
         'spec': {
             'containers': [{
                 'args': ['dask-worker', '$(DASK_SCHEDULER_ADDRESS)',
@@ -154,8 +153,7 @@ def test_pod_from_dict(image_name, loop):
                 'command': None,
                 'image': image_name,
                 'name': 'dask-worker',
-            }],
-        'restartPolicy': 'Never',
+            }]
         }
     }
 

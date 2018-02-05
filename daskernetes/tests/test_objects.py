@@ -1,11 +1,6 @@
-import pytest
-from time import sleep
-import yaml
-import tempfile
 from daskernetes import KubeCluster
 from daskernetes.objects import make_pod_spec, make_pod_from_dict
-from distributed.utils_test import loop, inc
-from dask.distributed import Client
+from distributed.utils_test import loop  # noqa: F401
 
 
 def test_extra_pod_config(image_name, loop):
@@ -25,7 +20,8 @@ def test_extra_pod_config(image_name, loop):
 
     pod = cluster.pod_template
 
-    assert pod.spec.automount_service_account_token == False
+    assert pod.spec.automount_service_account_token is False
+
 
 def test_extra_container_config(image_name, loop):
     """
@@ -52,6 +48,7 @@ def test_extra_container_config(image_name, loop):
         'runAsUser': 0
     }
 
+
 def test_container_resources_config(image_name, loop):
     """
     Test container resource requests / limits being set properly
@@ -73,6 +70,7 @@ def test_container_resources_config(image_name, loop):
     assert pod.spec.containers[0].resources.limits['memory'] == '2G'
     assert pod.spec.containers[0].resources.limits['cpu'] == '2'
     assert "cpu" not in pod.spec.containers[0].resources.requests
+
 
 def test_extra_container_config_merge(image_name, loop):
     """
@@ -134,13 +132,12 @@ def test_make_pod_from_dict():
         "kind": "Pod",
         "metadata": {
             "labels": {
-            "app": "dask",
-            "component": "dask-worker"
+                "app": "dask",
+                "component": "dask-worker"
             }
         },
         "spec": {
-            "containers": [
-            {
+            "containers": [{
                 "args": [
                     "dask-worker",
                     "$(DASK_SCHEDULER_ADDRESS)",
@@ -151,8 +148,7 @@ def test_make_pod_from_dict():
                 "name": "dask-worker",
                 "securityContext": {"capabilities": {"add": ["SYS_ADMIN"]},
                                      "privileged": True},
-            }
-            ],
+            }],
             "restartPolicy": "Never",
         }
     }
