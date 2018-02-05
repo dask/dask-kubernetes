@@ -55,7 +55,7 @@ jobs:
           command: |
             export PATH="$HOME/miniconda/bin:$PATH"
             source activate ${ENV_NAME}
-            pytest daskernetes
+            pytest daskernetes --verbose --worker-image daskdev/dask:latest
       - run:
           command: |
             export PATH="$HOME/miniconda/bin:$PATH"
