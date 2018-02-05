@@ -5,6 +5,9 @@ jobs:
     machine: true
     environment:
       CHANGE_MINIKUBE_NONE_USER: true
+    environment:
+      PYTHON: "3.6"
+      ENV_NAME: "daskernetes-test"
     steps:
       - checkout
       - run:
@@ -31,3 +34,14 @@ jobs:
       - run:
           command: |
             sudo kubectl get deployment
+      - run:
+          name: configure conda
+          command: ./ci/install-circle.sh
+      - run:
+          command: |
+            source activate ${ENV_NAME}
+            pytest daskernetes
+      - run:
+          command: |
+            source activate ${ENV_NAME}
+            flake8 daskernetes
