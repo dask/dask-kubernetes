@@ -131,10 +131,34 @@ class KubeCluster(object):
 
     @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
+        """ Create cluster with worker pod spec defined by a YAML file
+
+        We can start a cluster with pods defined in an accompanying YAML file
+        like the following:
+
+        .. code-block:: yaml
+
+            kind: Pod
+            metadata:
+                labels:
+                    foo: bar
+                    baz: quux
+            spec:
+                containers:
+                -   image: daskdev/dask
+                    name: dask-worker
+                    args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
+                restartPolicy: Never
+
+        Examples
+        --------
+        >>> cluster = KubeCluster.from_yaml('pod.yaml', namespace='my-ns')  # doctest: +SKIP
+        """
         if not yaml:
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
         with open(yaml_path) as f:
-            return cls.from_dict(yaml.safe_load(f))
+            d = yaml.safe_load(f)
+            return cls.from_dict(d)
 
     @property
     def namespace(self):
