@@ -13,11 +13,7 @@ from distributed.utils_test import loop, inc
 
 @pytest.fixture
 def pod_spec(image_name):
-    return make_pod_spec(image=image_name,
-                         memory_limit=None,
-                         memory_request=None,
-                         cpu_limit=None,
-                         cpu_request=None)
+    return make_pod_spec(image=image_name)
 
 
 def test_basic(pod_spec, loop):

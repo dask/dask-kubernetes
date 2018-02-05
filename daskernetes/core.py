@@ -23,7 +23,6 @@ from daskernetes.objects import make_pod_from_dict
 logger = logging.getLogger(__name__)
 
 
-
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
 

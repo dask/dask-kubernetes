@@ -86,19 +86,23 @@ def merge_dictionaries(a, b, path=None, update=True):
     return a
 
 def make_pod_spec(
-        image='daskdev/dask:latest',
+        image,
         labels={},
         threads_per_worker=1,
         env={},
         extra_container_config={},
         extra_pod_config={},
-        memory_limit='4GB',
-        memory_request='4GB',
-        cpu_limit=1,
-        cpu_request=1,
+        memory_limit=None,
+        memory_request=None,
+        cpu_limit=None,
+        cpu_request=None,
 ):
     """
-    Create a pod template from various parameters passed in.
+    Create generic pod template from input parameters
+
+    Examples
+    --------
+    >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
     """
     args = [
         'dask-worker',
