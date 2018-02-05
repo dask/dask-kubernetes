@@ -183,7 +183,7 @@ def test_pod_from_dict(image_name, loop):
 def test_constructor_parameters(pod_spec, loop):
     env = {'FOO': 'BAR', 'A': 1}
     with KubeCluster(pod_spec, name='myname', namespace='foo', loop=loop, env=env) as cluster:
-        pod = cluster._make_pod()
+        pod = cluster.pod_template
         assert pod.metadata.namespace == 'foo'
 
         var = [v for v in pod.spec.containers[0].env if v.name == 'FOO']

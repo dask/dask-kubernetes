@@ -61,7 +61,7 @@ class KubeCluster(object):
     """
     def __init__(
             self,
-            worker_pod_template,
+            pod_template,
             name=None,
             namespace=None,
             n_workers=0,
@@ -86,19 +86,28 @@ class KubeCluster(object):
         if name is None:
             name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
 
-        self.env = env
-        self.name = name
-
-        self.worker_pod_template = copy.deepcopy(worker_pod_template)
+        self.pod_template = copy.deepcopy(pod_template)
         # Default labels that can't be overwritten
-        if self.worker_pod_template.metadata.labels is None:
-            self.worker_pod_template.metadata.labels = {}
-        self.worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
-        self.worker_pod_template.metadata.labels['app'] = 'dask'
-        self.worker_pod_template.metadata.labels['component'] = 'dask-worker'
-        self.worker_pod_template.metadata.namespace = namespace
+        if self.pod_template.metadata.labels is None:
+            self.pod_template.metadata.labels = {}
+        self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        self.pod_template.metadata.labels['app'] = 'dask'
+        self.pod_template.metadata.labels['component'] = 'dask-worker'
+        self.pod_template.metadata.namespace = namespace
 
-        finalize(self, cleanup_pods, self.namespace, worker_pod_template.metadata.labels)
+        if self.pod_template.spec.containers[0].env is None:
+            self.pod_template.spec.containers[0].env = []
+        self.pod_template.spec.containers[0].env.append(
+            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
+        )
+        if env:
+            self.pod_template.spec.containers[0].env.extend([
+                client.V1EnvVar(name=k, value=str(v))
+                for k, v in env.items()
+            ])
+        self.pod_template.metadata.generate_name = name
+
+        finalize(self, cleanup_pods, self.namespace, pod_template.metadata.labels)
 
         self._cached_widget = None
 
@@ -162,7 +171,11 @@ class KubeCluster(object):
 
     @property
     def namespace(self):
-        return self.worker_pod_template.metadata.namespace
+        return self.pod_template.metadata.namespace
+
+    @property
+    def name(self):
+        return self.pod_template.metadata.generate_name
 
     def _widget(self):
         """ Create IPython widget for display within a notebook """
@@ -201,25 +214,10 @@ class KubeCluster(object):
     def scheduler_address(self):
         return self.scheduler.address
 
-    def _make_pod(self):
-        pod = copy.deepcopy(self.worker_pod_template)
-        if pod.spec.containers[0].env is None:
-            pod.spec.containers[0].env = []
-        pod.spec.containers[0].env.append(
-            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
-        )
-        if self.env:
-            pod.spec.containers[0].env.extend([
-                client.V1EnvVar(name=k, value=str(v))
-                for k, v in self.env.items()
-            ])
-        pod.metadata.generate_name = self.name
-        return pod
-
     def pods(self):
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.worker_pod_template.metadata.labels)
+            label_selector=format_labels(self.pod_template.metadata.labels)
         ).items
 
     def logs(self, pod):
@@ -233,7 +231,7 @@ class KubeCluster(object):
         pods = self.pods()
 
         out = [
-            self.core_api.create_namespaced_pod(self.namespace, self._make_pod())
+            self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
             for _ in range(n - len(pods))
         ]
 
@@ -280,7 +278,7 @@ class KubeCluster(object):
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.worker_pod_template.metadata.labels)
+        cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
