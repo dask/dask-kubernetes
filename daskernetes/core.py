@@ -23,12 +23,11 @@ from daskernetes.objects import make_pod_from_dict
 logger = logging.getLogger(__name__)
 
 
-
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
 
-    This enables dynamically launching Dask workers on a Kubernetes cluster.
-    It starts a dask scheduler in this local process and dynamically creates
+    This dynamically launches Dask workers on a Kubernetes cluster.
+    It starts a Dask scheduler in this local process and creates remote
     worker pods with Kubernetes.
 
     Parameters
@@ -40,7 +39,8 @@ class KubeCluster(object):
         namespace if available or "default"
     n_workers: int
         Number of workers on initial launch.  Use ``scale_up`` in the future
-    threads_per_worker: int
+    env: dict
+        Dictionariy of environment variables to pass to worker pod
     host: str
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
@@ -55,27 +55,23 @@ class KubeCluster(object):
     >>> cluster.scale_up(10)
 
     Alternatively have Dask allocate workers based on need
+
     >>> cluster.adapt()
     """
     def __init__(
             self,
-            worker_pod_template,
+            pod_template,
             name=None,
             namespace=None,
             n_workers=0,
             host='0.0.0.0',
             port=0,
+            env=None,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
-        if name is None:
-            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
-
-        self.name = name
-
-
         try:
             config.load_incluster_config()
         except config.ConfigException:
@@ -89,16 +85,28 @@ class KubeCluster(object):
         if name is None:
             name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
 
-        self.namespace = namespace
-        self.name = name
-
-        self.worker_pod_template = copy.deepcopy(worker_pod_template)
+        self.pod_template = copy.deepcopy(pod_template)
         # Default labels that can't be overwritten
-        self.worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
-        self.worker_pod_template.metadata.labels['app'] = 'dask'
-        self.worker_pod_template.metadata.labels['component'] = 'dask-worker'
+        if self.pod_template.metadata.labels is None:
+            self.pod_template.metadata.labels = {}
+        self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        self.pod_template.metadata.labels['app'] = 'dask'
+        self.pod_template.metadata.labels['component'] = 'dask-worker'
+        self.pod_template.metadata.namespace = namespace
 
-        finalize(self, cleanup_pods, self.namespace, worker_pod_template.metadata.labels)
+        if self.pod_template.spec.containers[0].env is None:
+            self.pod_template.spec.containers[0].env = []
+        self.pod_template.spec.containers[0].env.append(
+            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
+        )
+        if env:
+            self.pod_template.spec.containers[0].env.extend([
+                client.V1EnvVar(name=k, value=str(v))
+                for k, v in env.items()
+            ])
+        self.pod_template.metadata.generate_name = name
+
+        finalize(self, cleanup_pods, self.namespace, pod_template.metadata.labels)
 
         self._cached_widget = None
 
@@ -107,14 +115,66 @@ class KubeCluster(object):
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
+        """ Create cluster with worker pod spec defined by Python dictionary
+
+        Examples
+        --------
+        >>> spec = {
+        ...     'metadata': {},
+        ...     'spec': {
+        ...         'containers': [{
+        ...             'args': ['dask-worker', '$(DASK_SCHEDULER_ADDRESS)',
+        ...                      '--nthreads', '1',
+        ...                      '--death-timeout', '60'],
+        ...             'command': None,
+        ...             'image': image_name,
+        ...             'name': 'dask-worker',
+        ...         }],
+        ...     'restartPolicy': 'Never',
+        ...     }
+        ... }
+        >>> cluster = KubeCluster.from_dict(spec, namespace='my-ns')  # doctest: +SKIP
+        """
         return cls(make_pod_from_dict(pod_spec), **kwargs)
 
     @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
+        """ Create cluster with worker pod spec defined by a YAML file
+
+        We can start a cluster with pods defined in an accompanying YAML file
+        like the following:
+
+        .. code-block:: yaml
+
+            kind: Pod
+            metadata:
+                labels:
+                    foo: bar
+                    baz: quux
+            spec:
+                containers:
+                -   image: daskdev/dask
+                    name: dask-worker
+                    args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
+                restartPolicy: Never
+
+        Examples
+        --------
+        >>> cluster = KubeCluster.from_yaml('pod.yaml', namespace='my-ns')  # doctest: +SKIP
+        """
         if not yaml:
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
         with open(yaml_path) as f:
-            return cls.from_dict(yaml.safe_load(f))
+            d = yaml.safe_load(f)
+            return cls.from_dict(d)
+
+    @property
+    def namespace(self):
+        return self.pod_template.metadata.namespace
+
+    @property
+    def name(self):
+        return self.pod_template.metadata.generate_name
 
     def _widget(self):
         """ Create IPython widget for display within a notebook """
@@ -122,16 +182,14 @@ class KubeCluster(object):
             return self._cached_widget
         import ipywidgets
         layout = ipywidgets.Layout(width='150px')
-        n_workers = ipywidgets.IntText(0, description='Workers', layout=layout)
-        threads = ipywidgets.IntText(1, description='Cores', layout=layout)
+
+        n_workers = ipywidgets.IntText(0, description='Requested', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
-        box = ipywidgets.HBox([ipywidgets.VBox([n_workers, threads]),
-                               ipywidgets.VBox([button, actual])])
+        box = ipywidgets.VBox([n_workers, actual, button])
         self._cached_widget = box
 
         def cb(b):
-            self.threads_per_worker = threads.value
             n = n_workers.value
             self.scale_up(n)
 
@@ -155,21 +213,10 @@ class KubeCluster(object):
     def scheduler_address(self):
         return self.scheduler.address
 
-    def _make_pod(self):
-        pod = copy.deepcopy(self.worker_pod_template)
-        if pod.spec.containers[0].env is None:
-            pod.spec.containers[0].env = []
-        pod.spec.containers[0].env.append(
-            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
-        )
-        pod.metadata.generate_name = self.name
-        return pod
-
-
     def pods(self):
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.worker_pod_template.metadata.labels)
+            label_selector=format_labels(self.pod_template.metadata.labels)
         ).items
 
     def logs(self, pod):
@@ -183,7 +230,7 @@ class KubeCluster(object):
         pods = self.pods()
 
         out = [
-            self.core_api.create_namespaced_pod(self.namespace, self._make_pod())
+            self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
             for _ in range(n - len(pods))
         ]
 
@@ -230,7 +277,7 @@ class KubeCluster(object):
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.worker_pod_template.metadata.labels)
+        cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
@@ -260,7 +307,10 @@ def cleanup_pods(namespace, labels):
 
 
 def format_labels(labels):
-    return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+    if labels:
+        return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+    else:
+        return ''
 
 
 @gen.coroutine
