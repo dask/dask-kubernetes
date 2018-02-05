@@ -147,6 +147,39 @@ def test_pod_from_yaml(image_name, loop):
                 assert all(client.has_what().values())
 
 
+def test_pod_from_dict(image_name, loop):
+    spec = {
+        'metadata': {},
+        'spec': {
+            'containers': [{
+                'args': ['dask-worker', '$(DASK_SCHEDULER_ADDRESS)',
+                         '--nthreads', '1',
+                         '--death-timeout', '60'],
+                'command': None,
+                'image': image_name,
+                'name': 'dask-worker',
+            }],
+        'restartPolicy': 'Never',
+        }
+    }
+
+    with KubeCluster.from_dict(spec, loop=loop) as cluster:
+        cluster.scale_up(2)
+        with Client(cluster) as client:
+            future = client.submit(inc, 10)
+            result = future.result()
+            assert result == 11
+
+            while len(cluster.scheduler.workers) < 2:
+                sleep(0.1)
+
+            # Ensure that inter-worker communication works well
+            futures = client.map(inc, range(10))
+            total = client.submit(sum, futures)
+            assert total.result() == sum(map(inc, range(10)))
+            assert all(client.has_what().values())
+
+
 def test_constructor_parameters(pod_spec, loop):
     env = {'FOO': 'BAR', 'A': 1}
     with KubeCluster(pod_spec, name='myname', namespace='foo', loop=loop, env=env) as cluster:

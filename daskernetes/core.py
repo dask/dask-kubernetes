@@ -56,6 +56,7 @@ class KubeCluster(object):
     >>> cluster.scale_up(10)
 
     Alternatively have Dask allocate workers based on need
+
     >>> cluster.adapt()
     """
     def __init__(
@@ -90,6 +91,8 @@ class KubeCluster(object):
 
         self.worker_pod_template = copy.deepcopy(worker_pod_template)
         # Default labels that can't be overwritten
+        if self.worker_pod_template.metadata.labels is None:
+            self.worker_pod_template.metadata.labels = {}
         self.worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
         self.worker_pod_template.metadata.labels['app'] = 'dask'
         self.worker_pod_template.metadata.labels['component'] = 'dask-worker'
@@ -104,6 +107,26 @@ class KubeCluster(object):
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
+        """ Create cluster with worker pod spec defined by Python dictionary
+
+        Examples
+        --------
+        >>> spec = {
+        ...     'metadata': {},
+        ...     'spec': {
+        ...         'containers': [{
+        ...             'args': ['dask-worker', '$(DASK_SCHEDULER_ADDRESS)',
+        ...                      '--nthreads', '1',
+        ...                      '--death-timeout', '60'],
+        ...             'command': None,
+        ...             'image': image_name,
+        ...             'name': 'dask-worker',
+        ...         }],
+        ...     'restartPolicy': 'Never',
+        ...     }
+        ... }
+        >>> cluster = KubeCluster.from_dict(spec, namespace='my-ns')  # doctest: +SKIP
+        """
         return cls(make_pod_from_dict(pod_spec), **kwargs)
 
     @classmethod
@@ -263,7 +286,10 @@ def cleanup_pods(namespace, labels):
 
 
 def format_labels(labels):
-    return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+    if labels:
+        return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+    else:
+        return ''
 
 
 @gen.coroutine
