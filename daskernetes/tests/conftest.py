@@ -8,8 +8,5 @@ def pytest_addoption(parser):
 
 @pytest.fixture
 def image_name(request):
-    worker_image = request.config.getoption('--worker-image')
-    if not worker_image:
-        pytest.fail("Need to pass --worker-image. Image must have same python setup as host!")
-        return
+    worker_image = request.config.getoption('--worker-image') or 'daskdev/dask:latest'
     return worker_image

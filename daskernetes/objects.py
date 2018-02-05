@@ -86,20 +86,28 @@ def merge_dictionaries(a, b, path=None, update=True):
     return a
 
 def make_pod_spec(
-        image,
+        image='daskdev/dask:latest',
         labels={},
         threads_per_worker=1,
         env={},
         extra_container_config={},
         extra_pod_config={},
-        memory_limit=None,
-        memory_request=None,
-        cpu_limit=None,
-        cpu_request=None,
+        memory_limit='4GB',
+        memory_request='4GB',
+        cpu_limit=1,
+        cpu_request=1,
 ):
     """
     Create a pod template from various parameters passed in.
     """
+    args = [
+        'dask-worker',
+        '$(DASK_SCHEDULER_ADDRESS)',
+        '--nthreads', str(threads_per_worker),
+        '--death-timeout', '60',
+    ]
+    if memory_limit:
+        args.extend(['--memory-limit', str(memory_limit)])
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(
             labels=labels
@@ -110,18 +118,13 @@ def make_pod_spec(
                 client.V1Container(
                     name='dask-worker',
                     image=image,
-                    args=[
-                        'dask-worker',
-                        '$(DASK_SCHEDULER_ADDRESS)',
-                        '--nthreads', str(threads_per_worker),
-                    ],
+                    args=args,
                     env=[client.V1EnvVar(name=k, value=v)
                             for k, v in env.items()],
                 )
             ]
         )
     )
-
 
     resources = client.V1ResourceRequirements(limits={}, requests={})
 

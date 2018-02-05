@@ -11,8 +11,17 @@ from dask.distributed import Client
 from distributed.utils_test import loop, inc
 
 
-def test_basic(image_name, loop):
-    with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster:
+@pytest.fixture
+def pod_spec(image_name):
+    return make_pod_spec(image=image_name,
+                         memory_limit=None,
+                         memory_request=None,
+                         cpu_limit=None,
+                         cpu_request=None)
+
+
+def test_basic(pod_spec, loop):
+    with KubeCluster(pod_spec, loop=loop) as cluster:
         cluster.scale_up(2)
         with Client(cluster) as client:
             future = client.submit(inc, 10)
@@ -29,8 +38,8 @@ def test_basic(image_name, loop):
             assert all(client.has_what().values())
 
 
-def test_logs(image_name, loop):
-    with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster:
+def test_logs(pod_spec, loop):
+    with KubeCluster(pod_spec, loop=loop) as cluster:
         cluster.scale_up(2)
 
         start = time()
@@ -43,9 +52,9 @@ def test_logs(image_name, loop):
         assert 'distributed.worker' in logs
 
 
-def test_ipython_display(image_name, loop):
+def test_ipython_display(pod_spec, loop):
     ipywidgets = pytest.importorskip('ipywidgets')
-    with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster:
+    with KubeCluster(pod_spec, loop=loop) as cluster:
         cluster.scale_up(1)
         cluster._ipython_display_()
         box = cluster._cached_widget
@@ -54,23 +63,23 @@ def test_ipython_display(image_name, loop):
         assert cluster._cached_widget is box
 
         start = time()
-        workers = [child for b in box.children for child in b.children
+        workers = [child for child in box.children
                    if child.description == 'Actual'][0]
         while workers.value == 0:
             assert time() < start + 10
             sleep(0.5)
 
 
-def test_namespace(image_name, loop):
-    with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster:
+def test_namespace(pod_spec, loop):
+    with KubeCluster(pod_spec, loop=loop) as cluster:
         assert 'dask' in cluster.name
         assert getpass.getuser() in cluster.name
-        with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster2:
+        with KubeCluster(pod_spec, loop=loop) as cluster2:
             assert cluster.name != cluster2.name
 
 
-def test_adapt(image_name, loop):
-    with KubeCluster(make_pod_spec(image_name), loop=loop) as cluster:
+def test_adapt(pod_spec, loop):
+    with KubeCluster(pod_spec, loop=loop) as cluster:
         cluster.adapt()
         with Client(cluster) as client:
             future = client.submit(inc, 10)
@@ -83,14 +92,15 @@ def test_adapt(image_name, loop):
             assert time() < start + 10
 
 
-def test_env(image_name, loop):
-    with KubeCluster(make_pod_spec(image_name, env={'ABC': 'DEF'}), loop=loop) as cluster:
+def test_env(pod_spec, loop):
+    with KubeCluster(pod_spec, env={'ABC': 'DEF'}, loop=loop) as cluster:
         cluster.scale_up(1)
         with Client(cluster) as client:
             while not cluster.scheduler.workers:
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v['ABC'] == 'DEF' for v in env.values())
+
 
 def test_pod_from_yaml(image_name, loop):
     test_yaml = {
@@ -120,32 +130,26 @@ def test_pod_from_yaml(image_name, loop):
     with tempfile.NamedTemporaryFile('w') as f:
         yaml.safe_dump(test_yaml, f)
         f.flush()
-        cluster = KubeCluster.from_yaml(
-            f.name,
-            loop=loop,
-            n_workers=0,
-        )
+        with KubeCluster.from_yaml(f.name, loop=loop) as cluster:
+            cluster.scale_up(2)
+            with Client(cluster) as client:
+                future = client.submit(inc, 10)
+                result = future.result()
+                assert result == 11
 
-    cluster.scale_up(2)
-    with Client(cluster) as client:
-        future = client.submit(inc, 10)
-        result = future.result()
-        assert result == 11
+                while len(cluster.scheduler.workers) < 2:
+                    sleep(0.1)
 
-        while len(cluster.scheduler.workers) < 2:
-            sleep(0.1)
-
-        # Ensure that inter-worker communication works well
-        futures = client.map(inc, range(10))
-        total = client.submit(sum, futures)
-        assert total.result() == sum(map(inc, range(10)))
-        assert all(client.has_what().values())
+                # Ensure that inter-worker communication works well
+                futures = client.map(inc, range(10))
+                total = client.submit(sum, futures)
+                assert total.result() == sum(map(inc, range(10)))
+                assert all(client.has_what().values())
 
 
-def test_constructor_parameters(image_name, loop):
-    template = make_pod_spec(image_name)
+def test_constructor_parameters(pod_spec, loop):
     env = {'FOO': 'BAR', 'A': 1}
-    with KubeCluster(template, name='myname', namespace='foo', loop=loop, env=env) as cluster:
+    with KubeCluster(pod_spec, name='myname', namespace='foo', loop=loop, env=env) as cluster:
         pod = cluster._make_pod()
         assert pod.metadata.namespace == 'foo'
 

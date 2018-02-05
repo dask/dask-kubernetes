@@ -61,7 +61,8 @@ def test_container_resources_config(image_name, loop):
             image_name,
             memory_request="1G",
             memory_limit="2G",
-            cpu_limit="2"
+            cpu_limit="2",
+            cpu_request=None,
         ),
         loop=loop,
         n_workers=0,
