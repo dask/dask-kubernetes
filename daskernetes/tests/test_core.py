@@ -140,3 +140,19 @@ def test_pod_from_yaml(image_name, loop):
         total = client.submit(sum, futures)
         assert total.result() == sum(map(inc, range(10)))
         assert all(client.has_what().values())
+
+
+def test_constructor_parameters(image_name, loop):
+    template = make_pod_spec(image_name)
+    env = {'FOO': 'BAR', 'A': 1}
+    with KubeCluster(template, name='myname', namespace='foo', loop=loop, env=env) as cluster:
+        pod = cluster._make_pod()
+        assert pod.metadata.namespace == 'foo'
+
+        var = [v for v in pod.spec.containers[0].env if v.name == 'FOO']
+        assert var and var[0].value == 'BAR'
+
+        var = [v for v in pod.spec.containers[0].env if v.name == 'A']
+        assert var and var[0].value == '1'
+
+        assert pod.metadata.generate_name == 'myname'

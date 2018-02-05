@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
 
-    This enables dynamically launching Dask workers on a Kubernetes cluster.
-    It starts a dask scheduler in this local process and dynamically creates
+    This dynamically launches Dask workers on a Kubernetes cluster.
+    It starts a Dask scheduler in this local process and creates remote
     worker pods with Kubernetes.
 
     Parameters
@@ -41,6 +41,8 @@ class KubeCluster(object):
     n_workers: int
         Number of workers on initial launch.  Use ``scale_up`` in the future
     threads_per_worker: int
+    env: dict
+        Dictionariy of environment variables to pass to worker pod
     host: str
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
@@ -65,17 +67,12 @@ class KubeCluster(object):
             n_workers=0,
             host='0.0.0.0',
             port=0,
+            env=None,
             **kwargs,
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
-        if name is None:
-            name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
-
-        self.name = name
-
-
         try:
             config.load_incluster_config()
         except config.ConfigException:
@@ -89,7 +86,7 @@ class KubeCluster(object):
         if name is None:
             name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
 
-        self.namespace = namespace
+        self.env = env
         self.name = name
 
         self.worker_pod_template = copy.deepcopy(worker_pod_template)
@@ -97,6 +94,7 @@ class KubeCluster(object):
         self.worker_pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
         self.worker_pod_template.metadata.labels['app'] = 'dask'
         self.worker_pod_template.metadata.labels['component'] = 'dask-worker'
+        self.worker_pod_template.metadata.namespace = namespace
 
         finalize(self, cleanup_pods, self.namespace, worker_pod_template.metadata.labels)
 
@@ -115,6 +113,10 @@ class KubeCluster(object):
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
         with open(yaml_path) as f:
             return cls.from_dict(yaml.safe_load(f))
+
+    @property
+    def namespace(self):
+        return self.worker_pod_template.metadata.namespace
 
     def _widget(self):
         """ Create IPython widget for display within a notebook """
@@ -162,9 +164,13 @@ class KubeCluster(object):
         pod.spec.containers[0].env.append(
             client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
         )
+        if self.env:
+            pod.spec.containers[0].env.extend([
+                client.V1EnvVar(name=k, value=str(v))
+                for k, v in self.env.items()
+            ])
         pod.metadata.generate_name = self.name
         return pod
-
 
     def pods(self):
         return self.core_api.list_namespaced_pod(
