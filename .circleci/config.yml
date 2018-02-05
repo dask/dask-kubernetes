@@ -43,7 +43,14 @@ jobs:
               conda config --set always_yes yes --set changeps1 no
       - run:
           name: configure conda
-          command: ./ci/install-circle.sh
+          command: |
+              export PATH="$HOME/miniconda/bin:$PATH"
+              conda update -q conda
+              conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
+              conda env list
+              source activate ${ENV_NAME}
+              pip install --no-deps --quiet -e .
+              conda list ${ENV_NAME}
       - run:
           command: |
             source activate ${ENV_NAME}
