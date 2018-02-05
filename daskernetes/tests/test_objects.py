@@ -23,7 +23,7 @@ def test_extra_pod_config(image_name, loop):
         n_workers=0,
     )
 
-    pod = cluster._make_pod()
+    pod = cluster.pod_template
 
     assert pod.spec.automount_service_account_token == False
 
@@ -45,7 +45,7 @@ def test_extra_container_config(image_name, loop):
         n_workers=0,
     )
 
-    pod = cluster._make_pod()
+    pod = cluster.pod_template
 
     assert pod.spec.containers[0].image_pull_policy == 'IfNotReady'
     assert pod.spec.containers[0].security_context == {
@@ -61,13 +61,13 @@ def test_container_resources_config(image_name, loop):
             image_name,
             memory_request="1G",
             memory_limit="2G",
-            cpu_limit="2"
+            cpu_limit="2",
         ),
         loop=loop,
         n_workers=0,
     )
 
-    pod = cluster._make_pod()
+    pod = cluster.pod_template
 
     assert pod.spec.containers[0].resources.requests['memory'] == '1G'
     assert pod.spec.containers[0].resources.limits['memory'] == '2G'
@@ -91,7 +91,7 @@ def test_extra_container_config_merge(image_name, loop):
         env={"TEST": "HI"},
     )
 
-    pod = cluster._make_pod()
+    pod = cluster.pod_template
 
     assert pod.spec.containers[0].env == [
         { "name": "TEST", "value": "HI"},
@@ -118,7 +118,7 @@ def test_extra_container_config_merge(image_name, loop):
         n_workers=0,
     )
 
-    pod = cluster._make_pod()
+    pod = cluster.pod_template
 
     for e in [
         { "name": "TEST", "value": "HI"},

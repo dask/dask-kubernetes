@@ -98,8 +98,20 @@ def make_pod_spec(
         cpu_request=None,
 ):
     """
-    Create a pod template from various parameters passed in.
+    Create generic pod template from input parameters
+
+    Examples
+    --------
+    >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
     """
+    args = [
+        'dask-worker',
+        '$(DASK_SCHEDULER_ADDRESS)',
+        '--nthreads', str(threads_per_worker),
+        '--death-timeout', '60',
+    ]
+    if memory_limit:
+        args.extend(['--memory-limit', str(memory_limit)])
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(
             labels=labels
@@ -110,18 +122,13 @@ def make_pod_spec(
                 client.V1Container(
                     name='dask-worker',
                     image=image,
-                    args=[
-                        'dask-worker',
-                        '$(DASK_SCHEDULER_ADDRESS)',
-                        '--nthreads', str(threads_per_worker),
-                    ],
+                    args=args,
                     env=[client.V1EnvVar(name=k, value=v)
                             for k, v in env.items()],
                 )
             ]
         )
     )
-
 
     resources = client.V1ResourceRequirements(limits={}, requests={})
 
