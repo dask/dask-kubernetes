@@ -54,7 +54,7 @@ jobs:
               conda list ${ENV_NAME}
       - run:
           command: |
-            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes --verbose --worker-image daskdev/dask:latest
+            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes -s --verbose --worker-image daskdev/dask:latest
       - run:
           command: |
             /home/circleci/miniconda/envs/daskernetes-test/bin/flake8 daskernetes

@@ -121,26 +121,32 @@ def test_pod_from_yaml(image_name, loop):
         }
     }
 
+    print(1)
     with tmpfile(extension='yaml') as fn:
         with open(fn, mode='w') as f:
             yaml.dump(test_yaml, f)
+        print(2)
         with KubeCluster.from_yaml(f.name, loop=loop) as cluster:
             cluster.scale_up(2)
+            print(3)
             with Client(cluster) as client:
                 future = client.submit(inc, 10)
                 result = future.result()
                 assert result == 11
+                print(4)
 
                 start = time()
                 while len(cluster.scheduler.workers) < 2:
                     sleep(0.1)
                     assert time() < start + 10, 'timeout'
 
+                print(5)
                 # Ensure that inter-worker communication works well
                 futures = client.map(inc, range(10))
                 total = client.submit(sum, futures)
                 assert total.result() == sum(map(inc, range(10)))
                 assert all(client.has_what().values())
+                print(6)
 
 
 def test_pod_from_dict(image_name, loop):
