@@ -54,11 +54,7 @@ jobs:
               conda list ${ENV_NAME}
       - run:
           command: |
-            export PATH="$HOME/miniconda/bin:$PATH"
-            source activate ${ENV_NAME}
-            pytest daskernetes --verbose --worker-image daskdev/dask:latest
+            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes --verbose --worker-image daskdev/dask:latest
       - run:
           command: |
-            export PATH="$HOME/miniconda/bin:$PATH"
-            source activate ${ENV_NAME}
-            flake8 daskernetes
+            /home/circleci/miniconda/envs/daskernetes-test/bin/flake8 daskernetes
