@@ -2,13 +2,13 @@ import getpass
 import os
 from time import sleep, time
 import yaml
-import tempfile
 
 import pytest
 from daskernetes import KubeCluster
 from daskernetes.objects import make_pod_spec
 from dask.distributed import Client
 from distributed.utils_test import loop, inc  # noqa: F401
+from distributed.utils import tmpfile
 
 
 @pytest.fixture
@@ -121,9 +121,9 @@ def test_pod_from_yaml(image_name, loop):
         }
     }
 
-    with tempfile.NamedTemporaryFile('w') as f:
-        yaml.safe_dump(test_yaml, f)
-        f.flush()
+    with tmpfile(extension='yaml') as fn:
+        with open(fn, mode='w') as f:
+            yaml.dump(test_yaml, f)
         with KubeCluster.from_yaml(f.name, loop=loop) as cluster:
             cluster.scale_up(2)
             with Client(cluster) as client:
@@ -131,8 +131,10 @@ def test_pod_from_yaml(image_name, loop):
                 result = future.result()
                 assert result == 11
 
+                start = time()
                 while len(cluster.scheduler.workers) < 2:
                     sleep(0.1)
+                    assert time() < start + 10, 'timeout'
 
                 # Ensure that inter-worker communication works well
                 futures = client.map(inc, range(10))
