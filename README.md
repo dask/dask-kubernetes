@@ -75,7 +75,7 @@ project out of the [UK Met office](https://www.metoffice.gov.uk/)
 This Dask+Kubernetes solution was primarily developed by
 [Jacob Tomlinson](https://github.com/jacobtomlinson) of the Informatics Lab
 and [Matt Pryor](https://github.com/mkjpryor-stfc) of the
-[Science and Technology Facilities Council](http://www.stfc.ac.uk/).
+[STFC](http://www.stfc.ac.uk/) and funded by [NERC](http://www.nerc.ac.uk/).
 
 ![Met Office Logo](https://raw.githubusercontent.com/met-office-lab/blog/master/img/mo-logo.svg)
 
