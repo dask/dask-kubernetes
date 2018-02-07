@@ -92,7 +92,7 @@ class KubeCluster(object):
         self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
         self.pod_template.metadata.labels['app'] = 'dask'
         self.pod_template.metadata.labels['component'] = 'dask-worker'
-        self.pod_template.metadata.namespace = namespace # client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace))
+        self.pod_template.metadata.namespace = namespace
 
         if self.pod_template.spec.containers[0].env is None:
             self.pod_template.spec.containers[0].env = []

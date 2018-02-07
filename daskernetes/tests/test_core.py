@@ -23,26 +23,6 @@ api = kubernetes.client.CoreV1Api()
 
 @pytest.fixture
 def ns():
-    name = 'test-daskernetes'
-    try:
-        while api.list_namespaced_pod(name).items:  # wait for old pods to clear
-            sleep(0.5)
-        yield name
-    finally:
-        pods = api.list_namespaced_pod(name)
-        try:
-            for pod in pods.items:
-                api.delete_namespaced_pod(
-                    pod.metadata.name,
-                    name,
-                    kubernetes.client.V1DeleteOptions()
-                )
-        except kubernetes.client.rest.ApiException:
-            pass
-
-
-@pytest.fixture
-def ns():
     name = 'test-daskernetes' + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(metadata=kubernetes.client.V1ObjectMeta(name=name))
     api.create_namespace(ns)
@@ -61,7 +41,6 @@ def pod_spec(image_name):
 def cluster(pod_spec, ns, loop):
     with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
         yield cluster
-
 
 
 def test_basic(cluster):
