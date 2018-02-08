@@ -26,20 +26,22 @@ logger = logging.getLogger(__name__)
 class KubeCluster(object):
     """ Launch a Dask cluster on Kubernetes
 
-    This dynamically launches Dask workers on a Kubernetes cluster.
-    It starts a Dask scheduler in this local process and creates remote
-    worker pods with Kubernetes.
+    This starts a local Dask scheduler and then dynamically launches
+    Dask workers on a Kubernetes cluster.
 
     Parameters
     ----------
-    name: str
-        Name given to the pods.  Defaults to ``dask-user-random``
-    namespace: str
-        Namespace in which to launch the workers.  Defaults to current
-        namespace if available or "default"
+    pod_template: kubernetes.client.V1PodSpec
+        A Kubernetes specification for a Pod for a dask worker.
+    name: str (optional)
+        Name given to the pods.  Defaults to ``dask-$USER-random``
+    namespace: str (optional)
+        Namespace in which to launch the workers.
+        Defaults to current namespace if available or "default"
     n_workers: int
-        Number of workers on initial launch.  Use ``scale_up`` in the future
-    env: dict
+        Number of workers on initial launch.
+        Use ``scale_up`` to incrase this number in the future
+    env: Dict[str, str]
         Dictionariy of environment variables to pass to worker pod
     host: str
         Listen address for local scheduler.  Defaults to 0.0.0.0
@@ -50,13 +52,30 @@ class KubeCluster(object):
 
     Examples
     --------
-    >>> from daskernetes import KubeCluster
-    >>> cluster = KubeCluster()
+    >>> from daskernetes import KubeCluster, make_pod_spec
+    >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
+    ...                          memory_limit='4G', memory_request='4G',
+    ...                          cpu_limit=1, cpu_request=1,
+    ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed')
+    >>> cluster = KubeCluster(pod_spec)
     >>> cluster.scale_up(10)
 
-    Alternatively have Dask allocate workers based on need
+    You can also create clusters with worker pod specifications as dictionaries
+    or stored in YAML files
+
+    >>> cluster = KubeCluster.from_yaml('worker-spec.yml')
+    >>> cluster = KubeCluster.from_dict({...})
+
+    Rather than explicitly setting a number of workers you can also ask the
+    cluster to allocate workers dynamically based on current workload
 
     >>> cluster.adapt()
+
+    See Also
+    --------
+    KubeCluster.from_yaml
+    KubeCluster.from_dict
+    KubeCluster.adapt
     """
     def __init__(
             self,
@@ -106,7 +125,7 @@ class KubeCluster(object):
             ])
         self.pod_template.metadata.generate_name = name
 
-        finalize(self, cleanup_pods, self.namespace, pod_template.metadata.labels)
+        finalize(self, _cleanup_pods, self.namespace, pod_template.metadata.labels)
 
         self._cached_widget = None
 
@@ -127,13 +146,17 @@ class KubeCluster(object):
         ...                      '--nthreads', '1',
         ...                      '--death-timeout', '60'],
         ...             'command': None,
-        ...             'image': image_name,
+        ...             'image': 'daskdev/dask:latest',
         ...             'name': 'dask-worker',
         ...         }],
         ...     'restartPolicy': 'Never',
         ...     }
         ... }
         >>> cluster = KubeCluster.from_dict(spec, namespace='my-ns')  # doctest: +SKIP
+
+        See Also
+        --------
+        KubeCluster.from_yaml
         """
         return cls(make_pod_from_dict(pod_spec), **kwargs)
 
@@ -153,7 +176,7 @@ class KubeCluster(object):
                     baz: quux
             spec:
                 containers:
-                -   image: daskdev/dask
+                -   image: daskdev/dask:latest
                     name: dask-worker
                     args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
                 restartPolicy: Never
@@ -161,6 +184,10 @@ class KubeCluster(object):
         Examples
         --------
         >>> cluster = KubeCluster.from_yaml('pod.yaml', namespace='my-ns')  # doctest: +SKIP
+
+        See Also
+        --------
+        KubeCluster.from_dict
         """
         if not yaml:
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
@@ -214,18 +241,29 @@ class KubeCluster(object):
         return self.scheduler.address
 
     def pods(self):
+        """ A list of kubernetes pods corresponding to current workers """
         return self.core_api.list_namespaced_pod(
             self.namespace,
             label_selector=format_labels(self.pod_template.metadata.labels)
         ).items
 
     def logs(self, pod):
+        """ Logs from each of the worker pods delivered by Kubernetes
+
+        See Also
+        --------
+        Client.get_worker_logs
+        """
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
                                                      pod.metadata.namespace)
 
     def scale_up(self, n, **kwargs):
         """
         Make sure we have n dask-workers available for this cluster
+
+        Examples
+        --------
+        >>> cluster.scale_up(20)  # ask for twenty workers
         """
         pods = self.pods()
 
@@ -286,11 +324,12 @@ class KubeCluster(object):
         return self
 
     def close(self):
+        """ Close this cluster """
         self.scale_down(self.cluster.scheduler.workers)
         self.cluster.close()
 
     def __exit__(self, type, value, traceback):
-        cleanup_pods(self.namespace, self.pod_template.metadata.labels)
+        _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
     def __del__(self):
@@ -300,12 +339,18 @@ class KubeCluster(object):
         """ Have cluster dynamically allocate workers based on load
 
         http://distributed.readthedocs.io/en/latest/adaptive.html
+
+        Examples
+        --------
+        >>> cluster = KubeCluster.from_yaml('worker-spec.yaml')
+        >>> cluster.adapt()
         """
         from distributed.deploy import Adaptive
         return Adaptive(self.scheduler, self)
 
 
-def cleanup_pods(namespace, labels):
+def _cleanup_pods(namespace, labels):
+    """ Remove all pods with these labels in this namespace """
     api = client.CoreV1Api()
     pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
@@ -320,6 +365,7 @@ def cleanup_pods(namespace, labels):
 
 
 def format_labels(labels):
+    """ Convert a dictionary of labels into a comma separated string """
     if labels:
         return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
     else:
