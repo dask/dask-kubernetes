@@ -241,17 +241,30 @@ class KubeCluster(object):
         return self.scheduler.address
 
     def pods(self):
-        """ A list of kubernetes pods corresponding to current workers """
+        """ A list of kubernetes pods corresponding to current workers
+
+        See Also
+        --------
+        KubeCluster.logs
+        """
         return self.core_api.list_namespaced_pod(
             self.namespace,
             label_selector=format_labels(self.pod_template.metadata.labels)
         ).items
 
     def logs(self, pod):
-        """ Logs from each of the worker pods delivered by Kubernetes
+        """ Logs from a worker pod
+
+        You can get this pod object from the ``pods`` method.
+
+        Parameters
+        ----------
+        pod: kubernetes.client.V1Pod
+            The pod from which we want to collect logs.
 
         See Also
         --------
+        KubeCluster.pods
         Client.get_worker_logs
         """
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
