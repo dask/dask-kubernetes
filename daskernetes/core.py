@@ -237,7 +237,7 @@ class KubeCluster(object):
                 ]
                 break
             except client.rest.ApiException as e:
-                if 'ServerTimeout' in str(e):
+                if e.status == 500 and e.reason = 'ServerTimeout':
                     logger.info("Server timeout, retry #%d", i + 1)
                     time.sleep(1)
                     last_exception = e
