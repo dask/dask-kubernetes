@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 import copy
+import time
 from urllib.parse import urlparse
 import uuid
 from weakref import finalize, ref
@@ -165,7 +166,7 @@ class KubeCluster(object):
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
         with open(yaml_path) as f:
             d = yaml.safe_load(f)
-            return cls.from_dict(d)
+            return cls.from_dict(d, **kwargs)
 
     @property
     def namespace(self):
@@ -228,10 +229,23 @@ class KubeCluster(object):
         """
         pods = self.pods()
 
-        out = [
-            self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
-            for _ in range(n - len(pods))
-        ]
+        for i in range(3):
+            try:
+                out = [
+                    self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
+                    for _ in range(n - len(pods))
+                ]
+                break
+            except client.rest.ApiException as e:
+                if e.status == 500 and 'ServerTimeout' in e.body:
+                    logger.info("Server timeout, retry #%d", i + 1)
+                    time.sleep(1)
+                    last_exception = e
+                    continue
+                else:
+                    raise
+        else:
+            raise last_exception
 
         return out
         # fixme: wait for this to be ready before returning!

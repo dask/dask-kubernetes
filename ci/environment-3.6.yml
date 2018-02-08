@@ -1,0 +1,12 @@
+name: daskernetes-test
+channels:
+  - defaults
+dependencies:
+  - flake8
+  - ipywidgets
+  - distributed
+  - pytest
+  - python=3.6
+  - pyyaml
+  - pip:
+    - kubernetes==4
