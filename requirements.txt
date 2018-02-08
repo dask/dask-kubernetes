@@ -1,2 +1,2 @@
 dask[distributed]
-kubernetes
+kubernetes==4
