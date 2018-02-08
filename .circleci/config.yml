@@ -36,11 +36,11 @@ jobs:
             sudo kubectl get deployment
       - restore_cache:
           keys:
-            - miniconda-{{ checksum "ci/environment-3.6.yml" }}
+            - miniconda-v1-{{ checksum "ci/environment-3.6.yml" }}
       - run:
           name: install miniconda
           command: |
-              if [ ! -d "$HOME/miniconda" ]; then
+              if [ ! -d "/home/circleci/miniconda" ]; then
                 wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
                 bash miniconda.sh -b -p $HOME/miniconda
                 export PATH="$HOME/miniconda/bin:$PATH"
@@ -50,7 +50,7 @@ jobs:
       - run:
           name: configure conda
           command: |
-              if [ ! -d "/home/circleci/miniconda/envs/$ENV_NAME" ]; then
+              if [ ! -d "/home/circleci/miniconda/envs/daskernetes-test" ]; then
                 export PATH="$HOME/miniconda/bin:$PATH"
                 conda update -q conda
                 conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
@@ -60,9 +60,9 @@ jobs:
               conda env list
               conda list ${ENV_NAME}
       - save_cache:
-          key: miniconda-{{ checksum "ci/environment-3.6.yml" }}
+          key: miniconda-v1-{{ checksum "ci/environment-3.6.yml" }}
           paths:
-            - "$HOME/miniconda"
+            - "/home/circleci/miniconda"
       - run:
           command: |
             /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes -s --verbose --worker-image daskdev/dask:latest
