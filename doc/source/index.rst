@@ -46,6 +46,23 @@ Quickstart
 
    cluster.adapt()  # or dynamically scale based on current workload
 
+
+Considerations
+--------------
+
+1.  Your worker pod image should have a similar environment to your local
+    environment, including versions of Python, dask, cloudpickle, and any
+    libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
+    See :obj:`KubeCluster` docstring below for guidance on how to check and
+    modify this.
+
+2.  Your Kubernetes resource limits and requests should match the
+    ``--memory-limit`` and ``--nthreads`` parameters given to the
+    ``dask-worker`` command.  Otherwise your workers may get killed by
+    Kubernetes as they pack into the same node and overwhelm that nodes'
+    available memory, leading to ``KilledWorker`` errors.
+
+
 API Documentation
 -----------------
 

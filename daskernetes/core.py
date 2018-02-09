@@ -29,6 +29,19 @@ class KubeCluster(object):
     This starts a local Dask scheduler and then dynamically launches
     Dask workers on a Kubernetes cluster.
 
+    **Environments**
+
+    Your worker pod image should have a similar environment to your local
+    environment, including versions of Python, dask, cloudpickle, and any
+    libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
+    See examples below for suggestions on how to manage and check for this.
+
+    **Resources**
+
+    Your Kubernetes resource limits and requests should match the
+    ``--memory-limit`` and ``--nthreads`` parameters given to the
+    ``dask-worker`` command.
+
     Parameters
     ----------
     pod_template: kubernetes.client.V1PodSpec
@@ -40,9 +53,9 @@ class KubeCluster(object):
         Defaults to current namespace if available or "default"
     n_workers: int
         Number of workers on initial launch.
-        Use ``scale_up`` to incrase this number in the future
+        Use ``scale_up`` to increase this number in the future
     env: Dict[str, str]
-        Dictionariy of environment variables to pass to worker pod
+        Dictionary of environment variables to pass to worker pod
     host: str
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
@@ -70,6 +83,30 @@ class KubeCluster(object):
     cluster to allocate workers dynamically based on current workload
 
     >>> cluster.adapt()
+
+    You can pass this cluster directly to a Dask client
+
+    >>> from dask.distributed import Client
+    >>> client = Client(cluster)
+
+    You can verify that your local environment matches your worker environments
+    by calling ``client.get_versions(check=True)``.  This will raise an
+    informative error if versions do not match.
+
+    >>> client.get_versions(check=True)
+
+    The ``daskdev/dask`` docker images support ``EXTRA_PIP_PACKAGES``,
+    ``EXTRA_APT_PACKAGES`` and ``EXTRA_CONDA_PACKAGES`` environment variables
+    to help with small adjustments to the worker environments.  We recommend
+    the use of pip over conda in this case due to a much shorter startup time.
+    These environment variables can be modified directly from the KubeCluster
+    constructor methods using the ``env=`` keyword.  You may list as many
+    packages as you like in a single string like the following:
+
+    >>> pip = 'pyarrow gcsfs git+https://github.com/dask/distributed'
+    >>> conda = '-c conda-forge scikit-learn'
+    >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
+    ...                                 'ExtRA_CONDA_PACKAGES': conda})
 
     See Also
     --------
