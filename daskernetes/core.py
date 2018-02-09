@@ -167,7 +167,7 @@ class KubeCluster(object):
         self._cached_widget = None
 
         if n_workers:
-            self.scale_up(n_workers)
+            self.scale(n_workers)
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -255,7 +255,7 @@ class KubeCluster(object):
 
         def cb(b):
             n = n_workers.value
-            self.scale_up(n)
+            self.scale(n)
 
         button.on_click(cb)
 
@@ -307,6 +307,30 @@ class KubeCluster(object):
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
                                                      pod.metadata.namespace)
 
+    def scale(self, n):
+        """ Scale cluster to n workers
+
+        Parameters
+        ----------
+        n: int
+            Target number of workers
+
+        Example
+        -------
+        >>> cluster.scale(10)  # scale cluster to ten workers
+
+        See Also
+        --------
+        KubeCluster.scale_up
+        KubeCluster.scale_down
+        """
+        pods = self.pods()
+        if n >= len(pods):
+            return self.scale_up(n)
+        else:
+            to_close = select_workers_to_close(self.scheduler, len(pods) - n)
+            return self.scale_down(to_close)
+
     def scale_up(self, n, **kwargs):
         """
         Make sure we have n dask-workers available for this cluster
@@ -342,6 +366,11 @@ class KubeCluster(object):
         """
         When the worker process exits, Kubernetes leaves the pods in a completed
         state. Kill them when we are asked to.
+
+        Parameters
+        ----------
+        workers: List[str]
+            List of addresses of workers to close
         """
         # Get the existing worker pods
         pods = self.pods()
@@ -454,3 +483,17 @@ def _namespace_default():
         with open(ns_path) as f:
             return f.read().strip()
     return 'default'
+
+
+def select_workers_to_close(s, n):
+    """ Select n workers to close from scheduler s """
+    assert n <= len(s.workers)
+    key = lambda ws: ws.info['memory']
+    to_close = set(sorted(s.idle, key=key)[:n])
+
+    if len(to_close) < n:
+        rest = sorted(s.workers.values(), key=key, reverse=True)
+        while len(to_close) < n:
+            to_close.add(rest.pop())
+
+    return [ws.address for ws in to_close]
