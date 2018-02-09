@@ -7,7 +7,7 @@ import yaml
 import pytest
 from daskernetes import KubeCluster
 from daskernetes.objects import make_pod_spec
-from dask.distributed import Client
+from dask.distributed import Client, wait
 from distributed.utils_test import loop, inc  # noqa: F401
 from distributed.utils import tmpfile
 import kubernetes
@@ -43,25 +43,30 @@ def cluster(pod_spec, ns, loop):
         yield cluster
 
 
-def test_basic(cluster):
-    cluster.scale_up(2)
+@pytest.fixture
+def client(cluster):
     with Client(cluster) as client:
-        future = client.submit(inc, 10)
-        result = future.result()
-        assert result == 11
+        yield client
 
-        while len(cluster.scheduler.workers) < 2:
-            sleep(0.1)
 
-        # Ensure that inter-worker communication works well
-        futures = client.map(inc, range(10))
-        total = client.submit(sum, futures)
-        assert total.result() == sum(map(inc, range(10)))
-        assert all(client.has_what().values())
+def test_basic(cluster, client):
+    cluster.scale(2)
+    future = client.submit(inc, 10)
+    result = future.result()
+    assert result == 11
+
+    while len(cluster.scheduler.workers) < 2:
+        sleep(0.1)
+
+    # Ensure that inter-worker communication works well
+    futures = client.map(inc, range(10))
+    total = client.submit(sum, futures)
+    assert total.result() == sum(map(inc, range(10)))
+    assert all(client.has_what().values())
 
 
 def test_logs(cluster):
-    cluster.scale_up(2)
+    cluster.scale(2)
 
     start = time()
     while len(cluster.scheduler.workers) < 2:
@@ -75,7 +80,7 @@ def test_logs(cluster):
 
 def test_ipython_display(cluster):
     ipywidgets = pytest.importorskip('ipywidgets')
-    cluster.scale_up(1)
+    cluster.scale(1)
     cluster._ipython_display_()
     box = cluster._cached_widget
     assert isinstance(box, ipywidgets.Widget)
@@ -97,7 +102,7 @@ def test_namespace(pod_spec, loop, ns):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster2:
             assert cluster.name != cluster2.name
 
-            cluster2.scale_up(1)
+            cluster2.scale(1)
             [pod] = cluster2.pods()
 
 
@@ -116,7 +121,7 @@ def test_adapt(cluster):
 
 def test_env(pod_spec, loop, ns):
     with KubeCluster(pod_spec, env={'ABC': 'DEF'}, loop=loop, namespace=ns) as cluster:
-        cluster.scale_up(1)
+        cluster.scale(1)
         with Client(cluster) as client:
             while not cluster.scheduler.workers:
                 sleep(0.1)
@@ -152,7 +157,7 @@ def test_pod_from_yaml(image_name, loop, ns):
             yaml.dump(test_yaml, f)
         with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
             assert cluster.namespace == ns
-            cluster.scale_up(2)
+            cluster.scale(2)
             with Client(cluster) as client:
                 future = client.submit(inc, 10)
                 try:
@@ -190,7 +195,7 @@ def test_pod_from_dict(image_name, loop, ns):
     }
 
     with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
-        cluster.scale_up(2)
+        cluster.scale(2)
         with Client(cluster) as client:
             future = client.submit(inc, 10)
             result = future.result()
@@ -219,3 +224,28 @@ def test_constructor_parameters(pod_spec, loop, ns):
         assert var and var[0].value == '1'
 
         assert pod.metadata.generate_name == 'myname'
+
+
+def test_scale_up_down(cluster, client):
+    np = pytest.importorskip('numpy')
+    cluster.scale(2)
+
+    start = time()
+    while len(cluster.scheduler.workers) != 2:
+        sleep(0.1)
+        assert time() < start + 10
+
+    a, b = list(cluster.scheduler.workers)
+    x = client.submit(np.ones, 1, workers=a)
+    y = client.submit(np.ones, 100000000, workers=b)
+
+    wait([x, y])
+
+    cluster.scale(1)
+
+    start = time()
+    while len(cluster.scheduler.workers) != 1:
+        sleep(0.1)
+        assert time() < start + 10
+
+    assert set(cluster.scheduler.workers) == {b}

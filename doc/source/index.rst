@@ -75,7 +75,7 @@ API Documentation
    KubeCluster.from_yaml
    KubeCluster.logs
    KubeCluster.pods
-   KubeCluster.scale_up
+   KubeCluster.scale
 
 .. autoclass:: KubeCluster
    :members:
