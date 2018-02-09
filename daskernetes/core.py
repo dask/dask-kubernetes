@@ -86,7 +86,7 @@ class KubeCluster(object):
             host='0.0.0.0',
             port=0,
             env=None,
-            **kwargs,
+            **kwargs
     ):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
