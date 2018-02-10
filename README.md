@@ -5,7 +5,7 @@ Native Kubernetes integration for dask
 
 ## Setup
 
-### Telepresence
+### testing
 
 For local development, it is often desirable to run the scheduler
 process on one's local machine & the workers on minikube.
@@ -49,16 +49,10 @@ process on one's local machine & the workers on minikube.
    `sudo ip route add` command again. Note that restarting docker
    will restart all your running containers by default.
 
-3. Create a namespace to spawn your worker pods in.
+3. Run tests
 
    ```bash
-   kubectl create namespace dask-workers
-   ```
-
-4. Run the code!
-
-   ```bash
-   python daskernetes/__init__.py --worker-image <worker-image> <cluster-name> <namespace>
+   py.test daskernetes --worker-image <worker-image>
    ```
 
    where:
@@ -69,3 +63,25 @@ process on one's local machine & the workers on minikube.
         specific cluster
       - `<namespace>` is the namespace you created in step 3
 
+
+## History
+
+This repository was originally inspired by a
+[Dask+Kubernetes solution](https://github.com/met-office-lab/jade-dask/blob/master/kubernetes/adaptive.py)
+within the
+[Jade (Jupyter and Dask Environemt)](http://www.informaticslab.co.uk/projects/jade.html)
+project out of the [UK Met office](https://www.metoffice.gov.uk/)
+[Informatics Lab](http://www.informaticslab.co.uk/).
+This Dask+Kubernetes solution was primarily developed by
+[Jacob Tomlinson](https://github.com/jacobtomlinson) of the Informatics Lab
+and [Matt Pryor](https://github.com/mkjpryor-stfc) of the
+[STFC](http://www.stfc.ac.uk/) and funded by [NERC](http://www.nerc.ac.uk/).
+
+![Met Office Logo](https://raw.githubusercontent.com/met-office-lab/blog/master/img/mo-logo.svg)
+
+It was then adapted by [Yuvi Panda](http://words.yuvi.in/) at the
+[UC Berkeley Institute for Data Science (BIDS)](https://bids.berkeley.edu/) and
+[DSEP](http://data.berkeley.edu/) programs while using it with
+[JupyterHub](https://jupyterhub.readthedocs.io/en/latest/) on the
+[Pangeo project](https://pangeo-data.github.io/).
+It was then brought under the Dask github organization where it lives today.
