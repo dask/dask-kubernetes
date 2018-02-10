@@ -195,7 +195,9 @@ def clean_pod_template(pod_template):
         raise TypeError(msg % str(pod_template))
 
     pod_template = copy.deepcopy(pod_template)
-    # Default labels that can't be overwritten
+
+    # Make sure metadata / labels / env objects exist, so they can be modified
+    # later without a lot of `is None` checks
     if pod_template.metadata is None:
         pod_template.metadata = client.V1ObjectMeta()
     if pod_template.metadata.labels is None:
