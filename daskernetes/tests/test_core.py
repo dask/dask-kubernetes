@@ -309,9 +309,9 @@ def test_automatic_startup(image_name, loop, ns):
     with tmpfile(extension='yaml') as fn:
         with open(fn, mode='w') as f:
             yaml.dump(test_yaml, f)
-        config['worker-spec-path'] = fn
+        config['worker-template-path'] = fn
         try:
             with KubeCluster(loop=loop, namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
         finally:
-            del config['worker-spec-path']
+            del config['worker-template-path']

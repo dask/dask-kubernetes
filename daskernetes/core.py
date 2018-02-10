@@ -76,7 +76,7 @@ class KubeCluster(object):
     You can also create clusters with worker pod specifications as dictionaries
     or stored in YAML files
 
-    >>> cluster = KubeCluster.from_yaml('worker-spec.yml')
+    >>> cluster = KubeCluster.from_yaml('worker-template.yml')
     >>> cluster = KubeCluster.from_dict({...})
 
     Rather than explicitly setting a number of workers you can also ask the
@@ -108,6 +108,14 @@ class KubeCluster(object):
     >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
     ...                                 'ExtRA_CONDA_PACKAGES': conda})
 
+    You can also start a KubeCluster with no arguments *if* the YAML file
+    defining the worker template is referred to in the
+    ``DASKERNETES_WORKER_TEMPLATE_PATH`` environment variable
+
+        $ export DASKERNETES_WORKER_TEMPLATE_PATH=worker_template.yaml
+
+    >>> cluster = KubeCluster()  # automatically finds 'worker_template.yaml'
+
     See Also
     --------
     KubeCluster.from_yaml
@@ -126,9 +134,9 @@ class KubeCluster(object):
             **kwargs
     ):
         if pod_template is None:
-            if 'worker-spec-path' in config:
+            if 'worker-template-path' in config:
                 import yaml
-                with open(config['worker-spec-path']) as f:
+                with open(config['worker-template-path']) as f:
                     d = yaml.safe_load(f)
                 pod_template = make_pod_from_dict(d)
             else:
@@ -429,7 +437,7 @@ class KubeCluster(object):
 
         Examples
         --------
-        >>> cluster = KubeCluster.from_yaml('worker-spec.yaml')
+        >>> cluster = KubeCluster.from_yaml('worker-template.yaml')
         >>> cluster.adapt()
         """
         from distributed.deploy import Adaptive
