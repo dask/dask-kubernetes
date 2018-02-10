@@ -1,8 +1,9 @@
 """
 Convenience functions for creating pod templates.
 """
-from kubernetes import client
 from collections import namedtuple
+import copy
+from kubernetes import client
 import json
 
 try:
@@ -177,3 +178,30 @@ def make_pod_from_dict(dict_):
         _FakeResponse(data=json.dumps(dict_)),
         client.V1Pod
     )
+
+
+def clean_pod_template(pod_template):
+    """ Normalize pod template and check for type errors """
+    if isinstance(pod_template, str):
+        msg = ('Expected a kubernetes.client.V1Pod object, got %s'
+               'If trying to pass a yaml filename then use '
+               'KubeCluster.from_yaml')
+        raise TypeError(msg % pod_template)
+
+    if isinstance(pod_template, dict):
+        msg = ('Expected a kubernetes.client.V1Pod object, got %s'
+               'If trying to pass a dictionary specification then use '
+               'KubeCluster.from_dict')
+        raise TypeError(msg % str(pod_template))
+
+    pod_template = copy.deepcopy(pod_template)
+    # Default labels that can't be overwritten
+    if pod_template.metadata is None:
+        pod_template.metadata = client.V1ObjectMeta()
+    if pod_template.metadata.labels is None:
+        pod_template.metadata.labels = {}
+
+    if pod_template.spec.containers[0].env is None:
+        pod_template.spec.containers[0].env = []
+
+    return pod_template
