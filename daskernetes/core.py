@@ -15,9 +15,10 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 
 from distributed.deploy import LocalCluster
-from kubernetes import client, config
+import kubernetes
 
-from daskernetes.objects import make_pod_from_dict, clean_pod_template
+from .config import config
+from .objects import make_pod_from_dict, clean_pod_template
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ class KubeCluster(object):
     You can also create clusters with worker pod specifications as dictionaries
     or stored in YAML files
 
-    >>> cluster = KubeCluster.from_yaml('worker-spec.yml')
+    >>> cluster = KubeCluster.from_yaml('worker-template.yml')
     >>> cluster = KubeCluster.from_dict({...})
 
     Rather than explicitly setting a number of workers you can also ask the
@@ -107,6 +108,14 @@ class KubeCluster(object):
     >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
     ...                                 'ExtRA_CONDA_PACKAGES': conda})
 
+    You can also start a KubeCluster with no arguments *if* the YAML file
+    defining the worker template is referred to in the
+    ``DASKERNETES_WORKER_TEMPLATE_PATH`` environment variable
+
+        $ export DASKERNETES_WORKER_TEMPLATE_PATH=worker_template.yaml
+
+    >>> cluster = KubeCluster()  # automatically finds 'worker_template.yaml'
+
     See Also
     --------
     KubeCluster.from_yaml
@@ -115,7 +124,7 @@ class KubeCluster(object):
     """
     def __init__(
             self,
-            pod_template,
+            pod_template=None,
             name=None,
             namespace=None,
             n_workers=0,
@@ -124,15 +133,26 @@ class KubeCluster(object):
             env=None,
             **kwargs
     ):
+        if pod_template is None:
+            if 'worker-template-path' in config:
+                import yaml
+                with open(config['worker-template-path']) as f:
+                    d = yaml.safe_load(f)
+                pod_template = make_pod_from_dict(d)
+            else:
+                msg = ("Worker pod specification not provided. See KubeCluster "
+                       "docstring for ways to specify workers")
+                raise ValueError(msg)
+
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
         try:
-            config.load_incluster_config()
-        except config.ConfigException:
-            config.load_kube_config()
+            kubernetes.config.load_incluster_config()
+        except kubernetes.config.ConfigException:
+            kubernetes.config.load_kube_config()
 
-        self.core_api = client.CoreV1Api()
+        self.core_api = kubernetes.client.CoreV1Api()
 
         if namespace is None:
             namespace = _namespace_default()
@@ -148,11 +168,12 @@ class KubeCluster(object):
         self.pod_template.metadata.namespace = namespace
 
         self.pod_template.spec.containers[0].env.append(
-            client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
+            kubernetes.client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS',
+                                       value=self.scheduler_address)
         )
         if env:
             self.pod_template.spec.containers[0].env.extend([
-                client.V1EnvVar(name=k, value=str(v))
+                kubernetes.client.V1EnvVar(name=k, value=str(v))
                 for k, v in env.items()
             ])
         self.pod_template.metadata.generate_name = name
@@ -343,7 +364,7 @@ class KubeCluster(object):
                     for _ in range(n - len(pods))
                 ]
                 break
-            except client.rest.ApiException as e:
+            except kubernetes.client.rest.ApiException as e:
                 if e.status == 500 and 'ServerTimeout' in e.body:
                     logger.info("Server timeout, retry #%d", i + 1)
                     time.sleep(1)
@@ -386,10 +407,10 @@ class KubeCluster(object):
                 self.core_api.delete_namespaced_pod(
                     pod.metadata.name,
                     self.namespace,
-                    client.V1DeleteOptions()
+                    kubernetes.client.V1DeleteOptions()
                 )
                 logger.info('Deleted pod: %s', pod.metadata.name)
-            except client.rest.ApiException as e:
+            except kubernetes.client.rest.ApiException as e:
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
                     raise
@@ -416,7 +437,7 @@ class KubeCluster(object):
 
         Examples
         --------
-        >>> cluster = KubeCluster.from_yaml('worker-spec.yaml')
+        >>> cluster = KubeCluster.from_yaml('worker-template.yaml')
         >>> cluster.adapt()
         """
         from distributed.deploy import Adaptive
@@ -425,14 +446,14 @@ class KubeCluster(object):
 
 def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """
-    api = client.CoreV1Api()
+    api = kubernetes.client.CoreV1Api()
     pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(pod.metadata.name, namespace,
-                                      client.V1DeleteOptions())
+                                      kubernetes.client.V1DeleteOptions())
             logger.info('Deleted pod: %s', pod.metadata.name)
-        except client.rest.ApiException as e:
+        except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
             if e.status != 404:
                 raise
