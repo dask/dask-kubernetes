@@ -79,7 +79,9 @@ and [Matt Pryor](https://github.com/mkjpryor-stfc) of the
 
 ![Met Office Logo](https://raw.githubusercontent.com/met-office-lab/blog/master/img/mo-logo.svg)
 
-It was then adapted by [Yuvi Panda](http://words.yuvi.in/) at the UC Berkeley
-[BiDS](https://bids.berkeley.edu/) and [DSEP](http://words.yuvi.in/) programs
-while using it with [JupyterHub](https://jupyterhub.readthedocs.io/en/latest/)
-on the [Pangeo project](https://pangeo-data.github.io/).
+It was then adapted by [Yuvi Panda](http://words.yuvi.in/) at the
+[UC Berkeley Institute for Data Science (BIDS)](https://bids.berkeley.edu/) and
+[DSEP](http://data.berkeley.edu/) programs while using it with
+[JupyterHub](https://jupyterhub.readthedocs.io/en/latest/) on the
+[Pangeo project](https://pangeo-data.github.io/).
+It was then brought under the Dask github organization where it lives today.
