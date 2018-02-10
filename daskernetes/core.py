@@ -2,7 +2,6 @@ import getpass
 import logging
 import os
 import socket
-import copy
 import time
 from urllib.parse import urlparse
 import uuid
@@ -18,7 +17,7 @@ from tornado.ioloop import IOLoop
 from distributed.deploy import LocalCluster
 from kubernetes import client, config
 
-from daskernetes.objects import make_pod_from_dict
+from daskernetes.objects import make_pod_from_dict, clean_pod_template
 
 logger = logging.getLogger(__name__)
 
@@ -141,17 +140,13 @@ class KubeCluster(object):
         if name is None:
             name = 'dask-%s-%s' % (getpass.getuser(), str(uuid.uuid4())[:10])
 
-        self.pod_template = copy.deepcopy(pod_template)
+        self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
-        if self.pod_template.metadata.labels is None:
-            self.pod_template.metadata.labels = {}
         self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
         self.pod_template.metadata.labels['app'] = 'dask'
         self.pod_template.metadata.labels['component'] = 'dask-worker'
         self.pod_template.metadata.namespace = namespace
 
-        if self.pod_template.spec.containers[0].env is None:
-            self.pod_template.spec.containers[0].env = []
         self.pod_template.spec.containers[0].env.append(
             client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS', value=self.scheduler_address)
         )
@@ -162,7 +157,7 @@ class KubeCluster(object):
             ])
         self.pod_template.metadata.generate_name = name
 
-        finalize(self, _cleanup_pods, self.namespace, pod_template.metadata.labels)
+        finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
 
         self._cached_widget = None
 

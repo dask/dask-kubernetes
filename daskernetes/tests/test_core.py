@@ -211,6 +211,40 @@ def test_pod_from_dict(image_name, loop, ns):
             assert all(client.has_what().values())
 
 
+def test_pod_from_minimal_dict(image_name, loop, ns):
+    spec = {
+        'spec': {
+            'containers': [{
+                'args': ['dask-worker', '$(DASK_SCHEDULER_ADDRESS)',
+                         '--nthreads', '1',
+                         '--death-timeout', '60'],
+                'command': None,
+                'image': image_name,
+                'name': 'worker'
+            }]
+        }
+    }
+
+    with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
+        cluster.adapt()
+        with Client(cluster) as client:
+            future = client.submit(inc, 10)
+            result = future.result()
+            assert result == 11
+
+
+def test_bad_args(loop):
+    with pytest.raises(TypeError) as info:
+        KubeCluster('myfile.yaml')
+
+    assert 'KubeCluster.from_yaml' in str(info.value)
+
+    with pytest.raises(TypeError) as info:
+        KubeCluster({})
+
+    assert 'KubeCluster.from_dict' in str(info.value)
+
+
 def test_constructor_parameters(pod_spec, loop, ns):
     env = {'FOO': 'BAR', 'A': 1}
     with KubeCluster(pod_spec, name='myname', namespace=ns, loop=loop, env=env) as cluster:
