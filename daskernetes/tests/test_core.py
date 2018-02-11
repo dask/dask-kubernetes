@@ -94,6 +94,22 @@ def test_ipython_display(cluster):
         sleep(0.5)
 
 
+def test_diagnostics_link_env_variable(pod_spec, loop, ns):
+    pytest.importorskip('bokeh')
+    config['diagnostics-link'] = 'foo-{USER}-{port}'
+    try:
+        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+            port = cluster.scheduler.services['bokeh'].port
+            cluster._ipython_display_()
+            box = cluster._cached_widget
+
+            link = box.children[0]
+            assert 'foo-' + getpass.getuser() + '-' + str(port) in link.value
+            assert 'href' in link.value
+    finally:
+        del config['diagnostics-link']
+
+
 def test_namespace(pod_spec, loop, ns):
     with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
         assert 'dask' in cluster.name
