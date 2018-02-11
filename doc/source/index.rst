@@ -63,6 +63,29 @@ Considerations
     available memory, leading to ``KilledWorker`` errors.
 
 
+Configuration
+-------------
+
+There are a few special environment variables that affect daskernetes behavior:
+
+1.  ``DASKERNETES_WORKER_TEMPLATE_PATH``: a path a a YAML file that holds a
+    Pod spec for the worker.  If provided then this will be used when
+    :obj:`KubeCluster` is called with no arguments::
+
+       cluster = KubeCluster()  # reads provided yaml file
+
+2.  ``DASKERNETES_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
+    the location of Dask's dashboard.  This string will receive values for
+    ``host``, ``port``, and all environment variables.  This is useful when
+    using Daskernetes with JupyterHub and nbserverproxy to route the dashboard
+    link to a proxied address as follows::
+
+       export DASKERNETES_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+
+Any other environment variable starting with ``DASKERNETES_`` will be placed in
+the ``daskernetes.config`` dictionary for general use.
+
+
 API Documentation
 -----------------
 

@@ -270,11 +270,9 @@ class KubeCluster(object):
             else:
                 template = 'http://{host}:{port}/status'
 
-            d = {'host': self.scheduler.address.split('://')[1].split(':')[0],
-                 'port': self.scheduler.services['bokeh'].port}
-            d.update(os.environ)
-
-            link = template.format(**d)
+            host = self.scheduler.address.split('://')[1].split(':')[0]
+            port = self.scheduler.services['bokeh'].port
+            link = template.format(host=host, port=port, **os.environ)
             link = ipywidgets.HTML('<b>Dashboard:</b> <a href="%s" target="_blank">%s</a>' %
                                    (link, link))
             elements.append(link)
