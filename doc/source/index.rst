@@ -1,7 +1,9 @@
 Daskernetes
 ===========
 
-Daskernetes deploys Dask workers on Kubernetes clusters
+Daskernetes deploys Dask workers on Kubernetes clusters using native Kubernetes
+APIs.  It is designed to dynamically launch short-lived deployments of workers
+during the lifetime of a Python process.
 
 Install
 -------
@@ -13,30 +15,6 @@ Install
 Quickstart
 ----------
 
-.. code-block:: yaml
-
-      # worker-spec.yml
-
-      kind: Pod
-      metadata:
-        labels:
-          foo: bar
-      spec:
-        restart_policy: Never
-        containers:
-        - image: daskdev/dask:latest
-          args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 8GB, --death-timeout, '60']
-          env:
-            - name: EXTRA_PIP_PACKAGES
-              value: fastparquet git+https://github.com/dask/distributed
-          resources:
-            limits:
-              cpu: "3"
-              memory: 8G
-            requests:
-              cpu: "2"
-              memory: 8G
-
 .. code-block:: python
 
    from daskernetes import KubeCluster
@@ -46,8 +24,32 @@ Quickstart
 
    cluster.adapt()  # or dynamically scale based on current workload
 
+.. code-block:: yaml
 
-Considerations
+      # worker-spec.yml
+
+      kind: Pod
+      metadata:
+        labels:
+          foo: bar
+      spec:
+        restartPolicy: Never
+        containers:
+        - image: daskdev/dask:latest
+          args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 6GB, --death-timeout, '60']
+          env:
+            - name: EXTRA_PIP_PACKAGES
+              value: fastparquet git+https://github.com/dask/distributed
+          resources:
+            limits:
+              cpu: "2"
+              memory: 6G
+            requests:
+              cpu: "2"
+              memory: 6G
+
+
+Best Practices
 --------------
 
 1.  Your worker pod image should have a similar environment to your local
@@ -61,6 +63,11 @@ Considerations
     ``dask-worker`` command.  Otherwise your workers may get killed by
     Kubernetes as they pack into the same node and overwhelm that nodes'
     available memory, leading to ``KilledWorker`` errors.
+
+3.  We recommend adding the ``--death-timeout, '60'`` arguments and the
+    ``restartPolicy: Never`` attribute to your worker specification.
+    This ensures that these pods will clean themselves up if your Python
+    process disappears unexpectedly.
 
 
 Configuration
@@ -86,19 +93,10 @@ Any other environment variable starting with ``DASKERNETES_`` will be placed in
 the ``daskernetes.config`` dictionary for general use.
 
 
-API Documentation
------------------
+.. toctree::
+   :maxdepth: 1
+   :hidden:
 
-.. currentmodule:: daskernetes
-
-.. autosummary::
-   KubeCluster
-   KubeCluster.adapt
-   KubeCluster.from_dict
-   KubeCluster.from_yaml
-   KubeCluster.logs
-   KubeCluster.pods
-   KubeCluster.scale
-
-.. autoclass:: KubeCluster
-   :members:
+   api
+   history
+   testing
