@@ -25,4 +25,9 @@ It was then brought under the Dask github organization where it lives today.
 .. image:: https://upload.wikimedia.org/wikipedia/en/thumb/f/f4/Met_Office.svg/1200px-Met_Office.svg.png
    :alt: Met Office Logo
    :width: 20%
-
+.. image:: https://upload.wikimedia.org/wikipedia/commons/4/4c/Berkeley_Institute_for_Data_Science_-_Logo.png
+   :alt: BIDS Logo
+   :width: 20%
+.. image:: https://www.anaconda.com/wp-content/themes/anaconda/images/logo-dark.png
+   :alt: Anaconda Logo
+   :width: 30%
