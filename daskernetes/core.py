@@ -263,10 +263,25 @@ class KubeCluster(object):
         import ipywidgets
         layout = ipywidgets.Layout(width='150px')
 
+        elements = []
+        if 'bokeh' in self.scheduler.services:
+            if 'diagnostics-link' in config:
+                template = config['diagnostics-link']
+            else:
+                template = 'http://{host}:{port}/status'
+
+            host = self.scheduler.address.split('://')[1].split(':')[0]
+            port = self.scheduler.services['bokeh'].port
+            link = template.format(host=host, port=port, **os.environ)
+            link = ipywidgets.HTML('<b>Dashboard:</b> <a href="%s" target="_blank">%s</a>' %
+                                   (link, link))
+            elements.append(link)
+
         n_workers = ipywidgets.IntText(0, description='Requested', layout=layout)
         actual = ipywidgets.Text('0', description='Actual', layout=layout)
         button = ipywidgets.Button(description='Scale', layout=layout)
-        box = ipywidgets.VBox([n_workers, actual, button])
+        elements.extend([n_workers, actual, button])
+        box = ipywidgets.VBox(elements)
         self._cached_widget = box
 
         def cb(b):
