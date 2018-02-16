@@ -93,6 +93,15 @@ Any other environment variable starting with ``DASKERNETES_`` will be placed in
 the ``daskernetes.config`` dictionary for general use.
 
 
+Docker Images
+-------------
+
+Example Dask docker images daskdev/dask and daskdev/dask-notebook
+are available on https://hub.docker.com/r/daskdev .
+More information about these images is available at the
+`Dask documentation <http://dask.pydata.org/en/latest/setup/docker.html>`_.
+
+
 .. toctree::
    :maxdepth: 1
    :hidden:
