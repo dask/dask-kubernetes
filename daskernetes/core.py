@@ -357,12 +357,13 @@ class KubeCluster(object):
         """
         pods = self.pods()
         if n >= len(pods):
-            return self.scale_up(n)
+            return self.scale_up(n, pods=pods)
         else:
             to_close = select_workers_to_close(self.scheduler, len(pods) - n)
+            logger.debug("Closing workers: %s", to_close)
             return self.scale_down(to_close)
 
-    def scale_up(self, n, **kwargs):
+    def scale_up(self, n, pods=None, **kwargs):
         """
         Make sure we have n dask-workers available for this cluster
 
@@ -370,7 +371,7 @@ class KubeCluster(object):
         --------
         >>> cluster.scale_up(20)  # ask for twenty workers
         """
-        pods = self.pods()
+        pods = pods or self.pods()
 
         for i in range(3):
             try:
@@ -441,9 +442,6 @@ class KubeCluster(object):
     def __exit__(self, type, value, traceback):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
-
-    def __del__(self):
-        self.close()  # TODO: do this more cleanly
 
     def adapt(self):
         """ Have cluster dynamically allocate workers based on load
