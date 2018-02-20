@@ -98,6 +98,15 @@ def test_ipython_display(cluster):
         sleep(0.5)
 
 
+def test_dask_worker_name_env_variable(pod_spec, loop, ns):
+    config['worker-name'] = 'foo-{USER}-{uuid}'
+    try:
+        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+            assert 'foo-' + getpass.getuser() in cluster.name
+    finally:
+        del config['worker-name']
+
+
 def test_diagnostics_link_env_variable(pod_spec, loop, ns):
     pytest.importorskip('bokeh')
     config['diagnostics-link'] = 'foo-{USER}-{port}'
