@@ -6,6 +6,7 @@ dependencies:
   - ipywidgets
   - distributed=1.21.0
   - dask=0.17.0
+  - nomkl
   - pytest
   - python=3.6
   - pyyaml
