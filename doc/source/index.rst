@@ -89,6 +89,15 @@ There are a few special environment variables that affect daskernetes behavior:
 
        export DASKERNETES_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
 
+3.  ``DASKERNETES_WORKER_NAME_TEMPLATE``: a Python pre-formatted string to use
+    when naming dask worker pods. This string will receive values for ``user``,
+    ``uuid``, and all environment variables. This is useful when you want to have
+    control over the naming convention for your pods and use other tokens from
+    the environment. For example when using zero-to-jupyterhub every user is
+    called ``jovyan`` and so you may wish to use ``dask-{JUPYTERHUB_USER}-{uuid}``
+    instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
+    the template.**
+
 Any other environment variable starting with ``DASKERNETES_`` will be placed in
 the ``daskernetes.config`` dictionary for general use.
 
