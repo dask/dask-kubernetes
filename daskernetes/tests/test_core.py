@@ -7,7 +7,7 @@ import yaml
 import pytest
 from daskernetes import KubeCluster, make_pod_spec, config
 from dask.distributed import Client, wait
-from distributed.utils_test import loop, inc  # noqa: F401
+from distributed.utils_test import loop  # noqa: F401
 from distributed.utils import tmpfile
 import kubernetes
 
@@ -48,9 +48,13 @@ def client(cluster):
         yield client
 
 
+def test_versions(client):
+    client.get_versions(check=True)
+
+
 def test_basic(cluster, client):
     cluster.scale(2)
-    future = client.submit(inc, 10)
+    future = client.submit(lambda x: x + 1, 10)
     result = future.result()
     assert result == 11
 
@@ -58,9 +62,9 @@ def test_basic(cluster, client):
         sleep(0.1)
 
     # Ensure that inter-worker communication works well
-    futures = client.map(inc, range(10))
+    futures = client.map(lambda x: x + 1, range(10))
     total = client.submit(sum, futures)
-    assert total.result() == sum(map(inc, range(10)))
+    assert total.result() == sum(map(lambda x: x + 1, range(10)))
     assert all(client.has_what().values())
 
 
@@ -133,7 +137,7 @@ def test_namespace(pod_spec, loop, ns):
 def test_adapt(cluster):
     cluster.adapt()
     with Client(cluster) as client:
-        future = client.submit(inc, 10)
+        future = client.submit(lambda x: x + 1, 10)
         result = future.result()
         assert result == 11
 
@@ -183,11 +187,8 @@ def test_pod_from_yaml(image_name, loop, ns):
             assert cluster.namespace == ns
             cluster.scale(2)
             with Client(cluster) as client:
-                future = client.submit(inc, 10)
-                try:
-                    result = future.result(timeout=10)
-                except Exception as e:
-                    import pdb; pdb.set_trace()
+                future = client.submit(lambda x: x + 1, 10)
+                result = future.result(timeout=10)
                 assert result == 11
 
                 start = time()
@@ -196,9 +197,9 @@ def test_pod_from_yaml(image_name, loop, ns):
                     assert time() < start + 10, 'timeout'
 
                 # Ensure that inter-worker communication works well
-                futures = client.map(inc, range(10))
+                futures = client.map(lambda x: x + 1, range(10))
                 total = client.submit(sum, futures)
-                assert total.result() == sum(map(inc, range(10)))
+                assert total.result() == sum(map(lambda x: x + 1, range(10)))
                 assert all(client.has_what().values())
 
 
@@ -221,7 +222,7 @@ def test_pod_from_dict(image_name, loop, ns):
     with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
         cluster.scale(2)
         with Client(cluster) as client:
-            future = client.submit(inc, 10)
+            future = client.submit(lambda x: x + 1, 10)
             result = future.result()
             assert result == 11
 
@@ -229,9 +230,9 @@ def test_pod_from_dict(image_name, loop, ns):
                 sleep(0.1)
 
             # Ensure that inter-worker communication works well
-            futures = client.map(inc, range(10))
+            futures = client.map(lambda x: x + 1, range(10))
             total = client.submit(sum, futures)
-            assert total.result() == sum(map(inc, range(10)))
+            assert total.result() == sum(map(lambda x: x + 1, range(10)))
             assert all(client.has_what().values())
 
 
@@ -252,7 +253,7 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
     with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
         cluster.adapt()
         with Client(cluster) as client:
-            future = client.submit(inc, 10)
+            future = client.submit(lambda x: x + 1, 10)
             result = future.result()
             assert result == 11
 
