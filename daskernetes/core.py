@@ -158,8 +158,8 @@ class KubeCluster(object):
             namespace = _namespace_default()
 
         if name is None:
-            worker_name_template = config.get('worker-name-template', 'dask-{user}-{uuid}')
-            name =  worker_name_template.format(user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ)
+            worker_name = config.get('worker-name', 'dask-{user}-{uuid}')
+            name =  worker_name.format(user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ)
 
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
