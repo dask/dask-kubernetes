@@ -335,3 +335,10 @@ def test_automatic_startup(image_name, loop, ns):
         with set_config(**{'kubernetes-worker-template-path': fn}):
             with KubeCluster(loop=loop, namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
+
+
+def test_repr(cluster):
+    for text in [repr(cluster), str(cluster)]:
+        assert 'Box' not in text
+        assert cluster.scheduler.address in text
+        assert "workers=0" in text
