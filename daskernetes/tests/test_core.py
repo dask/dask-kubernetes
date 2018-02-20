@@ -48,6 +48,10 @@ def client(cluster):
         yield client
 
 
+def test_versions(client):
+    client.get_versions(check=True)
+
+
 def test_basic(cluster, client):
     cluster.scale(2)
     future = client.submit(inc, 10)
@@ -175,10 +179,7 @@ def test_pod_from_yaml(image_name, loop, ns):
             cluster.scale(2)
             with Client(cluster) as client:
                 future = client.submit(inc, 10)
-                try:
-                    result = future.result(timeout=10)
-                except Exception as e:
-                    import pdb; pdb.set_trace()
+                result = future.result(timeout=10)
                 assert result == 11
 
                 start = time()

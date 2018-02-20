@@ -65,7 +65,7 @@ jobs:
             - "/home/circleci/miniconda"
       - run:
           command: |
-            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes -s --verbose --worker-image daskdev/dask:latest
+            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes -s --verbose --worker-image daskdev/dask:0.17.0
       - run:
           command: |
             /home/circleci/miniconda/envs/daskernetes-test/bin/flake8 daskernetes
