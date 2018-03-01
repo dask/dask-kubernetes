@@ -1,7 +1,7 @@
 API
 ===
 
-.. currentmodule:: daskernetes
+.. currentmodule:: dask_kubernetes
 
 .. autosummary::
    KubeCluster

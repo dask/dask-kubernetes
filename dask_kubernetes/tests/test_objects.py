@@ -1,5 +1,5 @@
-from daskernetes import KubeCluster
-from daskernetes.objects import make_pod_spec, make_pod_from_dict
+from dask_kubernetes import KubeCluster
+from dask_kubernetes.objects import make_pod_spec, make_pod_from_dict
 from distributed.utils_test import loop  # noqa: F401
 
 

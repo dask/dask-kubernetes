@@ -7,7 +7,7 @@ jobs:
       CHANGE_MINIKUBE_NONE_USER: true
     environment:
       PYTHON: "3.6"
-      ENV_NAME: "daskernetes-test"
+      ENV_NAME: "dask-kubernetes-test"
     steps:
       - checkout
       - run:
@@ -51,7 +51,7 @@ jobs:
           name: configure conda
           command: |
               export PATH="$HOME/miniconda/bin:$PATH"
-              if [ ! -d "/home/circleci/miniconda/envs/daskernetes-test" ]; then
+              if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
                 conda update -q conda
                 conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
                 source activate ${ENV_NAME}
@@ -65,7 +65,7 @@ jobs:
             - "/home/circleci/miniconda"
       - run:
           command: |
-            /home/circleci/miniconda/envs/daskernetes-test/bin/pytest daskernetes -s --verbose --worker-image daskdev/dask:0.17.0
+            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/pytest dask-kubernetes -s --verbose --worker-image daskdev/dask:0.17.0
       - run:
           command: |
-            /home/circleci/miniconda/envs/daskernetes-test/bin/flake8 daskernetes
+            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/flake8 dask-kubernetes

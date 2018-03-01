@@ -22,6 +22,11 @@ and `DSEP <http://data.berkeley.edu/>`__ programs while using it with
 `Pangeo project <https://pangeo-data.github.io/>`__.
 It was then brought under the Dask github organization where it lives today.
 
+This repository was originally named *daskernetes* to avoid conflict with an
+older, Google Cloud Platform specific solution named dask-kubernetes.
+Eventually this package superceded that one and took on the name
+dask-kubernetes.
+
 .. image:: https://upload.wikimedia.org/wikipedia/en/thumb/f/f4/Met_Office.svg/1200px-Met_Office.svg.png
    :alt: Met Office Logo
    :width: 20%

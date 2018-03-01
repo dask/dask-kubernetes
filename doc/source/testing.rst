@@ -40,7 +40,7 @@ process on one's local machine & the workers on minikube.
 
 3.  Run tests::
 
-       py.test daskernetes --worker-image <worker-image>
+       py.test dask_kubernetes --worker-image <worker-image>
 
     where:
 

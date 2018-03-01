@@ -1,4 +1,4 @@
-name: daskernetes-test
+name: dask-kubernetes-test
 channels:
   - defaults
 dependencies:

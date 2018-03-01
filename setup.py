@@ -4,10 +4,10 @@ from os.path import exists
 from setuptools import setup, find_packages
 
 setup(
-    name='daskernetes',
+    name='dask-kubernetes',
     version='0.1.3',
     description='Native Kubernetes integration for Dask',
-    url='https://github.com/dask/daskernetes',
+    url='https://github.com/dask/dask-kubernetes',
     keywords='dask,kubernetes,distributed',
     license='BSD',
     packages=find_packages(),

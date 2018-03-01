@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Daskernetes documentation build configuration file, created by
+# Dask-kubernetes documentation build configuration file, created by
 # sphinx-quickstart on Thu Feb  8 17:56:16 2018.
 #
 # This file is execfile()d with the current directory set to its
@@ -56,16 +56,16 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Daskernetes'
-copyright = '2018, Daskernetes Developers'
-author = 'Daskernetes Developers'
+project = 'Dask Kubernetes'
+copyright = '2018, Dask Kubernetes Developers'
+author = 'Dask Kubernetes Developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-from daskernetes import __version__
+from dask_kubernetes import __version__
 version = __version__
 # The full version, including alpha/beta/rc tags.
 release = __version__
@@ -129,7 +129,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'Daskernetesdoc'
+htmlhelp_basename = 'dask-kubernetes-doc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -156,8 +156,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'Daskernetes.tex', 'Daskernetes Documentation',
-     'Daskernetes Developers', 'manual'),
+    (master_doc, 'dask-kubernetes.tex', 'Dask Kubernetes Documentation',
+     'Dask kubernetes Developers', 'manual'),
 ]
 
 
@@ -166,7 +166,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'daskernetes', 'Daskernetes Documentation',
+    (master_doc, 'dask-kubernetes', 'Dask Kubernetes Documentation',
      [author], 1)
 ]
 
@@ -177,8 +177,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Daskernetes', 'Daskernetes Documentation',
-     author, 'Daskernetes', 'One line description of project.',
+    (master_doc, 'Dask Kubernetes', 'Dask Kubernetes Documentation',
+     author, 'Dask-Kubernetes', 'One line description of project.',
      'Miscellaneous'),
 ]
 
