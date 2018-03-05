@@ -1,12 +1,12 @@
-Daskernetes
-===========
+Dask Kubernetes
+===============
 
 |Build Status|
 
 Native Kubernetes integration for Dask.
 
 See documentation for more information:
-`daskernetes.readthedocs.io <https://daskernetes.readthedocs.io/en/latest>`_
+`dask-kubernetes.readthedocs.io <https://dask-kubernetes.readthedocs.io/en/latest>`_
 
-.. |Build Status| image:: https://circleci.com/gh/dask/daskernetes.svg?&style=shield
-   :target: https://circleci.com/gh/dask/daskernetes.svg?&style=shield
+.. |Build Status| image:: https://circleci.com/gh/dask/dask-kubernetes.svg?&style=shield
+   :target: https://circleci.com/gh/dask/dask-kubernetes.svg?&style=shield

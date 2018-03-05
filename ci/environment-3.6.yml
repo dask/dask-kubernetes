@@ -1,11 +1,11 @@
-name: daskernetes-test
+name: dask-kubernetes-test
 channels:
   - defaults
 dependencies:
   - flake8
   - ipywidgets
-  - distributed=1.21.0
-  - dask=0.17.0
+  - distributed=1.21.1
+  - dask=0.17.1
   - nomkl
   - pytest
   - python=3.6

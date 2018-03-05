@@ -5,7 +5,7 @@ import uuid
 import yaml
 
 import pytest
-from daskernetes import KubeCluster, make_pod_spec, config
+from dask_kubernetes import KubeCluster, make_pod_spec, config
 from dask.distributed import Client, wait
 from distributed.utils_test import loop  # noqa: F401
 from distributed.utils import tmpfile
@@ -22,7 +22,7 @@ api = kubernetes.client.CoreV1Api()
 
 @pytest.fixture
 def ns():
-    name = 'test-daskernetes' + str(uuid.uuid4())[:10]
+    name = 'test-dask-kubernetes' + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(metadata=kubernetes.client.V1ObjectMeta(name=name))
     api.create_namespace(ns)
     try:
@@ -296,9 +296,15 @@ def test_scale_up_down(cluster, client):
 
     a, b = list(cluster.scheduler.workers)
     x = client.submit(np.ones, 1, workers=a)
-    y = client.submit(np.ones, 100000000, workers=b)
+    y = client.submit(np.ones, 100_000_000, workers=b)
 
     wait([x, y])
+
+    start = time()
+    while (cluster.scheduler.workers[a].info['memory'] >
+           cluster.scheduler.workers[b].info['memory']):
+        sleep(0.1)
+        assert time() < start + 1
 
     cluster.scale(1)
 

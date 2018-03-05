@@ -65,7 +65,7 @@ class KubeCluster(object):
 
     Examples
     --------
-    >>> from daskernetes import KubeCluster, make_pod_spec
+    >>> from dask_kubernetes import KubeCluster, make_pod_spec
     >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
     ...                          memory_limit='4G', memory_request='4G',
     ...                          cpu_limit=1, cpu_request=1,

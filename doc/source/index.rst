@@ -1,23 +1,23 @@
-Daskernetes
-===========
+Dask Kubernetes
+===============
 
-Daskernetes deploys Dask workers on Kubernetes clusters using native Kubernetes
-APIs.  It is designed to dynamically launch short-lived deployments of workers
-during the lifetime of a Python process.
+Dask Kubernetes deploys Dask workers on Kubernetes clusters using native
+Kubernetes APIs.  It is designed to dynamically launch short-lived deployments
+of workers during the lifetime of a Python process.
 
 Install
 -------
 
 ::
 
-   pip install daskernetes
+   pip install dask-kubernetes
 
 Quickstart
 ----------
 
 .. code-block:: python
 
-   from daskernetes import KubeCluster
+   from dask_kubernetes import KubeCluster
 
    cluster = KubeCluster.from_yaml('worker-spec.yml')
    cluster.scale_up(10)  # specify number of nodes explicitly
@@ -73,23 +73,23 @@ Best Practices
 Configuration
 -------------
 
-There are a few special environment variables that affect daskernetes behavior:
+There are a few special environment variables that affect dask-kubernetes behavior:
 
-1.  ``DASKERNETES_WORKER_TEMPLATE_PATH``: a path a a YAML file that holds a
+1.  ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH``: a path a a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
     :obj:`KubeCluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
-2.  ``DASKERNETES_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
+2.  ``DASK_KUBERNETES_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
     the location of Dask's dashboard.  This string will receive values for
     ``host``, ``port``, and all environment variables.  This is useful when
-    using Daskernetes with JupyterHub and nbserverproxy to route the dashboard
+    using dask-kubernetes with JupyterHub and nbserverproxy to route the dashboard
     link to a proxied address as follows::
 
-       export DASKERNETES_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+       export DASK_KUBERNETES_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
 
-3.  ``DASKERNETES_WORKER_NAME``: a Python pre-formatted string to use
+3.  ``DASK_KUBERNETES_WORKER_NAME``: a Python pre-formatted string to use
     when naming dask worker pods. This string will receive values for ``user``,
     ``uuid``, and all environment variables. This is useful when you want to have
     control over the naming convention for your pods and use other tokens from
@@ -98,8 +98,8 @@ There are a few special environment variables that affect daskernetes behavior:
     instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
     the template.**
 
-Any other environment variable starting with ``DASKERNETES_`` will be placed in
-the ``daskernetes.config`` dictionary for general use.
+Any other environment variable starting with ``DASK_KUBERNETES_`` will be placed in
+the ``dask_kubernetes.config`` dictionary for general use.
 
 
 Docker Images
