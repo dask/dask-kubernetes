@@ -14,7 +14,7 @@ except ImportError:
 from tornado import gen
 from tornado.ioloop import IOLoop
 
-from distributed.deploy import LocalCluster
+from distributed.deploy import LocalCluster, Cluster
 import kubernetes
 
 from .config import config
@@ -23,7 +23,7 @@ from .objects import make_pod_from_dict, clean_pod_template
 logger = logging.getLogger(__name__)
 
 
-class KubeCluster(object):
+class KubeCluster(Cluster):
     """ Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
@@ -181,8 +181,6 @@ class KubeCluster(object):
 
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
 
-        self._cached_widget = None
-
         if n_workers:
             self.scale(n_workers)
 
@@ -256,50 +254,6 @@ class KubeCluster(object):
     @property
     def name(self):
         return self.pod_template.metadata.generate_name
-
-    def _widget(self):
-        """ Create IPython widget for display within a notebook """
-        if self._cached_widget:
-            return self._cached_widget
-        import ipywidgets
-        layout = ipywidgets.Layout(width='150px')
-
-        elements = []
-        if 'bokeh' in self.scheduler.services:
-            if 'diagnostics-link' in config:
-                template = config['diagnostics-link']
-            else:
-                template = 'http://{host}:{port}/status'
-
-            host = self.scheduler.address.split('://')[1].split(':')[0]
-            port = self.scheduler.services['bokeh'].port
-            link = template.format(host=host, port=port, **os.environ)
-            link = ipywidgets.HTML('<b>Dashboard:</b> <a href="%s" target="_blank">%s</a>' %
-                                   (link, link))
-            elements.append(link)
-
-        n_workers = ipywidgets.IntText(0, description='Requested', layout=layout)
-        actual = ipywidgets.Text('0', description='Actual', layout=layout)
-        button = ipywidgets.Button(description='Scale', layout=layout)
-        elements.extend([n_workers, actual, button])
-        box = ipywidgets.VBox(elements)
-        self._cached_widget = box
-
-        def cb(b):
-            n = n_workers.value
-            self.scale(n)
-
-        button.on_click(cb)
-
-        worker_ref = ref(actual)
-        scheduler_ref = ref(self.scheduler)
-
-        IOLoop.current().add_callback(_update_worker_label, worker_ref,
-                                      scheduler_ref)
-        return box
-
-    def _ipython_display_(self, **kwargs):
-        return self._widget()._ipython_display_(**kwargs)
 
     @property
     def scheduler(self):
@@ -444,19 +398,6 @@ class KubeCluster(object):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
-    def adapt(self):
-        """ Have cluster dynamically allocate workers based on load
-
-        http://distributed.readthedocs.io/en/latest/adaptive.html
-
-        Examples
-        --------
-        >>> cluster = KubeCluster.from_yaml('worker-template.yaml')
-        >>> cluster.adapt()
-        """
-        from distributed.deploy import Adaptive
-        return Adaptive(self.scheduler, self)
-
 
 def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """
@@ -479,24 +420,6 @@ def format_labels(labels):
         return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
     else:
         return ''
-
-
-@gen.coroutine
-def _update_worker_label(worker_ref, scheduler_ref):
-    """ Periodically check the scheduler's workers and update widget
-
-    See Also
-    --------
-    KubeCluster._widget
-    """
-    while True:
-        worker = worker_ref()
-        scheduler = scheduler_ref()
-        if worker and scheduler:
-            worker.value = str(len(scheduler.workers))
-        else:
-            return
-        yield gen.sleep(0.5)
 
 
 def _namespace_default():

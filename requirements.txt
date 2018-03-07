@@ -1,2 +1,3 @@
 dask[distributed]
+distributed>=1.21.3
 kubernetes==4

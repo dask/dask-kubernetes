@@ -5,6 +5,7 @@ import uuid
 import yaml
 
 import pytest
+from distributed.config import set_config
 from dask_kubernetes import KubeCluster, make_pod_spec, config
 from dask.distributed import Client, wait
 from distributed.utils_test import loop  # noqa: F401
@@ -91,9 +92,7 @@ def test_ipython_display(cluster):
     assert cluster._cached_widget is box
 
     start = time()
-    workers = [child for child in box.children
-               if child.description == 'Actual'][0]
-    while workers.value == 0:
+    while "<td>1</td>" not in str(box):  # one worker in a table
         assert time() < start + 10
         sleep(0.5)
 
@@ -109,18 +108,13 @@ def test_dask_worker_name_env_variable(pod_spec, loop, ns):
 
 def test_diagnostics_link_env_variable(pod_spec, loop, ns):
     pytest.importorskip('bokeh')
-    config['diagnostics-link'] = 'foo-{USER}-{port}'
-    try:
+    with set_config(**{'diagnostics-link': 'foo-{USER}-{port}'}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             port = cluster.scheduler.services['bokeh'].port
             cluster._ipython_display_()
             box = cluster._cached_widget
 
-            link = box.children[0]
-            assert 'foo-' + getpass.getuser() + '-' + str(port) in link.value
-            assert 'href' in link.value
-    finally:
-        del config['diagnostics-link']
+            assert 'foo-' + getpass.getuser() + '-' + str(port) in str(box)
 
 
 def test_namespace(pod_spec, loop, ns):
