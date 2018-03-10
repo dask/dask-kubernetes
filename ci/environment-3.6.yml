@@ -4,7 +4,6 @@ channels:
 dependencies:
   - flake8
   - ipywidgets
-  - distributed=1.21.1
   - dask=0.17.1
   - nomkl
   - pytest
@@ -12,3 +11,4 @@ dependencies:
   - pyyaml
   - pip:
     - kubernetes==4
+    - distributed==1.21.3

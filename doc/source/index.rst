@@ -81,13 +81,15 @@ There are a few special environment variables that affect dask-kubernetes behavi
 
        cluster = KubeCluster()  # reads provided yaml file
 
-2.  ``DASK_KUBERNETES_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
+2.  ``DASK_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
     the location of Dask's dashboard.  This string will receive values for
     ``host``, ``port``, and all environment variables.  This is useful when
     using dask-kubernetes with JupyterHub and nbserverproxy to route the dashboard
     link to a proxied address as follows::
 
-       export DASK_KUBERNETES_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+       export DASK_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+
+    This is inherited from general Dask behavior.
 
 3.  ``DASK_KUBERNETES_WORKER_NAME``: a Python pre-formatted string to use
     when naming dask worker pods. This string will receive values for ``user``,
