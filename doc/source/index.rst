@@ -100,8 +100,8 @@ There are a few special environment variables that affect dask-kubernetes behavi
     instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
     the template.**
 
-Any other environment variable starting with ``DASK_KUBERNETES_`` will be placed in
-the ``dask_kubernetes.config`` dictionary for general use.
+Any other environment variable starting with ``DASK_`` will be placed in
+the ``dask.distributed.config`` dictionary for general use.
 
 
 Docker Images
