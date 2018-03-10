@@ -6,7 +6,7 @@ import yaml
 
 import pytest
 from distributed.config import set_config
-from dask_kubernetes import KubeCluster, make_pod_spec, config
+from dask_kubernetes import KubeCluster, make_pod_spec
 from dask.distributed import Client, wait
 from distributed.utils_test import loop  # noqa: F401
 from distributed.utils import tmpfile
@@ -98,12 +98,9 @@ def test_ipython_display(cluster):
 
 
 def test_dask_worker_name_env_variable(pod_spec, loop, ns):
-    config['worker-name'] = 'foo-{USER}-{uuid}'
-    try:
+    with set_config(**{'kubernetes-worker-name': 'foo-{USER}-{uuid}'}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             assert 'foo-' + getpass.getuser() in cluster.name
-    finally:
-        del config['worker-name']
 
 
 def test_diagnostics_link_env_variable(pod_spec, loop, ns):
@@ -335,9 +332,6 @@ def test_automatic_startup(image_name, loop, ns):
     with tmpfile(extension='yaml') as fn:
         with open(fn, mode='w') as f:
             yaml.dump(test_yaml, f)
-        config['worker-template-path'] = fn
-        try:
+        with set_config(**{'kubernetes-worker-template-path': fn}):
             with KubeCluster(loop=loop, namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
-        finally:
-            del config['worker-template-path']

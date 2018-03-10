@@ -5,19 +5,17 @@ import socket
 import time
 from urllib.parse import urlparse
 import uuid
-from weakref import finalize, ref
+from weakref import finalize
 
 try:
     import yaml
 except ImportError:
     yaml = False
-from tornado import gen
-from tornado.ioloop import IOLoop
 
 from distributed.deploy import LocalCluster, Cluster
+from distributed.config import config
 import kubernetes
 
-from .config import config
 from .objects import make_pod_from_dict, clean_pod_template
 
 logger = logging.getLogger(__name__)
@@ -134,9 +132,9 @@ class KubeCluster(Cluster):
             **kwargs
     ):
         if pod_template is None:
-            if 'worker-template-path' in config:
+            if 'kubernetes-worker-template-path' in config:
                 import yaml
-                with open(config['worker-template-path']) as f:
+                with open(config['kubernetes-worker-template-path']) as f:
                     d = yaml.safe_load(f)
                 pod_template = make_pod_from_dict(d)
             else:
@@ -158,7 +156,7 @@ class KubeCluster(Cluster):
             namespace = _namespace_default()
 
         if name is None:
-            worker_name = config.get('worker-name', 'dask-{user}-{uuid}')
+            worker_name = config.get('kubernetes-worker-name', 'dask-{user}-{uuid}')
             name = worker_name.format(user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ)
 
         self.pod_template = clean_pod_template(pod_template)
