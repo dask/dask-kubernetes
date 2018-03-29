@@ -67,7 +67,7 @@ class KubeCluster(Cluster):
     >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
     ...                          memory_limit='4G', memory_request='4G',
     ...                          cpu_limit=1, cpu_request=1,
-    ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed')
+    ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
     >>> cluster = KubeCluster(pod_spec)
     >>> cluster.scale_up(10)
 
