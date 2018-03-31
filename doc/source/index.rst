@@ -75,7 +75,7 @@ Configuration
 
 There are a few special environment variables that affect dask-kubernetes behavior:
 
-1.  ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH``: a path a a YAML file that holds a
+1.  ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
     :obj:`KubeCluster` is called with no arguments::
 
