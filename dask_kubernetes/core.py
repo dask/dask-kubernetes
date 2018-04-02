@@ -20,6 +20,8 @@ from .objects import make_pod_from_dict, clean_pod_template
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_WORKER_TEMPLATE_PATH = "/etc/dask/kubernetes/worker-template.yaml"
+
 
 class KubeCluster(Cluster):
     """ Launch a Dask cluster on Kubernetes
@@ -108,11 +110,14 @@ class KubeCluster(Cluster):
 
     You can also start a KubeCluster with no arguments *if* the YAML file
     defining the worker template is referred to in the
-    ``DASKERNETES_WORKER_TEMPLATE_PATH`` environment variable
+    ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH`` environment variable
 
-        $ export DASKERNETES_WORKER_TEMPLATE_PATH=worker_template.yaml
+        $ export DASK_KUBERNETES_WORKER_TEMPLATE_PATH=worker-template.yaml
 
-    >>> cluster = KubeCluster()  # automatically finds 'worker_template.yaml'
+    >>> cluster = KubeCluster()  # automatically finds 'worker-template.yaml'
+
+    If DASK_KUBERNETES_WORKER_TEMPLATE_PATH is not defined, will fallback to
+    '/etc/dask/kubernetes/worker-template.yaml' if it exists.
 
     See Also
     --------
@@ -132,9 +137,16 @@ class KubeCluster(Cluster):
             **kwargs
     ):
         if pod_template is None:
+            template_path = None
+            if os.path.exists(DEFAULT_WORKER_TEMPLATE_PATH):
+                template_path = DEFAULT_WORKER_TEMPLATE_PATH
+
             if 'kubernetes-worker-template-path' in config:
+                template_path = config['kubernetes-worker-template-path']
+
+            if template_path:
                 import yaml
-                with open(config['kubernetes-worker-template-path']) as f:
+                with open(template_path) as f:
                     d = yaml.safe_load(f)
                 pod_template = make_pod_from_dict(d)
             else:

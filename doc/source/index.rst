@@ -81,6 +81,9 @@ There are a few special environment variables that affect dask-kubernetes behavi
 
        cluster = KubeCluster()  # reads provided yaml file
 
+    If ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH`` is not defined, :obj:`KubeCluster`
+    it will fallback to '/etc/dask/kubernetes/worker-template.yaml' if it exists.
+
 2.  ``DASK_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
     the location of Dask's dashboard.  This string will receive values for
     ``host``, ``port``, and all environment variables.  This is useful when
