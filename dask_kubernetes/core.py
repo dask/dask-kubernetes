@@ -253,6 +253,10 @@ class KubeCluster(Cluster):
     def name(self):
         return self.pod_template.metadata.generate_name
 
+    def __repr__(self):
+        return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address,
+                                                  len(self.pods()))
+
     @property
     def scheduler(self):
         return self.cluster.scheduler
