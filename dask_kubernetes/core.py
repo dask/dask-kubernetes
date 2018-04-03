@@ -82,11 +82,6 @@ class KubeCluster(Cluster):
 
     >>> cluster.adapt()
 
-    You can also set un upper boundary on the number of workers you can scale to. For more info see 
-    `Adaptive Clusters <http://distributed.readthedocs.io/en/latest/adaptive.html?highlight=adaptive>`_.
-
-    >>> cluster.adapt(minimum=1, maximum=100)
-
     You can pass this cluster directly to a Dask client
 
     >>> from dask.distributed import Client

@@ -22,7 +22,7 @@ Quickstart
    cluster = KubeCluster.from_yaml('worker-spec.yml')
    cluster.scale_up(10)  # specify number of nodes explicitly
 
-   cluster.adapt()  # or dynamically scale based on current workload
+   cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
 
 .. code-block:: yaml
 
