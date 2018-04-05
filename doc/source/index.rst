@@ -37,6 +37,7 @@ Quickstart
         containers:
         - image: daskdev/dask:latest
           args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 6GB, --death-timeout, '60']
+          name: dask
           env:
             - name: EXTRA_PIP_PACKAGES
               value: fastparquet git+https://github.com/dask/distributed
