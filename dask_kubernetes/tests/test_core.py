@@ -34,7 +34,10 @@ def ns():
 
 @pytest.fixture
 def pod_spec(image_name):
-    yield make_pod_spec(image=image_name)
+    yield make_pod_spec(
+        image=image_name,
+        extra_container_config={'imagePullPolicy': 'IfNotPresent'}
+    )
 
 
 @pytest.fixture
@@ -166,6 +169,7 @@ def test_pod_from_yaml(image_name, loop, ns):
                     "1"
                 ],
                 "image": image_name,
+                'imagePullPolicy': 'IfNotPresent',
                 "name": "dask-worker"
             }]
         }
@@ -205,6 +209,7 @@ def test_pod_from_dict(image_name, loop, ns):
                          '--death-timeout', '60'],
                 'command': None,
                 'image': image_name,
+                'imagePullPolicy': 'IfNotPresent',
                 'name': 'dask-worker',
             }]
         }
@@ -236,6 +241,7 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
                          '--death-timeout', '60'],
                 'command': None,
                 'image': image_name,
+                'imagePullPolicy': 'IfNotPresent',
                 'name': 'worker'
             }]
         }
