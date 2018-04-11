@@ -11,6 +11,7 @@ from dask.distributed import Client, wait
 from distributed.utils_test import loop  # noqa: F401
 from distributed.utils import tmpfile
 import kubernetes
+from random import random
 
 
 try:
@@ -311,6 +312,94 @@ def test_scale_up_down(cluster, client):
         assert time() < start + 10
 
     assert set(cluster.scheduler.workers) == {b}
+
+
+def test_scale_up_down_fast(cluster, client):
+    cluster.scale(1)
+
+    start = time()
+    while len(cluster.scheduler.workers) != 1:
+        sleep(0.1)
+        assert time() < start + 10
+
+    # Put some data on this worker
+    future = client.submit(lambda: b'\x00' * int(1e6))
+    wait(future)
+
+    # Rescale the cluster many times without waiting: this should put some
+    # pressure on kubernetes but this should never fail nor delete our worker
+    # with the temporary result.
+    for i in range(10):
+        cluster.scale(4)
+        sleep(random() / 2)
+        cluster.scale(1)
+        sleep(random() / 2)
+
+    start = time()
+    while len(cluster.scheduler.workers) != 1:
+        sleep(0.1)
+        assert time() < start + 10
+
+    assert len(future.result()) == int(1e6)
+
+
+def test_scale_down_pending(cluster, client):
+    # Try to scale the cluster to use more pods than available
+    nodes = cluster.core_api.list_node().items
+    max_pods = sum(int(node.status.allocatable['pods']) for node in nodes)
+    if max_pods > 50:
+        # It's probably not reasonable to run this test against a large
+        # kubernetes cluster.
+        pytest.skip("Require a small test kubernetes cluster (maxpod <= 50)")
+    extra_pods = 5
+    requested_pods = max_pods + extra_pods
+    cluster.scale(requested_pods)
+
+    start = time()
+    while len(cluster.scheduler.workers) < 2:
+        sleep(0.1)
+        # Wait a bit because the kubernetes cluster can take time to provision
+        # the requested pods as we requested a large number of pods.
+        assert time() < start + 60
+
+    pending_pods = [p for p in cluster.pods() if p.status.phase == 'Pending']
+    assert len(pending_pods) >= extra_pods
+
+    running_workers = list(cluster.scheduler.workers.keys())
+    assert len(running_workers) >= 2
+
+    # Put some data on those workers to make them important to keep as long
+    # as possible.
+    def load_data(i):
+        return b'\x00' * (i * int(1e6))
+
+    futures = [client.submit(load_data, i, workers=w)
+               for i, w in enumerate(running_workers)]
+    wait(futures)
+
+    # Reduce the cluster size down to the actually useful nodes: pending pods
+    # and running pods without results should be shutdown and removed first:
+    cluster.scale(len(running_workers))
+
+    start = time()
+    pod_statuses = [p.status.phase for p in cluster.pods()]
+    while len(pod_statuses) != len(running_workers):
+        if time() - start > 60:
+            raise AssertionError("Expected %d running pods but got %r"
+                                 % (len(running_workers), pod_statuses))
+        sleep(0.1)
+        pod_statuses = [p.status.phase for p in cluster.pods()]
+
+    assert pod_statuses == ['Running'] * len(running_workers)
+    assert list(cluster.scheduler.workers.keys()) == running_workers
+
+    # Terminate everything
+    cluster.scale(0)
+
+    start = time()
+    while len(cluster.scheduler.workers) > 0:
+        sleep(0.1)
+        assert time() < start + 60
 
 
 def test_automatic_startup(image_name, loop, ns):
