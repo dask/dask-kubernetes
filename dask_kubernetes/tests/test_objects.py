@@ -31,7 +31,7 @@ def test_extra_container_config(image_name, loop):
         make_pod_spec(
             image_name,
             extra_container_config={
-                'imagePullPolicy': 'IfNotReady',
+                'imagePullPolicy': 'IfNotPresent',
                 'securityContext': {
                     'runAsUser': 0
                 }
@@ -43,7 +43,7 @@ def test_extra_container_config(image_name, loop):
 
     pod = cluster.pod_template
 
-    assert pod.spec.containers[0].image_pull_policy == 'IfNotReady'
+    assert pod.spec.containers[0].image_pull_policy == 'IfNotPresent'
     assert pod.spec.containers[0].security_context == {
         'runAsUser': 0
     }

@@ -36,6 +36,7 @@ Quickstart
         restartPolicy: Never
         containers:
         - image: daskdev/dask:latest
+          imagePullPolicy: IfNotPresent
           args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 6GB, --death-timeout, '60']
           name: dask
           env:
