@@ -23,7 +23,7 @@ jobs:
             curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v0.25.2/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
       - run:
           command: |
-            sudo -E minikube start --vm-driver=none
+            sudo -E minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20
       - run:
           command: |
             sudo -E minikube update-context
