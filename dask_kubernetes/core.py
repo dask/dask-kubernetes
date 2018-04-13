@@ -12,8 +12,10 @@ try:
 except ImportError:
     yaml = False
 
+from tornado import gen
 from distributed.deploy import LocalCluster, Cluster
 from distributed.config import config
+from distributed.comm.utils import offload
 import kubernetes
 
 from .objects import make_pod_from_dict, clean_pod_template
@@ -312,69 +314,45 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = self.pods()
+        pods = self._cleanup_succeeded_pods(self.pods())
         if n >= len(pods):
             return self.scale_up(n, pods=pods)
         else:
-            to_close = select_workers_to_close(self.scheduler, len(pods) - n)
+            n_to_delete = len(pods) - n
+            # Before trying to close running workers, check if we can cancel
+            # pending pods (in case the kubernetes cluster was too full to
+            # provision those pods in the first place).
+            running_workers = list(self.scheduler.workers.keys())
+            running_ips = set(urlparse(worker).hostname
+                              for worker in running_workers)
+            pending_pods = [p for p in pods
+                            if p.status.pod_ip not in running_ips]
+            if pending_pods:
+                pending_to_delete = pending_pods[:n_to_delete]
+                logger.debug("Deleting pending pods: %s", pending_to_delete)
+                self._delete_pods(pending_to_delete)
+                n_to_delete = n_to_delete - len(pending_to_delete)
+                if n_to_delete <= 0:
+                    return
+
+            to_close = select_workers_to_close(self.scheduler, n_to_delete)
             logger.debug("Closing workers: %s", to_close)
-            return self.scale_down(to_close)
+            if len(to_close) < len(self.scheduler.workers):
+                # Close workers cleanly to migrate any temporary results to
+                # remaining workers.
+                @gen.coroutine
+                def f(to_close):
+                    yield self.scheduler.retire_workers(
+                        workers=to_close, remove=True, close_workers=True)
+                    yield offload(self.scale_down, to_close)
 
-    def scale_up(self, n, pods=None, **kwargs):
-        """
-        Make sure we have n dask-workers available for this cluster
+                self.scheduler.loop.add_callback(f, to_close)
+                return
 
-        Examples
-        --------
-        >>> cluster.scale_up(20)  # ask for twenty workers
-        """
-        pods = pods or self.pods()
+            # Terminate all pods without waiting for clean worker shutdown
+            self.scale_down(to_close)
 
-        for i in range(3):
-            try:
-                out = [
-                    self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
-                    for _ in range(n - len(pods))
-                ]
-                break
-            except kubernetes.client.rest.ApiException as e:
-                if e.status == 500 and 'ServerTimeout' in e.body:
-                    logger.info("Server timeout, retry #%d", i + 1)
-                    time.sleep(1)
-                    last_exception = e
-                    continue
-                else:
-                    raise
-        else:
-            raise last_exception
-
-        return out
-        # fixme: wait for this to be ready before returning!
-
-    def scale_down(self, workers):
-        """
-        When the worker process exits, Kubernetes leaves the pods in a completed
-        state. Kill them when we are asked to.
-
-        Parameters
-        ----------
-        workers: List[str]
-            List of addresses of workers to close
-        """
-        # Get the existing worker pods
-        pods = self.pods()
-
-        # Work out pods that we are going to delete
-        # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
-        # Convert this to a set of IPs
-        ips = set(urlparse(worker).hostname for worker in workers)
-        to_delete = [
-            p for p in pods
-            # Every time we run, purge any completed pods as well as the specified ones
-            if p.status.phase == 'Succeeded' or p.status.pod_ip in ips
-        ]
-        if not to_delete:
-            return
+    def _delete_pods(self, to_delete):
         for pod in to_delete:
             try:
                 self.core_api.delete_namespaced_pod(
@@ -387,6 +365,72 @@ class KubeCluster(Cluster):
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
                     raise
+
+    def _cleanup_succeeded_pods(self, pods):
+        terminated_pods = [p for p in pods if p.status.phase == 'Succeeded']
+        self._delete_pods(terminated_pods)
+        return [p for p in pods if p.status.phase != 'Succeeded']
+
+    def scale_up(self, n, pods=None, **kwargs):
+        """
+        Make sure we have n dask-workers available for this cluster
+
+        Examples
+        --------
+        >>> cluster.scale_up(20)  # ask for twenty workers
+        """
+        pods = pods or self._cleanup_succeeded_pods(self.pods())
+        to_create = n - len(pods)
+        new_pods = []
+        for i in range(3):
+            try:
+                for _ in range(to_create):
+                    new_pods.append(self.core_api.create_namespaced_pod(
+                        self.namespace, self.pod_template))
+                    to_create -= 1
+                break
+            except kubernetes.client.rest.ApiException as e:
+                if e.status == 500 and 'ServerTimeout' in e.body:
+                    logger.info("Server timeout, retry #%d", i + 1)
+                    time.sleep(1)
+                    last_exception = e
+                    continue
+                else:
+                    raise
+        else:
+            raise last_exception
+
+        return new_pods
+        # fixme: wait for this to be ready before returning!
+
+    def scale_down(self, workers, pods=None):
+        """ Remove the pods for the requested list of workers
+
+        When scale_down is called by the _adapt async loop, the workers are
+        assumed to have been cleanly closed first and in-memory data has been
+        migrated to the remaining workers.
+
+        Note that when the worker process exits, Kubernetes leaves the pods in
+        a 'Succeeded' state that we collect here.
+
+        If some workers have not been closed, we just delete the pods with
+        matching ip addresses.
+
+        Parameters
+        ----------
+        workers: List[str] List of addresses of workers to close
+        """
+        # Get the existing worker pods
+        pods = pods or self._cleanup_succeeded_pods(self.pods())
+
+        # Work out the list of pods that we are going to delete
+        # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
+        # Convert this to a set of IPs
+        ips = set(urlparse(worker).hostname for worker in workers)
+        to_delete = [p for p in pods if p.status.pod_ip in ips]
+        if not to_delete:
+            return
+        self._delete_pods(to_delete)
 
     def __enter__(self):
         return self
@@ -440,15 +484,16 @@ def _namespace_default():
     return 'default'
 
 
-def select_workers_to_close(s, n):
-    """ Select n workers to close from scheduler s """
-    assert n <= len(s.workers)
+def select_workers_to_close(scheduler, n_to_close):
+    """ Select n workers to close from scheduler """
+    workers = list(scheduler.workers.values())
+    assert n_to_close <= len(workers)
     key = lambda ws: ws.info['memory']
-    to_close = set(sorted(s.idle, key=key)[:n])
+    to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
 
-    if len(to_close) < n:
-        rest = sorted(s.workers.values(), key=key, reverse=True)
-        while len(to_close) < n:
+    if len(to_close) < n_to_close:
+        rest = sorted(workers, key=key, reverse=True)
+        while len(to_close) < n_to_close:
             to_close.add(rest.pop())
 
     return [ws.address for ws in to_close]
