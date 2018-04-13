@@ -322,9 +322,12 @@ def test_scale_up_down_fast(cluster, client):
         sleep(0.1)
         assert time() < start + 10
 
+    worker = next(iter(cluster.scheduler.workers.values()))
+
     # Put some data on this worker
     future = client.submit(lambda: b'\x00' * int(1e6))
     wait(future)
+    assert worker in cluster.scheduler.tasks[future.key].who_has
 
     # Rescale the cluster many times without waiting: this should put some
     # pressure on kubernetes but this should never fail nor delete our worker
@@ -340,6 +343,10 @@ def test_scale_up_down_fast(cluster, client):
         sleep(0.1)
         assert time() < start + 10
 
+    # The original task result is still stored on the original worker: this pod
+    # has never been deleted when rescaling the cluster and the result can
+    # still be fetched back.
+    assert worker in cluster.scheduler.tasks[future.key].who_has
     assert len(future.result()) == int(1e6)
 
 

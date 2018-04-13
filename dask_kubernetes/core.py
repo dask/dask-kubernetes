@@ -12,8 +12,10 @@ try:
 except ImportError:
     yaml = False
 
+from tornado import gen
 from distributed.deploy import LocalCluster, Cluster
 from distributed.config import config
+from distributed.comm.utils import offload
 import kubernetes
 
 from .objects import make_pod_from_dict, clean_pod_template
@@ -338,13 +340,13 @@ class KubeCluster(Cluster):
             if len(to_close) < len(self.scheduler.workers):
                 # Close workers cleanly to migrate any temporary results to
                 # remaining workers.
-                future = self.scheduler.retire_workers(
+                @gen.coroutine
+                def f(to_close):
+                    yield self.scheduler.retire_workers(
                         workers=to_close, remove=True, close_workers=True)
+                    yield offload(self.scale_down, to_close)
 
-                def callback(future):
-                    self.scale_down(to_close)
-
-                self.scheduler.loop.add_future(future, callback)
+                self.scheduler.loop.add_callback(f, to_close)
                 return
 
             # Terminate all pods without waiting for clean worker shutdown
