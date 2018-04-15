@@ -89,7 +89,7 @@ There are a few special environment variables that affect dask-kubernetes behavi
     using dask-kubernetes with JupyterHub and nbserverproxy to route the dashboard
     link to a proxied address as follows::
 
-       export DASK_DIANGOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+       export DASK_DIAGNOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
 
     This is inherited from general Dask behavior.
 
