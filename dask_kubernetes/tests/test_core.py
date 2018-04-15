@@ -1,17 +1,18 @@
 import getpass
 import os
+from random import random
 from time import sleep, time
 import uuid
 import yaml
 
 import pytest
+from tornado import gen
 from distributed.config import set_config
 from dask_kubernetes import KubeCluster, make_pod_spec
-from dask.distributed import Client, wait
-from distributed.utils_test import loop  # noqa: F401
-from distributed.utils import tmpfile
+from dask.distributed import Client, wait, TimeoutError
+from distributed.utils_test import loop, gen_cluster  # noqa: F401
+from distributed.utils import tmpfile, get_ip
 import kubernetes
-from random import random
 
 
 try:
@@ -51,6 +52,37 @@ def cluster(pod_spec, ns, loop):
 def client(cluster):
     with Client(cluster) as client:
         yield client
+
+
+def test_add_kube_after_scheduler(ns, pod_spec):
+
+    @gen_cluster(client=True, ncores=[], scheduler=(get_ip(), 0), timeout=20)
+    def f(c, s):
+        with KubeCluster(scheduler=s,
+                         pod_template=pod_spec,
+                         namespace=ns) as cluster:
+            cluster.adapt()
+
+            future = c.submit(lambda x: x + 1, 10)
+            assert s.extensions['kubernetes'] is cluster
+            while not cluster._adaptive.log:
+                yield gen.sleep(0.01)
+
+            result = yield future
+            assert result == 11
+            del future
+
+            while s.workers:
+                yield gen.sleep(0.1)
+
+        assert 'kubernetes' not in s.extensions['kubernetes']
+
+        # Cleans up correctly
+        future = yield c.submit(lambda x: x + 1, 20)
+        with pytest.raises(TimeoutError):
+            yield future.result(timeout=1)
+
+    f()
 
 
 def test_versions(client):

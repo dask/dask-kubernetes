@@ -15,6 +15,7 @@ except ImportError:
 from tornado import gen
 from distributed.deploy import LocalCluster, Cluster
 from distributed.config import config
+from distributed.utils import ignoring
 from distributed.comm.utils import offload
 import kubernetes
 
@@ -131,6 +132,7 @@ class KubeCluster(Cluster):
             host='0.0.0.0',
             port=0,
             env=None,
+            scheduler=None,
             **kwargs
     ):
         if pod_template is None:
@@ -144,9 +146,14 @@ class KubeCluster(Cluster):
                        "docstring for ways to specify workers")
                 raise ValueError(msg)
 
-        self.cluster = LocalCluster(ip=host or socket.gethostname(),
-                                    scheduler_port=port,
-                                    n_workers=0, **kwargs)
+        if scheduler:
+            self.scheduler = scheduler
+            self.scheduler.extensions['kubernetes'] = self
+        else:
+            self.cluster = LocalCluster(ip=host or socket.gethostname(),
+                                        scheduler_port=port,
+                                        n_workers=0, **kwargs)
+            self.scheduler = self.cluster.scheduler
         try:
             kubernetes.config.load_incluster_config()
         except kubernetes.config.ConfigException:
@@ -258,10 +265,6 @@ class KubeCluster(Cluster):
     def __repr__(self):
         return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address,
                                                   len(self.pods()))
-
-    @property
-    def scheduler(self):
-        return self.cluster.scheduler
 
     @property
     def scheduler_address(self):
@@ -437,12 +440,16 @@ class KubeCluster(Cluster):
 
     def close(self):
         """ Close this cluster """
-        self.scale_down(self.cluster.scheduler.workers)
-        self.cluster.close()
+        self.scale_down(self.scheduler.workers)
+        try:
+            self.cluster.close()
+        except AttributeError:
+            del self.scheduler.extensions['kubernetes']
 
     def __exit__(self, type, value, traceback):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
-        self.cluster.__exit__(type, value, traceback)
+        with ignoring(AttributeError):
+            self.cluster.__exit__(type, value, traceback)
 
 
 def _cleanup_pods(namespace, labels):
