@@ -444,3 +444,15 @@ def test_repr(cluster):
         assert 'Box' not in text
         assert cluster.scheduler.address in text
         assert "workers=0" in text
+
+
+def test_escape_username(pod_spec, loop, ns):
+    old_logname = os.environ.get('LOGNAME')
+    os.environ['LOGNAME'] = 'foo!'
+
+    try:
+        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+            assert 'foo'  in cluster.name
+            assert '!' not in cluster.name
+    finally:
+        os.environ['LOGNAME'] = old_logname

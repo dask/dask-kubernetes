@@ -2,6 +2,7 @@ import getpass
 import logging
 import os
 import socket
+import string
 import time
 from urllib.parse import urlparse
 import uuid
@@ -159,7 +160,8 @@ class KubeCluster(Cluster):
 
         if name is None:
             worker_name = config.get('kubernetes-worker-name', 'dask-{user}-{uuid}')
-            name = worker_name.format(user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ)
+            name = worker_name.format(user=escape(getpass.getuser()),
+                                      uuid=str(uuid.uuid4())[:10], **os.environ)
 
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
@@ -497,3 +499,10 @@ def select_workers_to_close(scheduler, n_to_close):
             to_close.add(rest.pop())
 
     return [ws.address for ws in to_close]
+
+
+valid_characters = string.ascii_letters + string.digits + '_-.'
+
+
+def escape(s):
+    return ''.join(c for c in s if c in valid_characters)
