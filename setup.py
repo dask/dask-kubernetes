@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dask-kubernetes',
-    version='0.2.0',
+    version='0.3.0',
     description='Native Kubernetes integration for Dask',
     url='https://github.com/dask/dask-kubernetes',
     keywords='dask,kubernetes,distributed',
