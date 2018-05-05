@@ -4,8 +4,8 @@ from time import sleep, time
 import uuid
 import yaml
 
+import dask
 import pytest
-from distributed.config import set_config
 from dask_kubernetes import KubeCluster, make_pod_spec
 from dask.distributed import Client, wait
 from distributed.utils_test import loop  # noqa: F401
@@ -102,14 +102,14 @@ def test_ipython_display(cluster):
 
 
 def test_dask_worker_name_env_variable(pod_spec, loop, ns):
-    with set_config(**{'kubernetes-worker-name': 'foo-{USER}-{uuid}'}):
+    with dask.config.set({'kubernetes.name': 'foo-{USER}-{uuid}'}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             assert 'foo-' + getpass.getuser() in cluster.name
 
 
 def test_diagnostics_link_env_variable(pod_spec, loop, ns):
     pytest.importorskip('bokeh')
-    with set_config(**{'diagnostics-link': 'foo-{USER}-{port}'}):
+    with dask.config.set({'distributed.dashboard.link': 'foo-{USER}-{port}'}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             port = cluster.scheduler.services['bokeh'].port
             cluster._ipython_display_()
@@ -434,7 +434,7 @@ def test_automatic_startup(image_name, loop, ns):
     with tmpfile(extension='yaml') as fn:
         with open(fn, mode='w') as f:
             yaml.dump(test_yaml, f)
-        with set_config(**{'kubernetes-worker-template-path': fn}):
+        with dask.config.set({'kubernetes.worker.template-path': fn}):
             with KubeCluster(loop=loop, namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
 
@@ -452,7 +452,7 @@ def test_escape_username(pod_spec, loop, ns):
 
     try:
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-            assert 'foo'  in cluster.name
+            assert 'foo' in cluster.name
             assert '!' not in cluster.name
     finally:
         os.environ['LOGNAME'] = old_logname

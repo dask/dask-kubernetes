@@ -19,7 +19,8 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - args:
+    #   - image: daskdev/dask:latest
+    #     args:
     #       - dask-worker
     #       - --nthreads
     #       - '2'
@@ -28,7 +29,6 @@ kubernetes:
     #       - 6GB
     #       - --death-timeout
     #       - '60'
-    #     image: daskdev/dask:latest
     #     resources:
     #       limits:
     #         cpu: "1.75"

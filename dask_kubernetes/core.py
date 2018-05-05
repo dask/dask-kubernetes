@@ -1,6 +1,5 @@
 import getpass
 import logging
-import math
 import os
 import socket
 import string
@@ -141,7 +140,7 @@ class KubeCluster(Cluster):
 
         if pod_template is None and dask.config.get('kubernetes.worker-template-path', None):
             import yaml
-            with open(dask.config.get('kubernetes.worker-template-path']) as f:
+            with open(dask.config.get('kubernetes.worker-template-path')) as f:
                 d = yaml.safe_load(f)
             pod_template = make_pod_from_dict(d)
 
