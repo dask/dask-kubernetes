@@ -381,6 +381,8 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.scale_up(20)  # ask for twenty workers
         """
+        if 'kubernetes-maximum-workers' in config:
+            n = min(n, config['kubernetes-maximum-workers'])
         pods = pods or self._cleanup_succeeded_pods(self.pods())
         to_create = n - len(pods)
         new_pods = []
