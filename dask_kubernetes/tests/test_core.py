@@ -439,6 +439,19 @@ def test_automatic_startup(image_name, loop, ns):
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
 
 
+def test_maximum(cluster):
+    with set_config(**{'kubernetes-maximum-workers': 1}):
+        cluster.scale(10)
+
+        start = time()
+        while len(cluster.scheduler.workers) <= 0:
+            sleep(0.1)
+            assert time() < start + 60
+
+        sleep(0.5)
+        assert len(cluster.scheduler.workers) == 1
+
+
 def test_repr(cluster):
     for text in [repr(cluster), str(cluster)]:
         assert 'Box' not in text
