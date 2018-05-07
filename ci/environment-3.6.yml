@@ -4,11 +4,13 @@ channels:
 dependencies:
   - flake8
   - ipywidgets
-  - dask=0.17.1
+  - dask=0.17.4
+  - distributed=1.21.8
   - nomkl
   - pytest
   - python=3.6
   - pyyaml
   - pip:
     - kubernetes==4
-    - distributed==1.21.3
+    - git+https://github.com/dask/dask.git@5c2787fcda94c212e1bdaec4ca591471ddc3820b
+    - git+https://github.com/dask/distributed.git@fefbaa38ad7ca9e07c1a19c83945209e5e626ac5
