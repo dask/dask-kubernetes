@@ -134,7 +134,7 @@ class KubeCluster(Cluster):
             env=None,
             **kwargs
     ):
-        pod_template = pod_template or dask.config.get('kubernetes.pod_template')
+        pod_template = pod_template or dask.config.get('kubernetes.worker-template')
         name = name or dask.config.get('kubernetes.name')
         namespace = namespace or dask.config.get('kubernetes.namespace')
         n_workers = n_workers if n_workers is not None else dask.config.get('kubernetes.count.start')
@@ -142,17 +142,17 @@ class KubeCluster(Cluster):
         port = port if port is not None else dask.config.get('kubernetes.port')
         env = env if env is not None else dask.config.get('kubernetes.env')
 
-        if pod_template is None and dask.config.get('kubernetes.worker-template', None):
+        if not pod_template and dask.config.get('kubernetes.worker-template', None):
             d = dask.config.get('kubernetes.worker-template')
             pod_template = make_pod_from_dict(d)
 
-        if pod_template is None and dask.config.get('kubernetes.worker-template-path', None):
+        if not pod_template and dask.config.get('kubernetes.worker-template-path', None):
             import yaml
             with open(dask.config.get('kubernetes.worker-template-path')) as f:
                 d = yaml.safe_load(f)
             pod_template = make_pod_from_dict(d)
 
-        if pod_template is None:
+        if not pod_template:
             msg = ("Worker pod specification not provided. See KubeCluster "
                    "docstring for ways to specify workers")
             raise ValueError(msg)

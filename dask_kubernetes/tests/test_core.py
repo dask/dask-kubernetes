@@ -262,8 +262,8 @@ def test_bad_args(loop):
 
     assert 'KubeCluster.from_yaml' in str(info.value)
 
-    with pytest.raises(TypeError) as info:
-        KubeCluster({})
+    with pytest.raises((ValueError, TypeError)) as info:
+        KubeCluster({'kind': 'Pod'})
 
     assert 'KubeCluster.from_dict' in str(info.value)
 
