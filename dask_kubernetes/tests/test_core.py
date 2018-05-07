@@ -434,7 +434,7 @@ def test_automatic_startup(image_name, loop, ns):
     with tmpfile(extension='yaml') as fn:
         with open(fn, mode='w') as f:
             yaml.dump(test_yaml, f)
-        with dask.config.set({'kubernetes.worker.template-path': fn}):
+        with dask.config.set({'kubernetes.worker-template-path': fn}):
             with KubeCluster(loop=loop, namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
 

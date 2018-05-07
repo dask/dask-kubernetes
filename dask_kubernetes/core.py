@@ -126,14 +126,22 @@ class KubeCluster(Cluster):
     def __init__(
             self,
             pod_template=None,
-            name=dask.config.get('kubernetes.name'),
-            namespace=dask.config.get('kubernetes.namespace'),
-            n_workers=dask.config.get('kubernetes.count.start'),
-            host=dask.config.get('kubernetes.host'),
-            port=dask.config.get('kubernetes.port'),
-            env=dask.config.get('kubernetes.env'),
+            name=None,
+            namespace=None,
+            n_workers=None,
+            host=None,
+            port=None,
+            env=None,
             **kwargs
     ):
+        pod_template = pod_template or dask.config.get('kubernetes.pod_template')
+        name = name or dask.config.get('kubernetes.name')
+        namespace = namespace or dask.config.get('kubernetes.namespace')
+        n_workers = n_workers if n_workers is not None else dask.config.get('kubernetes.count.start')
+        host = host or dask.config.get('kubernetes.host')
+        port = port if port is not None else dask.config.get('kubernetes.port')
+        env = env if env is not None else dask.config.get('kubernetes.env')
+
         if pod_template is None and dask.config.get('kubernetes.worker-template', None):
             d = dask.config.get('kubernetes.worker-template')
             pod_template = make_pod_from_dict(d)
