@@ -1,4 +1,5 @@
 recursive-include dask_kubernetes *.py
+recursive-include dask_kubernetes *.yaml
 
 include setup.py
 include setup.cfg
