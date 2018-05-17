@@ -11,6 +11,6 @@ dependencies:
   - python=3.6
   - pyyaml
   - pip:
-    - kubernetes==4
+    - kubernetes==6
     - git+https://github.com/dask/dask.git@5c2787fcda94c212e1bdaec4ca591471ddc3820b
     - git+https://github.com/dask/distributed.git@fefbaa38ad7ca9e07c1a19c83945209e5e626ac5
