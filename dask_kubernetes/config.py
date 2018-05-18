@@ -12,4 +12,4 @@ dask.config.ensure_file(source=fn)
 with open(fn) as f:
     defaults = yaml.load(f)
 
-dask.config.update(dask.config.config, defaults, priority='old')
+dask.config.update_defaults(defaults)
