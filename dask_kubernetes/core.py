@@ -392,8 +392,11 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.scale_up(20)  # ask for twenty workers
         """
-        if dask.config.get('kubernetes.count.max') is not None:
-            n = min(n, dask.config.get('kubernetes.count.max'))
+        maximum = dask.config.get('kubernetes.count.max')
+        if maximum is not None and maximum < n:
+            logger.info("Tried to scale beyond maximum number of workers %d > %d",
+                        n, maximum)
+            n = maximum
         pods = pods or self._cleanup_succeeded_pods(self.pods())
         to_create = n - len(pods)
         new_pods = []

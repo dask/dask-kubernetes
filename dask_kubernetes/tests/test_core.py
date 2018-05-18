@@ -8,7 +8,7 @@ import dask
 import pytest
 from dask_kubernetes import KubeCluster, make_pod_spec
 from dask.distributed import Client, wait
-from distributed.utils_test import loop  # noqa: F401
+from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
 import kubernetes
 from random import random
@@ -456,3 +456,20 @@ def test_escape_username(pod_spec, loop, ns):
             assert '!' not in cluster.name
     finally:
         os.environ['LOGNAME'] = old_logname
+
+
+def test_maximum(cluster):
+    with dask.config.set(**{'kubernetes.count.max': 1}):
+        with captured_logger('dask_kubernetes') as logger:
+            cluster.scale(10)
+
+            start = time()
+            while len(cluster.scheduler.workers) <= 0:
+                sleep(0.1)
+                assert time() < start + 60
+
+            sleep(0.5)
+            assert len(cluster.scheduler.workers) == 1
+
+        result = logger.getvalue()
+        assert "scale beyond maximum number of workers" in result.lower()
