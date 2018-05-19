@@ -13,11 +13,11 @@ try:
 except ImportError:
     yaml = False
 
-from tornado import gen
+import dask
 from distributed.deploy import LocalCluster, Cluster
-from distributed.config import config
 from distributed.comm.utils import offload
 import kubernetes
+from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
 
@@ -128,22 +128,34 @@ class KubeCluster(Cluster):
             pod_template=None,
             name=None,
             namespace=None,
-            n_workers=0,
-            host='0.0.0.0',
-            port=0,
+            n_workers=None,
+            host=None,
+            port=None,
             env=None,
             **kwargs
     ):
-        if pod_template is None:
-            if 'kubernetes-worker-template-path' in config:
-                import yaml
-                with open(config['kubernetes-worker-template-path']) as f:
-                    d = yaml.safe_load(f)
-                pod_template = make_pod_from_dict(d)
-            else:
-                msg = ("Worker pod specification not provided. See KubeCluster "
-                       "docstring for ways to specify workers")
-                raise ValueError(msg)
+        pod_template = pod_template or dask.config.get('kubernetes.worker-template')
+        name = name or dask.config.get('kubernetes.name')
+        namespace = namespace or dask.config.get('kubernetes.namespace')
+        n_workers = n_workers if n_workers is not None else dask.config.get('kubernetes.count.start')
+        host = host or dask.config.get('kubernetes.host')
+        port = port if port is not None else dask.config.get('kubernetes.port')
+        env = env if env is not None else dask.config.get('kubernetes.env')
+
+        if not pod_template and dask.config.get('kubernetes.worker-template', None):
+            d = dask.config.get('kubernetes.worker-template')
+            pod_template = make_pod_from_dict(d)
+
+        if not pod_template and dask.config.get('kubernetes.worker-template-path', None):
+            import yaml
+            with open(dask.config.get('kubernetes.worker-template-path')) as f:
+                d = yaml.safe_load(f)
+            pod_template = make_pod_from_dict(d)
+
+        if not pod_template:
+            msg = ("Worker pod specification not provided. See KubeCluster "
+                   "docstring for ways to specify workers")
+            raise ValueError(msg)
 
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
@@ -158,10 +170,9 @@ class KubeCluster(Cluster):
         if namespace is None:
             namespace = _namespace_default()
 
-        if name is None:
-            worker_name = config.get('kubernetes-worker-name', 'dask-{user}-{uuid}')
-            name = worker_name.format(user=escape(getpass.getuser()),
-                                      uuid=str(uuid.uuid4())[:10], **os.environ)
+        name = name.format(user=escape(getpass.getuser()),
+                           uuid=str(uuid.uuid4())[:10],
+                           **os.environ)
 
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
@@ -225,15 +236,15 @@ class KubeCluster(Cluster):
 
             kind: Pod
             metadata:
-                labels:
-                    foo: bar
-                    baz: quux
+              labels:
+                foo: bar
+                baz: quux
             spec:
-                containers:
-                -   image: daskdev/dask:latest
-                    name: dask-worker
-                    args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
-                restartPolicy: Never
+              containers:
+              - image: daskdev/dask:latest
+                name: dask-worker
+                args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
+              restartPolicy: Never
 
         Examples
         --------
@@ -381,6 +392,11 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.scale_up(20)  # ask for twenty workers
         """
+        maximum = dask.config.get('kubernetes.count.max')
+        if maximum is not None and maximum < n:
+            logger.info("Tried to scale beyond maximum number of workers %d > %d",
+                        n, maximum)
+            n = maximum
         pods = pods or self._cleanup_succeeded_pods(self.pods())
         to_create = n - len(pods)
         new_pods = []
