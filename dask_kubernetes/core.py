@@ -109,11 +109,15 @@ class KubeCluster(Cluster):
     >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
     ...                                 'ExtRA_CONDA_PACKAGES': conda})
 
-    You can also start a KubeCluster with no arguments *if* the YAML file
-    defining the worker template is referred to in the
-    ``DASKERNETES_WORKER_TEMPLATE_PATH`` environment variable
+    You can also start a KubeCluster with no arguments *if* the worker template
+    is specified in the Dask config files, either as a full template in
+    ``kubernetes.worker-template`` or a path to a YAML file in
+    ``kubernetes.worker-template-path``.
 
-        $ export DASKERNETES_WORKER_TEMPLATE_PATH=worker_template.yaml
+    See http://dask.pydata.org/en/latest/configuration.html for more
+    information about setting configuration values.::
+
+        $ export DASK_KUBERNETES__WORKER_TEMPLATE_PATH=worker_template.yaml
 
     >>> cluster = KubeCluster()  # automatically finds 'worker_template.yaml'
 
