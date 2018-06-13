@@ -148,7 +148,9 @@ class KubeCluster(Cluster):
 
         if not pod_template and dask.config.get('kubernetes.worker-template-path', None):
             import yaml
-            with open(dask.config.get('kubernetes.worker-template-path')) as f:
+            fn = dask.config.get('kubernetes.worker-template-path')
+            fn = fn.format(**os.environ)
+            with open(fn) as f:
                 d = yaml.safe_load(f)
             pod_template = make_pod_from_dict(d)
 
