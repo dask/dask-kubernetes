@@ -75,25 +75,28 @@ Best Practices
 Configuration
 -------------
 
-There are a few special environment variables that affect dask-kubernetes behavior:
+You can use `Dask's configuration <http://dask.pydata.org/en/latest/configuration.html>`_
+to control the behavior of Dask-kubernetes.  You can see a full set of
+configuration options
+`here <https://github.com/dask/dask-kubernetes/blob/master/dask_kubernetes/kubernetes.yaml>`_.
+Some notable ones are described below:
 
-1.  ``DASK_KUBERNETES_WORKER_TEMPLATE_PATH``: a path to a YAML file that holds a
+1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
     :obj:`KubeCluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
-2.  ``DASK_DIAGNOSTICS_LINK``: a Python pre-formatted string that shows
+2.  ``distributed.dashboard.link``: a Python pre-formatted string that shows
     the location of Dask's dashboard.  This string will receive values for
-    ``host``, ``port``, and all environment variables.  This is useful when
-    using dask-kubernetes with JupyterHub and nbserverproxy to route the dashboard
-    link to a proxied address as follows::
+    ``host``, ``port``, and all environment variables.
 
-       export DASK_DIAGNOSTICS_LINK="{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
+    For example this is useful when using dask-kubernetes with JupyterHub and
+    nbserverproxy to route the dashboard link to a proxied address as follows::
 
-    This is inherited from general Dask behavior.
+       "{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
 
-3.  ``DASK_KUBERNETES_WORKER_NAME``: a Python pre-formatted string to use
+3.  ``kubernetes.worker-name``: a Python pre-formatted string to use
     when naming dask worker pods. This string will receive values for ``user``,
     ``uuid``, and all environment variables. This is useful when you want to have
     control over the naming convention for your pods and use other tokens from
@@ -101,9 +104,6 @@ There are a few special environment variables that affect dask-kubernetes behavi
     called ``jovyan`` and so you may wish to use ``dask-{JUPYTERHUB_USER}-{uuid}``
     instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
     the template.**
-
-Any other environment variable starting with ``DASK_`` will be placed in
-the ``dask.distributed.config`` dictionary for general use.
 
 
 Docker Images
