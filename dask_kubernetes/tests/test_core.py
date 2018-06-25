@@ -454,6 +454,7 @@ def test_escape_username(pod_spec, loop, ns):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             assert 'foo' in cluster.name
             assert '!' not in cluster.name
+            assert 'foo' in cluster.pod_template.metadata.labels['user']
     finally:
         os.environ['LOGNAME'] = old_logname
 
