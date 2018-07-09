@@ -5,6 +5,11 @@ Dask Kubernetes deploys Dask workers on Kubernetes clusters using native
 Kubernetes APIs.  It is designed to dynamically launch short-lived deployments
 of workers during the lifetime of a Python process.
 
+Currently, it is designed to be run from a pod on a Kubernetes cluster that
+has permissions to launch other pods. However, it can also work with a remote
+Kubernetes cluster (configured via a kubeconfig file), as long as it is possible
+to open network connections with all the workers nodes on the remote cluster.
+
 Install
 -------
 
