@@ -28,7 +28,9 @@ class KubeCluster(Cluster):
     """ Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
-    Dask workers on a Kubernetes cluster.
+    Dask workers on a Kubernetes cluster. The Kubernetes cluster is taken
+    to be either the current one on which this code is running, or as a 
+    fallback, the default one configured in a kubeconfig file.
 
     **Environments**
 
@@ -36,6 +38,14 @@ class KubeCluster(Cluster):
     environment, including versions of Python, dask, cloudpickle, and any
     libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
     See examples below for suggestions on how to manage and check for this.
+
+    **Network**
+
+    Since the Dask scheduler is launched locally, for it to work, we need to
+    be able to open network connections between this local node and all the
+    workers nodes on the Kubernetes cluster. If the current process is not
+    already on a Kubernetes node, some network configuration will likely be
+    required to make this work.
 
     **Resources**
 
