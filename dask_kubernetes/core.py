@@ -193,6 +193,7 @@ class KubeCluster(Cluster):
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
         self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        self.pod_template.metadata.labels['user'] = escape(getpass.getuser())
         self.pod_template.metadata.labels['app'] = 'dask'
         self.pod_template.metadata.labels['component'] = 'dask-worker'
         self.pod_template.metadata.namespace = namespace
