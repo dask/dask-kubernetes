@@ -85,6 +85,11 @@ def test_logs(cluster):
     logs = cluster.logs(a)
     assert 'distributed.worker' in logs
 
+    logs = cluster.logs()
+    assert len(logs) == 2
+    for pod in logs:
+        assert 'distributed.worker' in logs[pod]
+
 
 def test_ipython_display(cluster):
     ipywidgets = pytest.importorskip('ipywidgets')

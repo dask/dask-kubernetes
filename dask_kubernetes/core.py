@@ -29,7 +29,7 @@ class KubeCluster(Cluster):
 
     This starts a local Dask scheduler and then dynamically launches
     Dask workers on a Kubernetes cluster. The Kubernetes cluster is taken
-    to be either the current one on which this code is running, or as a 
+    to be either the current one on which this code is running, or as a
     fallback, the default one configured in a kubeconfig file.
 
     **Environments**
@@ -309,10 +309,13 @@ class KubeCluster(Cluster):
             label_selector=format_labels(self.pod_template.metadata.labels)
         ).items
 
-    def logs(self, pod):
+    def logs(self, pod=None):
         """ Logs from a worker pod
 
         You can get this pod object from the ``pods`` method.
+
+        If no pod is specified all pod logs will be returned. On large clusters
+        this could end up being rather large.
 
         Parameters
         ----------
@@ -324,6 +327,9 @@ class KubeCluster(Cluster):
         KubeCluster.pods
         Client.get_worker_logs
         """
+        if pod is None:
+            return {pod.status.pod_ip: self.logs(pod) for pod in self.pods()}
+
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
                                                      pod.metadata.namespace)
 
