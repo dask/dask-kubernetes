@@ -327,7 +327,7 @@ class KubeCluster(Cluster):
         Client.get_worker_logs
         """
         if pod is None:
-            return [self.logs(pod for pod in self.pods())]
+            return {pod.status.pod_ip: self.logs(pod) for pod in self.pods()}
 
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
                                                      pod.metadata.namespace)
