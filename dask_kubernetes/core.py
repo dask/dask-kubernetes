@@ -333,7 +333,7 @@ class KubeCluster(Cluster):
         return self.core_api.read_namespaced_pod_log(pod.metadata.name,
                                                      pod.metadata.namespace)
 
-    def scale(self, n):
+    def scale(self, n, wait=False):
         """ Scale cluster to n workers
 
         Parameters
@@ -341,9 +341,13 @@ class KubeCluster(Cluster):
         n: int
             Target number of workers
 
+        wait: bool
+            Flag to wait for the scaling to happen before returning
+
         Example
         -------
         >>> cluster.scale(10)  # scale cluster to ten workers
+        >>> cluster.scale(10, wait=True)  # scale and block until workers are connected
 
         See Also
         --------
@@ -387,6 +391,10 @@ class KubeCluster(Cluster):
 
             # Terminate all pods without waiting for clean worker shutdown
             self.scale_down(to_close)
+
+        if wait:
+            while len(self.scheduler.workers) != n:
+                time.sleep(0.1)
 
     def _delete_pods(self, to_delete):
         for pod in to_delete:
