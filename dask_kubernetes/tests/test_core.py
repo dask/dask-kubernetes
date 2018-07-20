@@ -414,6 +414,13 @@ def test_scale_down_pending(cluster, client):
         assert time() < start + 60
 
 
+def test_scale_wait(cluster, client):
+    cluster.scale(3, wait=True)
+    assert len(cluster.scheduler.workers) == 3
+
+    cluster.scale(2, wait=True)
+    assert len(cluster.scheduler.workers) == 2
+
 def test_automatic_startup(image_name, loop, ns):
     test_yaml = {
         "kind": "Pod",
