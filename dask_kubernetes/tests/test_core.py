@@ -261,6 +261,14 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
             assert result == 11
 
 
+def test_pod_template_from_conf():
+    spec = {'spec': {'containers': [{'name': 'some-name'}]}}
+
+    with dask.config.set({'kubernetes.worker-template': spec}):
+        with KubeCluster() as cluster:
+            assert cluster.pod_template.spec.containers[0].name == 'some-name'
+
+
 def test_bad_args(loop):
     with pytest.raises(TypeError) as info:
         KubeCluster('myfile.yaml')
