@@ -148,7 +148,6 @@ class KubeCluster(Cluster):
             env=None,
             **kwargs
     ):
-        pod_template = pod_template or dask.config.get('kubernetes.worker-template')
         name = name or dask.config.get('kubernetes.name')
         namespace = namespace or dask.config.get('kubernetes.namespace')
         n_workers = n_workers if n_workers is not None else dask.config.get('kubernetes.count.start')
