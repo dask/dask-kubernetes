@@ -349,7 +349,7 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = self._cleanup_succeeded_pods(self.pods())
+        pods = self._cleanup_terminated_pods(self.pods())
         if n >= len(pods):
             return self.scale_up(n, pods=pods)
         else:
@@ -401,10 +401,11 @@ class KubeCluster(Cluster):
                 if e.status != 404:
                     raise
 
-    def _cleanup_succeeded_pods(self, pods):
-        terminated_pods = [p for p in pods if p.status.phase == 'Succeeded']
+    def _cleanup_terminated_pods(self, pods):
+        terminated_phases = {'Succeeded', 'Failed'}
+        terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         self._delete_pods(terminated_pods)
-        return [p for p in pods if p.status.phase != 'Succeeded']
+        return [p for p in pods if p.status.phase not in terminated_phases]
 
     def scale_up(self, n, pods=None, **kwargs):
         """
@@ -419,7 +420,7 @@ class KubeCluster(Cluster):
             logger.info("Tried to scale beyond maximum number of workers %d > %d",
                         n, maximum)
             n = maximum
-        pods = pods or self._cleanup_succeeded_pods(self.pods())
+        pods = pods or self._cleanup_terminated_pods(self.pods())
         to_create = n - len(pods)
         new_pods = []
         for i in range(3):
@@ -461,7 +462,7 @@ class KubeCluster(Cluster):
         workers: List[str] List of addresses of workers to close
         """
         # Get the existing worker pods
-        pods = pods or self._cleanup_succeeded_pods(self.pods())
+        pods = pods or self._cleanup_terminated_pods(self.pods())
 
         # Work out the list of pods that we are going to delete
         # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
