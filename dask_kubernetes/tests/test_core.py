@@ -296,6 +296,42 @@ def test_constructor_parameters(pod_spec, loop, ns):
         assert pod.metadata.generate_name == 'myname'
 
 
+def test_reject_evicted_workers(cluster):
+    cluster.scale(1)
+
+    start = time()
+    while len(cluster.scheduler.workers) != 1:
+        sleep(0.1)
+        assert time() < start + 60
+
+    # Evict worker
+    [worker] = cluster.pods()
+    cluster.core_api.create_namespaced_pod_eviction(
+        worker.metadata.name,
+        worker.metadata.namespace,
+        kubernetes.client.V1beta1Eviction(
+            delete_options=kubernetes.client.V1DeleteOptions(grace_period_seconds=300),
+            metadata=worker.metadata))
+
+    # Wait until pod is evicted
+    start = time()
+    while cluster.pods()[0].status.phase == 'Running':
+        sleep(0.1)
+        assert time() < start + 60
+
+    [worker] = cluster.pods()
+    assert worker.status.phase == 'Failed'
+
+    # Make sure the failed pod is removed
+    pods = cluster._cleanup_terminated_pods([worker])
+    assert len(pods) == 0
+
+    start = time()
+    while cluster.pods():
+        sleep(0.1)
+        assert time() < start + 60
+
+
 def test_scale_up_down(cluster, client):
     np = pytest.importorskip('numpy')
     cluster.scale(2)
