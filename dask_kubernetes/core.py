@@ -395,7 +395,12 @@ class KubeCluster(Cluster):
                     self.namespace,
                     kubernetes.client.V1DeleteOptions()
                 )
-                logger.info('Deleted pod: %s', pod.metadata.name)
+                pod_info = pod.metadata.name
+                if pod.status.reason:
+                    pod_info += ' [{}]'.format(pod.status.reason)
+                if pod.status.message:
+                    pod_info += ' {}'.format(pod.status.message)
+                logger.info('Deleted pod: %s', pod_info)
             except kubernetes.client.rest.ApiException as e:
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
