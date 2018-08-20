@@ -97,7 +97,8 @@ Some notable ones are described below:
     ``host``, ``port``, and all environment variables.
 
     For example this is useful when using dask-kubernetes with JupyterHub and
-    nbserverproxy to route the dashboard link to a proxied address as follows::
+    `nbserverproxy <https://github.com/jupyterhub/nbserverproxy>`_ to route the
+    dashboard link to a proxied address as follows::
 
        "{JUPYTERHUB_SERVICE_PREFIX}proxy/{port}/status"
 
