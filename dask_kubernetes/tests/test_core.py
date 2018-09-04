@@ -507,6 +507,11 @@ def test_escape_username(pod_spec, loop, ns):
     finally:
         os.environ['LOGNAME'] = old_logname
 
+        
+def test_escape_name():
+    with KubeCluster(name='foo@bar') as cluster:
+        assert '@' not in str(cluster.pod_template)
+
 
 def test_maximum(cluster):
     with dask.config.set(**{'kubernetes.count.max': 1}):
