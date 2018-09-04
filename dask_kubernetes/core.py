@@ -117,7 +117,7 @@ class KubeCluster(Cluster):
     >>> pip = 'pyarrow gcsfs git+https://github.com/dask/distributed'
     >>> conda = '-c conda-forge scikit-learn'
     >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
-    ...                                 'ExtRA_CONDA_PACKAGES': conda})
+    ...                                 'EXTRA_CONDA_PACKAGES': conda})
 
     You can also start a KubeCluster with no arguments *if* the worker template
     is specified in the Dask config files, either as a full template in
@@ -184,11 +184,12 @@ class KubeCluster(Cluster):
 
         if namespace is None:
             namespace = _namespace_default()
-
-        name = name.format(user=escape(getpass.getuser()),
+        
+        name = name.format(user=getpass.getuser(),
                            uuid=str(uuid.uuid4())[:10],
                            **os.environ)
-
+        name = escape(name)
+        
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
         self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
