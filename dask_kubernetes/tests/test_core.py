@@ -508,8 +508,8 @@ def test_escape_username(pod_spec, loop, ns):
         os.environ['LOGNAME'] = old_logname
 
         
-def test_escape_name():
-    with KubeCluster(name='foo@bar') as cluster:
+def test_escape_name(pod_spec, loop, ns):
+    with KubeCluster(pod_spec, loop=loop, namespace=ns, name='foo@bar') as cluster:
         assert '@' not in str(cluster.pod_template)
 
 
