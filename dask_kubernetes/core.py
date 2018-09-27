@@ -124,7 +124,7 @@ class KubeCluster(Cluster):
     ``kubernetes.worker-template`` or a path to a YAML file in
     ``kubernetes.worker-template-path``.
 
-    See http://dask.pydata.org/en/latest/configuration.html for more
+    See https://dask.org/en/latest/configuration.html for more
     information about setting configuration values.::
 
         $ export DASK_KUBERNETES__WORKER_TEMPLATE_PATH=worker_template.yaml
@@ -184,15 +184,15 @@ class KubeCluster(Cluster):
 
         if namespace is None:
             namespace = _namespace_default()
-        
+
         name = name.format(user=getpass.getuser(),
                            uuid=str(uuid.uuid4())[:10],
                            **os.environ)
         name = escape(name)
-        
+
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
-        self.pod_template.metadata.labels['dask.pydata.org/cluster-name'] = name
+        self.pod_template.metadata.labels['dask.org/cluster-name'] = name
         self.pod_template.metadata.labels['user'] = escape(getpass.getuser())
         self.pod_template.metadata.labels['app'] = 'dask'
         self.pod_template.metadata.labels['component'] = 'dask-worker'
