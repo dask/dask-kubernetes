@@ -124,7 +124,7 @@ class KubeCluster(Cluster):
     ``kubernetes.worker-template`` or a path to a YAML file in
     ``kubernetes.worker-template-path``.
 
-    See https://dask.org/en/latest/configuration.html for more
+    See https://docs.dask.org/en/latest/configuration.html for more
     information about setting configuration values.::
 
         $ export DASK_KUBERNETES__WORKER_TEMPLATE_PATH=worker_template.yaml

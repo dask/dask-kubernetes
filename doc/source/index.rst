@@ -80,7 +80,7 @@ Best Practices
 Configuration
 -------------
 
-You can use `Dask's configuration <https://dask.org/en/latest/configuration.html>`_
+You can use `Dask's configuration <https://docs.dask.org/en/latest/configuration.html>`_
 to control the behavior of Dask-kubernetes.  You can see a full set of
 configuration options
 `here <https://github.com/dask/dask-kubernetes/blob/master/dask_kubernetes/kubernetes.yaml>`_.
@@ -118,7 +118,7 @@ Docker Images
 Example Dask docker images daskdev/dask and daskdev/dask-notebook
 are available on https://hub.docker.com/r/daskdev .
 More information about these images is available at the
-`Dask documentation <https://dask.org/en/latest/setup/docker.html>`_.
+`Dask documentation <https://docs.dask.org/en/latest/setup/docker.html>`_.
 
 
 .. toctree::
