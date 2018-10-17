@@ -348,8 +348,8 @@ def test_scale_up_down(cluster, client):
     wait([x, y])
 
     start = time()
-    while (cluster.scheduler.workers[a].info['memory'] >
-           cluster.scheduler.workers[b].info['memory']):
+    while (cluster.scheduler.workers[a].metrics['memory'] >
+           cluster.scheduler.workers[b].metrics['memory']):
         sleep(0.1)
         assert time() < start + 1
 
@@ -507,7 +507,7 @@ def test_escape_username(pod_spec, loop, ns):
     finally:
         os.environ['LOGNAME'] = old_logname
 
-        
+
 def test_escape_name(pod_spec, loop, ns):
     with KubeCluster(pod_spec, loop=loop, namespace=ns, name='foo@bar') as cluster:
         assert '@' not in str(cluster.pod_template)

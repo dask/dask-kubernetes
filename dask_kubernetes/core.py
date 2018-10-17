@@ -535,7 +535,7 @@ def select_workers_to_close(scheduler, n_to_close):
     """ Select n workers to close from scheduler """
     workers = list(scheduler.workers.values())
     assert n_to_close <= len(workers)
-    key = lambda ws: ws.info['memory']
+    key = lambda ws: ws.metrics['memory']
     to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
 
     if len(to_close) < n_to_close:
