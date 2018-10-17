@@ -204,6 +204,42 @@ def test_pod_from_yaml(image_name, loop, ns):
                 assert all(client.has_what().values())
 
 
+def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
+    try:
+        os.environ["FOO_IMAGE"] = image_name
+
+        test_yaml = {
+            "kind": "Pod",
+            "metadata": {
+                "labels": {
+                    "app": "dask",
+                    "component": "dask-worker"
+                }
+            },
+            "spec": {
+                "containers": [{
+                    "args": [
+                        "dask-worker",
+                        "$(DASK_SCHEDULER_ADDRESS)",
+                        "--nthreads",
+                        "1"
+                    ],
+                    "image": '${FOO_IMAGE}',
+                    'imagePullPolicy': 'IfNotPresent',
+                    "name": "dask-worker"
+                }]
+            }
+        }
+
+        with tmpfile(extension='yaml') as fn:
+            with open(fn, mode='w') as f:
+                yaml.dump(test_yaml, f)
+            with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
+                assert cluster.pod_template.spec.containers[0].image == image_name
+    finally:
+        del os.environ['FOO_IMAGE']
+
+
 def test_pod_from_dict(image_name, loop, ns):
     spec = {
         'metadata': {},

@@ -157,6 +157,7 @@ class KubeCluster(Cluster):
 
         if not pod_template and dask.config.get('kubernetes.worker-template', None):
             d = dask.config.get('kubernetes.worker-template')
+            d = dask.config.expand_environment_variables(d)
             pod_template = make_pod_from_dict(d)
 
         if not pod_template and dask.config.get('kubernetes.worker-template-path', None):
@@ -165,6 +166,7 @@ class KubeCluster(Cluster):
             fn = fn.format(**os.environ)
             with open(fn) as f:
                 d = yaml.safe_load(f)
+            d = dask.config.expand_environment_variables(d)
             pod_template = make_pod_from_dict(d)
 
         if not pod_template:
@@ -275,6 +277,7 @@ class KubeCluster(Cluster):
             raise ImportError("PyYaml is required to use yaml functionality, please install it!")
         with open(yaml_path) as f:
             d = yaml.safe_load(f)
+            d = dask.config.expand_environment_variables(d)
             return cls.from_dict(d, **kwargs)
 
     @property
