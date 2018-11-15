@@ -560,3 +560,54 @@ def test_maximum(cluster):
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
+
+
+def test_default_toleration(pod_spec):
+    tolerations = pod_spec.to_dict()['spec']['tolerations']
+    assert {
+        'key': 'k8s.dask.org/dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+        'toleration_seconds': None
+    } in tolerations
+    assert {
+        'key': 'k8s.dask.org_dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+        'toleration_seconds': None
+    } in tolerations
+
+
+def test_default_toleration_preserved(image_name):
+    pod_spec = make_pod_spec(
+        image=image_name,
+        extra_pod_config={
+            'tolerations': [
+                {
+                    'key': 'example.org/toleration',
+                    'operator': 'Exists',
+                    'effect': 'NoSchedule',
+                }
+            ],
+        }
+    )
+    tolerations = pod_spec.to_dict()['spec']['tolerations']
+    assert {
+        'key': 'k8s.dask.org/dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+    } in tolerations
+    assert {
+        'key': 'k8s.dask.org_dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+    } in tolerations
+    assert {
+        'key': 'example.org/toleration',
+        'operator': 'Exists',
+        'effect': 'NoSchedule',
+    } in tolerations
