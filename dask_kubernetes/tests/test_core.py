@@ -564,3 +564,24 @@ def test_maximum(cluster):
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
+
+
+def test_auth_missing(pod_spec, ns, loop):
+    with pytest.raises(ValueError) as info:
+        KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)
+
+    assert "No authorization methods were provided" in str(info.value)
+
+
+def test_auth_tries_all_methods(pod_spec, ns, loop):
+    fail_count = 0
+    class FailAuth(ClusterAuth):
+        def load(self):
+            fail_count += 1
+            raise kubernetes.client.ConfigException('Fail #{}'.format(fail_count))
+
+    with pytest.raises(ValueError) as info:
+        KubeCluster(pod_spec, auth=[FailAuth()] * 3, loop=loop, namespace=ns)
+
+    assert "Fail #3" in str(info.value)
+    assert fail_count == 3
