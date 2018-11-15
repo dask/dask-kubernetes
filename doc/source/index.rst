@@ -124,6 +124,23 @@ More information about these images is available at the
 `Dask documentation <https://docs.dask.org/en/latest/setup/docker.html>`_.
 
 
+Deployment Details
+------------------
+
+Workers are created directly as simple pods.  These worker pods are configured
+to shutdown if they are unable to connect to the scheduler for 60 seconds.
+The pods are cleaned up when :meth:`~dask_kubernetes.KubeCluster.close` is called,
+or the scheduler process exits.
+
+The pods are created with two default `tolerations <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>`_:
+
+* ``k8s.dask.org/dedicated=worker:NoSchedule``
+* ``k8s.dask.org_dedicated=worker:NoSchedule``
+
+If you have nodes with the corresponding taints, then the worker pods will
+schedule to those nodes (and no other pods will be able to schedule to those
+nodes).
+
 .. toctree::
    :maxdepth: 1
    :hidden:
