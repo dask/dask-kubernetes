@@ -379,7 +379,7 @@ def test_scale_up_down(cluster, client):
 
     a, b = list(cluster.scheduler.workers)
     x = client.submit(np.ones, 1, workers=a)
-    y = client.submit(np.ones, 100_000_000, workers=b)
+    y = client.submit(np.ones, 50_000_000, workers=b)
 
     wait([x, y])
 
@@ -531,17 +531,13 @@ def test_repr(cluster):
         assert "workers=0" in text
 
 
-def test_escape_username(pod_spec, loop, ns):
-    old_logname = os.environ.get('LOGNAME')
-    os.environ['LOGNAME'] = 'foo!'
+def test_escape_username(pod_spec, loop, ns, monkeypatch):
+    monkeypatch.setenv('LOGNAME', 'foo!')
 
-    try:
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-            assert 'foo' in cluster.name
-            assert '!' not in cluster.name
-            assert 'foo' in cluster.pod_template.metadata.labels['user']
-    finally:
-        os.environ['LOGNAME'] = old_logname
+    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+        assert 'foo' in cluster.name
+        assert '!' not in cluster.name
+        assert 'foo' in cluster.pod_template.metadata.labels['user']
 
 
 def test_escape_name(pod_spec, loop, ns):
