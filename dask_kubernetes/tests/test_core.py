@@ -384,7 +384,7 @@ def test_scale_up_down(cluster, client):
 
     a, b = list(cluster.scheduler.workers)
     x = client.submit(np.ones, 1, workers=a)
-    y = client.submit(np.ones, 100_000_000, workers=b)
+    y = client.submit(np.ones, 50_000_000, workers=b)
 
     wait([x, y])
 
@@ -536,17 +536,13 @@ def test_repr(cluster):
         assert "workers=0" in text
 
 
-def test_escape_username(pod_spec, loop, ns):
-    old_logname = os.environ.get('LOGNAME')
-    os.environ['LOGNAME'] = 'foo!'
+def test_escape_username(pod_spec, loop, ns, monkeypatch):
+    monkeypatch.setenv('LOGNAME', 'foo!')
 
-    try:
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-            assert 'foo' in cluster.name
-            assert '!' not in cluster.name
-            assert 'foo' in cluster.pod_template.metadata.labels['user']
-    finally:
-        os.environ['LOGNAME'] = old_logname
+    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+        assert 'foo' in cluster.name
+        assert '!' not in cluster.name
+        assert 'foo' in cluster.pod_template.metadata.labels['user']
 
 
 def test_escape_name(pod_spec, loop, ns):
@@ -571,6 +567,59 @@ def test_maximum(cluster):
         assert "scale beyond maximum number of workers" in result.lower()
 
 
+def test_default_toleration(pod_spec):
+    tolerations = pod_spec.to_dict()['spec']['tolerations']
+    assert {
+        'key': 'k8s.dask.org/dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+        'toleration_seconds': None
+    } in tolerations
+    assert {
+        'key': 'k8s.dask.org_dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+        'toleration_seconds': None
+    } in tolerations
+
+
+def test_default_toleration_preserved(image_name):
+    pod_spec = make_pod_spec(
+        image=image_name,
+        extra_pod_config={
+            'tolerations': [
+                {
+                    'key': 'example.org/toleration',
+                    'operator': 'Exists',
+                    'effect': 'NoSchedule',
+                }
+            ],
+        }
+    )
+    tolerations = pod_spec.to_dict()['spec']['tolerations']
+    assert {
+        'key': 'k8s.dask.org/dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+    } in tolerations
+    assert {
+        'key': 'k8s.dask.org_dedicated',
+        'operator': 'Equal',
+        'value': 'worker',
+        'effect': 'NoSchedule',
+    } in tolerations
+    assert {
+        'key': 'example.org/toleration',
+        'operator': 'Exists',
+        'effect': 'NoSchedule',
+    } in tolerations
+    assert "Fail #3" in str(info.value)
+    assert fails['count'] == 3
+
+
 def test_auth_missing(pod_spec, ns, loop):
     with pytest.raises(kubernetes.config.ConfigException) as info:
         KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)
@@ -587,9 +636,6 @@ def test_auth_tries_all_methods(pod_spec, ns, loop):
 
     with pytest.raises(kubernetes.config.ConfigException) as info:
         KubeCluster(pod_spec, auth=[FailAuth()] * 3, loop=loop, namespace=ns)
-
-    assert "Fail #3" in str(info.value)
-    assert fails['count'] == 3
 
 
 def test_auth_kubeconfig_with_filename():
