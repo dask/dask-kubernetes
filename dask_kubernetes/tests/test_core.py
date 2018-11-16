@@ -616,8 +616,6 @@ def test_default_toleration_preserved(image_name):
         'operator': 'Exists',
         'effect': 'NoSchedule',
     } in tolerations
-    assert "Fail #3" in str(info.value)
-    assert fails['count'] == 3
 
 
 def test_auth_missing(pod_spec, ns, loop):
@@ -636,6 +634,9 @@ def test_auth_tries_all_methods(pod_spec, ns, loop):
 
     with pytest.raises(kubernetes.config.ConfigException) as info:
         KubeCluster(pod_spec, auth=[FailAuth()] * 3, loop=loop, namespace=ns)
+
+    assert "Fail #3" in str(info.value)
+    assert fails['count'] == 3
 
 
 def test_auth_kubeconfig_with_filename():
