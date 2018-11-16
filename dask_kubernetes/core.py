@@ -20,92 +20,9 @@ import kubernetes
 from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
+from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
-
-
-class ClusterAuth(object):
-    def load(self):
-        raise NotImplementedError()
-
-
-class InCluster(ClusterAuth):
-    """
-    Gather configuration from the mounted service account token and discover
-    Kubernetes service via Kubernetes service discovery.
-    """
-    def load(self):
-        kubernetes.config.load_incluster_config()
-
-
-class KubeConfig(ClusterAuth):
-    """
-    Load configuration from a kubeconfig file.
-
-    Parameters
-    ----------
-    config_file: str (optional)
-        The path of the kubeconfig file to load.  Defaults to the value of the
-        ``KUBECONFIG`` environment variable, or the string ``~/.kube/config``.
-    context: str (optional)
-        The kubeconfig context to use.  Defaults to the value of ``current-context``
-        in the configuration file.
-    persist_config: bool (optional)
-        Whether changes to the configuration will be saved back to disk (e.g.
-        GCP token refresh).  Defaults to ``True``.
-    """
-    def __init__(self, config_file=None, context=None, persist_config=True):
-        self.config_file = config_file
-        self.context = context
-        self.persist_config = persist_config
-
-    def load(self):
-        kubernetes.config.load_kube_config(self.config_file, self.context,
-                                           None, self.persist_config)
-
-
-class KubeAuth(ClusterAuth):
-    """Authentication method to configuration the Kubernetes connection
-    directly.
-
-    Parameters
-    ----------
-    host: str
-        The base URL of the Kubernetes host to connect
-
-    Keyword Arguments
-    -----------------
-    username: str (optional)
-        Username for HTTP basic authentication
-    password: str (optional)
-        Password for HTTP basic authentication
-    debug: bool (optional)
-        Debug switch
-        # SSL/TLS verification
-    verify_ssl: bool (optional)
-        Set this to false to skip verifying SSL certificate when calling API
-        from https server.  Defaults to ``True``.
-    ssl_ca_cert: str (optional)
-        Set this to customize the certificate file to verify the peer.
-    cert_file: str (optional)
-        Client certificate file
-    key_file: str (optional)
-        Client key file
-    assert_hostname: bool (optional)
-        Set this to True/False to enable/disable SSL hostname verification.
-        Defaults to True.
-    proxy: str (optional)
-        URL for a proxy to connect through
-    """
-    def __init__(self, host, **kwargs):
-        config = kubernetes.client.Configuration()
-        config.host = host
-        for key, value in kwargs.items():
-            setattr(config, key, value)
-        self.config = config
-
-    def load(self):
-        kubernetes.config.Configuration.set_default(self.config)
 
 
 class KubeCluster(Cluster):
@@ -155,6 +72,9 @@ class KubeCluster(Cluster):
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
         Port of local scheduler
+    auth: List[ClusterAuth] (optional)
+        Configuration methods to attempt in order.  Defaults to
+        ``[InCluster(), KubeConfig()]``.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -230,7 +150,7 @@ class KubeCluster(Cluster):
             host=None,
             port=None,
             env=None,
-            auth=[InCluster(), KubeConfig()],
+            auth=ClusterAuth.DEFAULT,
             **kwargs
     ):
         name = name or dask.config.get('kubernetes.name')
@@ -263,20 +183,7 @@ class KubeCluster(Cluster):
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
 
-        if isinstance(auth, ClusterAuth):
-            auth = [auth]
-        auth_exc = ValueError('No authorization methods were provided')
-        for auth_instance in auth:
-            try:
-                auth_instance.load()
-            except kubernetes.config.ConfigException as exc:
-                logger.debug('Failed to load configuration with %s method: %s', auth_instance.__class__, exc)
-                auth_exc = exc
-            else:
-                break
-        else:
-            raise auth_exc
-
+        ClusterAuth.load_first(auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
 
