@@ -4,10 +4,15 @@ import os
 import socket
 import string
 import time
-from urllib.parse import urlparse
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 import uuid
-from weakref import finalize
-
+try:
+    from weakref import finalize
+except ImportError:
+    from backports.weakref import finalize
 try:
     import yaml
 except ImportError:
