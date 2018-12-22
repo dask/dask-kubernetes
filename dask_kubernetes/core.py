@@ -485,10 +485,10 @@ class KubeCluster(Cluster):
     def __enter__(self):
         return self
 
-    def close(self):
+    def close(self, **kwargs):
         """ Close this cluster """
         self.scale_down(self.cluster.scheduler.workers)
-        self.cluster.close()
+        return self.cluster.close(**kwargs)
 
     def __exit__(self, type, value, traceback):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
