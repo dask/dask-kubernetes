@@ -300,6 +300,9 @@ class KubeCluster(Cluster):
     def scheduler_address(self):
         return self.scheduler.address
 
+    def __await__(self):
+        return self.cluster.__await__()
+
     def pods(self):
         """ A list of kubernetes pods corresponding to current workers
 

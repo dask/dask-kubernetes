@@ -611,3 +611,12 @@ def test_default_toleration_preserved(image_name):
         'operator': 'Exists',
         'effect': 'NoSchedule',
     } in tolerations
+
+
+def test_async(pod_spec, loop, ns):
+    @gen.coroutine
+    def f():
+        cluster = yield KubeCluster(pod_spec, loop=loop, namespace=ns, asynchronous=True)
+        yield cluster.close()
+
+    loop.run_sync(f)
