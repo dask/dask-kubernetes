@@ -1,3 +1,4 @@
+import base64
 import getpass
 import os
 from time import sleep, time
@@ -6,24 +7,28 @@ import yaml
 
 import dask
 import pytest
-from dask_kubernetes import KubeCluster, make_pod_spec
+from dask_kubernetes import KubeCluster, make_pod_spec, ClusterAuth, KubeConfig, KubeAuth
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
 import kubernetes
 from random import random
 
-
-try:
-    kubernetes.config.load_incluster_config()
-except kubernetes.config.ConfigException:
-    kubernetes.config.load_kube_config()
-
-api = kubernetes.client.CoreV1Api()
+TEST_DIR = os.path.abspath(os.path.join(__file__, '..'))
+CONFIG_DEMO = os.path.join(TEST_DIR, 'config-demo.yaml')
+FAKE_CERT = os.path.join(TEST_DIR, 'fake-cert-file')
+FAKE_KEY = os.path.join(TEST_DIR, 'fake-key-file')
+FAKE_CA = os.path.join(TEST_DIR, 'fake-ca-file')
 
 
 @pytest.fixture
-def ns():
+def api():
+    ClusterAuth.load_first()
+    return kubernetes.client.CoreV1Api()
+
+
+@pytest.fixture
+def ns(api):
     name = 'test-dask-kubernetes' + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(metadata=kubernetes.client.V1ObjectMeta(name=name))
     api.create_namespace(ns)
@@ -611,3 +616,58 @@ def test_default_toleration_preserved(image_name):
         'operator': 'Exists',
         'effect': 'NoSchedule',
     } in tolerations
+
+
+def test_auth_missing(pod_spec, ns, loop):
+    with pytest.raises(kubernetes.config.ConfigException) as info:
+        KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)
+
+    assert "No authorization methods were provided" in str(info.value)
+
+
+def test_auth_tries_all_methods(pod_spec, ns, loop):
+    fails = {'count': 0}
+    class FailAuth(ClusterAuth):
+        def load(self):
+            fails['count'] += 1
+            raise kubernetes.config.ConfigException('Fail #{count}'.format(**fails))
+
+    with pytest.raises(kubernetes.config.ConfigException) as info:
+        KubeCluster(pod_spec, auth=[FailAuth()] * 3, loop=loop, namespace=ns)
+
+    assert "Fail #3" in str(info.value)
+    assert fails['count'] == 3
+
+
+def test_auth_kubeconfig_with_filename():
+    KubeConfig(config_file=CONFIG_DEMO).load()
+
+    # we've set the default configuration, so check that it is default
+    config = kubernetes.client.Configuration()
+    assert config.host == 'https://1.2.3.4'
+    assert config.cert_file == FAKE_CERT
+    assert config.key_file == FAKE_KEY
+    assert config.ssl_ca_cert == FAKE_CA
+
+
+def test_auth_kubeconfig_with_context():
+    KubeConfig(config_file=CONFIG_DEMO, context='exp-scratch').load()
+
+    # we've set the default configuration, so check that it is default
+    config = kubernetes.client.Configuration()
+    assert config.host == 'https://5.6.7.8'
+    assert config.api_key['authorization'] == 'Basic {}'.format(
+        base64.b64encode(b'exp:some-password').decode('ascii')
+    )
+
+
+def test_auth_explicit():
+    KubeAuth(host='https://9.8.7.6', username='abc', password='some-password').load()
+
+    config = kubernetes.client.Configuration()
+    assert config.host == 'https://9.8.7.6'
+    assert config.username == 'abc'
+    assert config.password == 'some-password'
+    assert config.get_basic_auth_token() == 'Basic {}'.format(
+        base64.b64encode(b'abc:some-password').decode('ascii')
+    )

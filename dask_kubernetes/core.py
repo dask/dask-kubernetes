@@ -25,6 +25,7 @@ import kubernetes
 from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
+from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,9 @@ class KubeCluster(Cluster):
         Listen address for local scheduler.  Defaults to 0.0.0.0
     port: int
         Port of local scheduler
+    auth: List[ClusterAuth] (optional)
+        Configuration methods to attempt in order.  Defaults to
+        ``[InCluster(), KubeConfig()]``.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -151,6 +155,7 @@ class KubeCluster(Cluster):
             host=None,
             port=None,
             env=None,
+            auth=ClusterAuth.DEFAULT,
             **kwargs
     ):
         name = name or dask.config.get('kubernetes.name')
@@ -182,10 +187,8 @@ class KubeCluster(Cluster):
         self.cluster = LocalCluster(ip=host or socket.gethostname(),
                                     scheduler_port=port,
                                     n_workers=0, **kwargs)
-        try:
-            kubernetes.config.load_incluster_config()
-        except kubernetes.config.ConfigException:
-            kubernetes.config.load_kube_config()
+
+        ClusterAuth.load_first(auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
 
