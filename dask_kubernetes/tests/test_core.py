@@ -11,7 +11,7 @@ from dask_kubernetes import KubeCluster, make_pod_spec, ClusterAuth, KubeConfig,
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
-import kubernetes
+import kubernetes_asyncio as kubernetes
 from random import random
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, '..'))
@@ -26,6 +26,11 @@ def api():
     ClusterAuth.load_first()
     return kubernetes.client.CoreV1Api()
 
+@pytest.fixture
+async def api_async():
+    await ClusterAuth.load_first()
+    return kubernetes.client.CoreV1Api()
+
 
 @pytest.fixture
 def ns(api):
@@ -37,6 +42,15 @@ def ns(api):
     finally:
         api.delete_namespace(name, kubernetes.client.V1DeleteOptions())
 
+@pytest.fixture
+async def ns_async(api_async):
+    name = 'test-dask-kubernetes' + str(uuid.uuid4())[:10]
+    ns = kubernetes.client.V1Namespace(metadata=kubernetes.client.V1ObjectMeta(name=name))
+    await api_async.create_namespace(ns)
+    try:
+        yield name
+    finally:
+        await api_async.delete_namespace(name, kubernetes.client.V1DeleteOptions())
 
 @pytest.fixture
 def pod_spec(image_name):
@@ -56,6 +70,12 @@ def cluster(pod_spec, ns, loop):
 def client(cluster):
     with Client(cluster) as client:
         yield client
+
+
+@pytest.mark.asyncio
+async def test_cluster_create(pod_spec, ns_async):
+    async with KubeCluster(pod_spec, namespace=ns_async, asynchronous=True) as cluster:
+        pass
 
 
 def test_versions(client):
