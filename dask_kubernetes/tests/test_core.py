@@ -11,7 +11,7 @@ from dask_kubernetes import KubeCluster, make_pod_spec, ClusterAuth, KubeConfig,
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
-import kubernetes_asyncio as kubernetes
+import kubernetes
 from random import random
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, '..'))
