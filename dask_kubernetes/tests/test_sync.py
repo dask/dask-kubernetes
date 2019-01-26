@@ -16,9 +16,18 @@ FAKE_KEY = os.path.join(TEST_DIR, 'fake-key-file')
 FAKE_CA = os.path.join(TEST_DIR, 'fake-ca-file')
 
 
+try:
+    kubernetes.config.load_incluster_config()
+except kubernetes.config.ConfigException:
+    kubernetes.config.load_kube_config()
+
+
+# FIXME?
+asyncio.get_event_loop().run_until_complete(ClusterAuth.load_first())
+
+
 @pytest.fixture
 def api():
-    asyncio.get_event_loop().run_until_complete(ClusterAuth.load_first())
     return kubernetes.client.CoreV1Api()
 
 
@@ -53,5 +62,7 @@ def client(cluster):
         yield client
 
 
-def test_fixtures(client):
+def test_fixtures(client, cluster):
     client.scheduler_info()
+    cluster.scale(1)
+    assert client.submit(lambda x: x + 1, 10).result(timeout=10) == 11
