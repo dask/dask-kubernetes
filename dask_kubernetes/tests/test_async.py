@@ -2,6 +2,7 @@ import uuid
 
 import kubernetes_asyncio as kubernetes
 import pytest
+from tornado import gen
 
 from dask.distributed import Client
 from dask_kubernetes import KubeCluster, ClusterAuth, make_pod_spec
@@ -32,6 +33,18 @@ async def ns(api):
         await api.delete_namespace(name, kubernetes.client.V1DeleteOptions())
 
 
+@pytest.fixture
+async def cluster(pod_spec, ns):
+    async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
+        yield cluster
+
+
+@pytest.fixture
+async def client(cluster):
+    async with Client(cluster, asynchronous=True) as client:
+        yield client
+
+
 @pytest.mark.asyncio
 async def test_cluster_create(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
@@ -39,3 +52,20 @@ async def test_cluster_create(pod_spec, ns):
         async with Client(cluster, asynchronous=True) as client:
             result = await client.submit(lambda x: x + 1, 10)
             assert result == 11
+
+
+@pytest.mark.asyncio
+async def test_basic(cluster, client):
+    cluster.scale(2)
+    future = client.submit(lambda x: x + 1, 10)
+    result = await future
+    assert result == 11
+
+    while len(cluster.scheduler.workers) < 2:
+        await gen.sleep(0.1)
+
+    # Ensure that inter-worker communication works well
+    futures = client.map(lambda x: x + 1, range(10))
+    total = client.submit(sum, futures)
+    assert (await total) == sum(map(lambda x: x + 1, range(10)))
+    assert all((await client.has_what()).values())
