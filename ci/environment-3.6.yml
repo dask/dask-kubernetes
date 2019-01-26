@@ -4,11 +4,12 @@ channels:
 dependencies:
   - flake8
   - ipywidgets
-  - dask=0.19.4
-  - distributed=1.23.3
+  - dask=1.1.0
+  - distributed=1.25.2
   - nomkl
   - pytest
-  - python=3.6
+  - python=3.7
   - pyyaml
   - pip:
     - kubernetes==6
+    - kubernetes-asyncio
