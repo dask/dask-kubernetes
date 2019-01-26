@@ -1,3 +1,4 @@
+from time import time
 import uuid
 
 import kubernetes_asyncio as kubernetes
@@ -69,3 +70,22 @@ async def test_basic(cluster, client):
     total = client.submit(sum, futures)
     assert (await total) == sum(map(lambda x: x + 1, range(10)))
     assert all((await client.has_what()).values())
+
+
+@pytest.mark.asyncio
+async def test_logs(cluster):
+    cluster.scale(2)
+
+    start = time()
+    while len(cluster.scheduler.workers) < 2:
+        await gen.sleep(0.1)
+        assert time() < start + 20
+
+    a, b = await cluster.pods()
+    logs = await cluster.logs(a)
+    assert 'distributed.worker' in logs
+
+    logs = await cluster.logs()
+    assert len(logs) == 2
+    for pod in logs:
+        assert 'distributed.worker' in logs[pod]

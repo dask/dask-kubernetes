@@ -202,15 +202,9 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.namespace = namespace
         self.pod_template.metadata.generate_name = name
 
-
-        self.start()
-
-
-    async def _start(self):
-        self.cluster = await LocalCluster(ip=self.host or socket.gethostname(),
+        self.cluster = LocalCluster(ip=self.host or socket.gethostname(),
                                     scheduler_port=self.port,
-                                    n_workers=0, asynchronous=True, **self.cluster_kwargs)
-
+                                    n_workers=0, asynchronous=asynchronous, **self.cluster_kwargs)
 
         self.pod_template.spec.containers[0].env.append(
             kubernetes.client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS',
@@ -222,6 +216,10 @@ class KubeCluster(Cluster):
                 for k, v in self.env.items()
             ])
 
+        self.start()
+
+
+    async def _start(self):
         await ClusterAuth.load_first(self.auth)
         self.core_api = kubernetes.client.CoreV1Api()
 
@@ -547,7 +545,7 @@ class KubeCluster(Cluster):
 
 
 def _cleanup_pods_sync(namespace, labels):
-    loop = asyncio.new_event_loop()
+    loop = asyncio.get_event_loop()
     loop.run_until_complete(_cleanup_pods(namespace, labels))
 
 async def _cleanup_pods(namespace, labels):
