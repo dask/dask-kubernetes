@@ -87,7 +87,7 @@ class KubeCluster(Cluster):
     ...                          cpu_limit=1, cpu_request=1,
     ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
     >>> cluster = KubeCluster(pod_spec)
-    >>> cluster.scale_up(10)
+    >>> cluster.scale(10)
 
     You can also create clusters with worker pod specifications as dictionaries
     or stored in YAML files
@@ -398,7 +398,7 @@ class KubeCluster(Cluster):
         """
         pods = self._cleanup_terminated_pods(self.pods())
         if n >= len(pods):
-            return self.scale_up(n, pods=pods)
+            return await self._scale_up(n, pods=pods)
         else:
             n_to_delete = len(pods) - n
             # Before trying to close running workers, check if we can cancel
@@ -459,26 +459,28 @@ class KubeCluster(Cluster):
         await self._delete_pods(terminated_pods)
         return [p for p in pods if p.status.phase not in terminated_phases]
 
-    def scale_up(self, n, pods=None, **kwargs):
-        """
-        Make sure we have n dask-workers available for this cluster
+    def scale_up(self, n, **kwargs):
+        self.scheduler.loop.add_callback(self._scale_up, n, **kwargs)
 
-        Examples
-        --------
-        >>> cluster.scale_up(20)  # ask for twenty workers
+    async def _scale_up(self, n, pods=None, **kwargs):
+        """
+        Use the ``.scale`` method instead
         """
         maximum = dask.config.get('kubernetes.count.max')
         if maximum is not None and maximum < n:
             logger.info("Tried to scale beyond maximum number of workers %d > %d",
                         n, maximum)
             n = maximum
-        pods = pods or self._cleanup_terminated_pods(self.pods())
+        if not pods:
+            pods = await self.pods()
+            pods = await self._cleanup_terminated_pods(pods)
+
         to_create = n - len(pods)
         new_pods = []
         for i in range(3):
             try:
                 for _ in range(to_create):
-                    new_pods.append(self.core_api.create_namespaced_pod(
+                    new_pods.append(await self.core_api.create_namespaced_pod(
                         self.namespace, self.pod_template))
                     to_create -= 1
                 break
