@@ -546,7 +546,10 @@ class KubeCluster(Cluster):
 
 def _cleanup_pods_sync(namespace, labels):
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(_cleanup_pods(namespace, labels))
+    try:
+        loop.run_until_complete(_cleanup_pods(namespace, labels))
+    except RuntimeError:
+        loop.call_soon(_cleanup_pods(namespace, labels))
 
 async def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """

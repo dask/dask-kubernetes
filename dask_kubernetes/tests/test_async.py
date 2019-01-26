@@ -1,3 +1,4 @@
+import getpass
 from time import time
 import uuid
 
@@ -5,6 +6,7 @@ import kubernetes_asyncio as kubernetes
 import pytest
 from tornado import gen
 
+import dask
 from dask.distributed import Client
 from dask_kubernetes import KubeCluster, ClusterAuth, make_pod_spec
 
@@ -89,3 +91,49 @@ async def test_logs(cluster):
     assert len(logs) == 2
     for pod in logs:
         assert 'distributed.worker' in logs[pod]
+
+
+@pytest.mark.asyncio
+async def test_dask_worker_name_env_variable(pod_spec, ns):
+    with dask.config.set({'kubernetes.name': 'foo-{USER}-{uuid}'}):
+        async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
+            assert 'foo-' + getpass.getuser() in cluster.name
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_link_env_variable(pod_spec, ns):
+    pytest.importorskip('bokeh')
+    with dask.config.set({'distributed.dashboard.link': 'foo-{USER}-{port}'}):
+        async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
+            port = cluster.scheduler.services['bokeh'].port
+            cluster._ipython_display_()
+            box = cluster._cached_widget
+
+            assert 'foo-' + getpass.getuser() + '-' + str(port) in str(box)
+
+
+@pytest.mark.asyncio
+async def test_namespace(pod_spec, ns):
+    async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
+        assert 'dask' in cluster.name
+        assert getpass.getuser() in cluster.name
+        async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster2:
+            assert cluster.name != cluster2.name
+
+            cluster2.scale(1)
+            while len(await cluster2.pods()) != 1:
+                await gen.sleep(0.1)
+
+
+@pytest.mark.asyncio
+async def test_adapt(cluster):
+    cluster.adapt()
+    async with Client(cluster, asynchronous=True) as client:
+        future = client.submit(lambda x: x + 1, 10)
+        result = await future
+        assert result == 11
+
+    start = time()
+    while cluster.scheduler.workers:
+        await gen.sleep(0.1)
+        assert time() < start + 10

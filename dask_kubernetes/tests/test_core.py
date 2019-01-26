@@ -58,6 +58,10 @@ def client(cluster):
         yield client
 
 
+def test_fixtures(client):
+    client.scheduler_info()
+
+
 def test_versions(client):
     client.get_versions(check=True)
 
@@ -109,47 +113,6 @@ def test_ipython_display(cluster):
     while "<td>1</td>" not in str(box):  # one worker in a table
         assert time() < start + 10
         sleep(0.5)
-
-
-def test_dask_worker_name_env_variable(pod_spec, loop, ns):
-    with dask.config.set({'kubernetes.name': 'foo-{USER}-{uuid}'}):
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-            assert 'foo-' + getpass.getuser() in cluster.name
-
-
-def test_diagnostics_link_env_variable(pod_spec, loop, ns):
-    pytest.importorskip('bokeh')
-    with dask.config.set({'distributed.dashboard.link': 'foo-{USER}-{port}'}):
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-            port = cluster.scheduler.services['bokeh'].port
-            cluster._ipython_display_()
-            box = cluster._cached_widget
-
-            assert 'foo-' + getpass.getuser() + '-' + str(port) in str(box)
-
-
-def test_namespace(pod_spec, loop, ns):
-    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
-        assert 'dask' in cluster.name
-        assert getpass.getuser() in cluster.name
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster2:
-            assert cluster.name != cluster2.name
-
-            cluster2.scale(1)
-            [pod] = cluster2.pods()
-
-
-def test_adapt(cluster):
-    cluster.adapt()
-    with Client(cluster) as client:
-        future = client.submit(lambda x: x + 1, 10)
-        result = future.result()
-        assert result == 11
-
-    start = time()
-    while cluster.scheduler.workers:
-        sleep(0.1)
-        assert time() < start + 10
 
 
 def test_env(pod_spec, loop, ns):
