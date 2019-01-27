@@ -17,6 +17,7 @@ except ImportError:
 import dask
 from distributed.deploy import LocalCluster, Cluster
 from distributed.comm.utils import offload
+from distributed.utils import thread_state
 import kubernetes_asyncio as kubernetes
 from tornado import gen
 
@@ -218,6 +219,9 @@ class KubeCluster(Cluster):
 
         self.start()
 
+    @property
+    def asynchronous(self):
+        return self._asynchronous or getattr(thread_state, 'asynchronous', False)
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
@@ -234,8 +238,11 @@ class KubeCluster(Cluster):
         else:
             return self.sync(self._start)
 
+    def __await__(self):
+        return self._started.__await__()
+
     async def __aenter__(self):
-        await self._started
+        await self
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
@@ -314,8 +321,10 @@ class KubeCluster(Cluster):
         return self.pod_template.metadata.generate_name
 
     def __repr__(self):
-        return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address,
-                                                  len(self.pods()))
+        if self.asynchronous:
+            return 'KubeCluster("%s")' % (self.scheduler.address,)
+        else:
+            return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address, len(self.pods))
 
     @property
     def scheduler(self):
@@ -549,7 +558,7 @@ def _cleanup_pods_sync(namespace, labels):
     try:
         loop.run_until_complete(_cleanup_pods(namespace, labels))
     except RuntimeError:
-        loop.call_soon(_cleanup_pods(namespace, labels))
+        loop.call_soon(_cleanup_pods, namespace, labels)
 
 async def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """

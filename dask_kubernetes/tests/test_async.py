@@ -1,3 +1,4 @@
+import base64
 import getpass
 import os
 import random
@@ -11,8 +12,16 @@ from tornado import gen
 
 import dask
 from dask.distributed import Client, wait
-from dask_kubernetes import KubeCluster, ClusterAuth, make_pod_spec
+from dask_kubernetes import KubeCluster, make_pod_spec, ClusterAuth, KubeConfig, KubeAuth
 from distributed.utils import tmpfile
+from distributed.utils_test import captured_logger
+
+
+TEST_DIR = os.path.abspath(os.path.join(__file__, '..'))
+CONFIG_DEMO = os.path.join(TEST_DIR, 'config-demo.yaml')
+FAKE_CERT = os.path.join(TEST_DIR, 'fake-cert-file')
+FAKE_KEY = os.path.join(TEST_DIR, 'fake-key-file')
+FAKE_CA = os.path.join(TEST_DIR, 'fake-ca-file')
 
 
 @pytest.fixture
@@ -372,7 +381,7 @@ async def test_reject_evicted_workers(cluster):
 
     # Wait until pod is evicted
     start = time()
-    while (await cluster.pods())[0].status.phase == 'Running':
+    while (await cluster.pods())[0].status.phase in ('Pending', 'Running'):
         await gen.sleep(0.1)
         assert time() < start + 60
 
@@ -458,6 +467,7 @@ async def test_scale_up_down_fast(cluster, client):
     assert len(await future) == int(1e6)
 
 
+@pytest.mark.asyncio
 async def test_scale_down_pending(cluster, client):
     # Try to scale the cluster to use more pods than available
     nodes = (await cluster.core_api.list_node()).items
@@ -517,6 +527,7 @@ async def test_scale_down_pending(cluster, client):
         assert time() < start + 60
 
 
+@pytest.mark.asyncio
 async def test_automatic_startup(image_name, ns):
     test_yaml = {
         "kind": "Pod",
@@ -547,13 +558,14 @@ async def test_automatic_startup(image_name, ns):
                 assert cluster.pod_template.metadata.labels['foo'] == 'bar'
 
 
+@pytest.mark.asyncio
 async def test_repr(cluster):
     for text in [repr(cluster), str(cluster)]:
         assert 'Box' not in text
         assert cluster.scheduler.address in text
-        assert "workers=0" in text
 
 
+@pytest.mark.asyncio
 async def test_escape_username(pod_spec, ns, monkeypatch):
     monkeypatch.setenv('LOGNAME', 'foo!')
 
@@ -563,11 +575,13 @@ async def test_escape_username(pod_spec, ns, monkeypatch):
         assert 'foo' in cluster.pod_template.metadata.labels['user']
 
 
+@pytest.mark.asyncio
 async def test_escape_name(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, name='foo@bar', asynchronous=True) as cluster:
         assert '@' not in str(cluster.pod_template)
 
 
+@pytest.mark.asyncio
 async def test_maximum(cluster):
     with dask.config.set(**{'kubernetes.count.max': 1}):
         with captured_logger('dask_kubernetes') as logger:
@@ -636,13 +650,15 @@ def test_default_toleration_preserved(image_name):
     } in tolerations
 
 
+@pytest.mark.asyncio
 async def test_auth_missing(pod_spec, ns):
     with pytest.raises(kubernetes.config.ConfigException) as info:
-        await KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns, asynchronous=True)
+        await KubeCluster(pod_spec, auth=[], namespace=ns, asynchronous=True)
 
     assert "No authorization methods were provided" in str(info.value)
 
 
+@pytest.mark.asyncio
 async def test_auth_tries_all_methods(pod_spec, ns):
     fails = {'count': 0}
     class FailAuth(ClusterAuth):
@@ -657,32 +673,35 @@ async def test_auth_tries_all_methods(pod_spec, ns):
     assert fails['count'] == 3
 
 
+@pytest.mark.asyncio
 async def test_auth_kubeconfig_with_filename():
     await KubeConfig(config_file=CONFIG_DEMO).load()
 
     # we've set the default configuration, so check that it is default
-    config = await kubernetes.client.Configuration()
+    config = kubernetes.client.Configuration()
     assert config.host == 'https://1.2.3.4'
     assert config.cert_file == FAKE_CERT
     assert config.key_file == FAKE_KEY
     assert config.ssl_ca_cert == FAKE_CA
 
 
+@pytest.mark.asyncio
 async def test_auth_kubeconfig_with_context():
     await KubeConfig(config_file=CONFIG_DEMO, context='exp-scratch').load()
 
     # we've set the default configuration, so check that it is default
-    config = await kubernetes.client.Configuration()
+    config = kubernetes.client.Configuration()
     assert config.host == 'https://5.6.7.8'
     assert config.api_key['authorization'] == 'Basic {}'.format(
         base64.b64encode(b'exp:some-password').decode('ascii')
     )
 
 
+@pytest.mark.asyncio
 async def test_auth_explicit():
     await KubeAuth(host='https://9.8.7.6', username='abc', password='some-password').load()
 
-    config = await kubernetes.client.Configuration()
+    config = kubernetes.client.Configuration()
     assert config.host == 'https://9.8.7.6'
     assert config.username == 'abc'
     assert config.password == 'some-password'
