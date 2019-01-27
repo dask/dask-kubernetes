@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 import string
+import threading
 import time
 from urllib.parse import urlparse
 import uuid
@@ -220,8 +221,18 @@ class KubeCluster(Cluster):
         self.start()
 
     @property
+    def loop(self):
+        return self.scheduler.loop
+
+    @property
     def asynchronous(self):
-        return self._asynchronous or getattr(thread_state, 'asynchronous', False)
+        if hasattr(self.loop, '_thread_identity') and self.loop._thread_identity == threading.get_ident():
+            return True
+        if self._asynchronous:
+            return True
+        if getattr(thread_state, 'asynchronous', False):
+            return True
+        return False
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
@@ -324,7 +335,7 @@ class KubeCluster(Cluster):
         if self.asynchronous:
             return 'KubeCluster("%s")' % (self.scheduler.address,)
         else:
-            return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address, len(self.pods))
+            return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address, len(self.pods()))
 
     @property
     def scheduler(self):
@@ -338,10 +349,12 @@ class KubeCluster(Cluster):
         return self.cluster.sync(func, *args, **kwargs)
 
     async def _pods(self):
-        return (await self.core_api.list_namespaced_pod(
+        nsp = await self.core_api.list_namespaced_pod(
             self.namespace,
             label_selector=format_labels(self.pod_template.metadata.labels)
-        )).items
+        )
+
+        return nsp.items
 
     def pods(self):
         """ A list of kubernetes pods corresponding to current workers
@@ -479,7 +492,7 @@ class KubeCluster(Cluster):
                         n, maximum)
             n = maximum
         if not pods:
-            pods = await self.pods()
+            pods = await self._pods()
             pods = await self._cleanup_terminated_pods(pods)
 
         to_create = n - len(pods)
