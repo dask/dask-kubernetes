@@ -539,7 +539,9 @@ class KubeCluster(Cluster):
 
     async def _scale_down(self, workers, pods=None):
         # Get the existing worker pods
-        pods = pods or await self._cleanup_terminated_pods(await self.pods())
+        if pods is None:
+            pods = await self._pods()
+            pods = await self._cleanup_terminated_pods(pods)
 
         # Work out the list of pods that we are going to delete
         # Each worker to delete is given in the form "tcp://<worker ip>:<port>"

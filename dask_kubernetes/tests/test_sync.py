@@ -57,8 +57,8 @@ def cluster(pod_spec, ns, loop):
 
 
 @pytest.fixture
-def client(cluster):
-    with Client(cluster) as client:
+def client(cluster, loop):
+    with Client(cluster, loop=loop) as client:
         yield client
 
 
