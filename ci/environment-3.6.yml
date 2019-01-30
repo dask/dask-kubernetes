@@ -14,3 +14,4 @@ dependencies:
   - pip:
     - kubernetes==6
     - kubernetes-asyncio
+    - git+https://github.com/dask/distributed@master
