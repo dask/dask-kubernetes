@@ -458,7 +458,7 @@ async def test_scale_up_down_fast(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         await gen.sleep(0.1)
-        assert time() < start + 10
+        assert time() < start + 20
 
     # The original task result is still stored on the original worker: this pod
     # has never been deleted when rescaling the cluster and the result can
