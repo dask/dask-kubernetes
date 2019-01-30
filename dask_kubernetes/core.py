@@ -365,7 +365,6 @@ class KubeCluster(Cluster):
         """
         return self.sync(self._pods)
 
-
     async def _logs(self, pod=None):
         if pod is None:
             pods = await self._pods()
