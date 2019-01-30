@@ -104,7 +104,7 @@ def test_ipython_display(cluster):
 
     start = time()
     while "<td>1</td>" not in str(box):  # one worker in a table
-        assert time() < start + 10
+        assert time() < start + 20
         sleep(0.5)
 
 
@@ -156,7 +156,7 @@ def dont_test_pod_from_yaml(image_name, loop, ns):
                 start = time()
                 while len(cluster.scheduler.workers) < 2:
                     sleep(0.1)
-                    assert time() < start + 10, 'timeout'
+                    assert time() < start + 20, 'timeout'
 
                 # Ensure that inter-worker communication works well
                 futures = client.map(lambda x: x + 1, range(10))
@@ -300,7 +300,7 @@ def test_scale_up_down(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 2:
         sleep(0.1)
-        assert time() < start + 10
+        assert time() < start + 20
 
     a, b = list(cluster.scheduler.workers)
     x = client.submit(np.ones, 1, workers=a)
@@ -319,7 +319,7 @@ def test_scale_up_down(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         sleep(0.1)
-        assert time() < start + 10
+        assert time() < start + 20
 
     assert set(cluster.scheduler.workers) == {b}
 
@@ -330,7 +330,7 @@ def test_scale_up_down_fast(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         sleep(0.1)
-        assert time() < start + 10
+        assert time() < start + 20
 
     worker = next(iter(cluster.scheduler.workers.values()))
 
@@ -351,7 +351,7 @@ def test_scale_up_down_fast(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         sleep(0.1)
-        assert time() < start + 10
+        assert time() < start + 20
 
     # The original task result is still stored on the original worker: this pod
     # has never been deleted when rescaling the cluster and the result can
