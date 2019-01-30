@@ -83,7 +83,7 @@ class InCluster(ClusterAuth):
     API via Kubernetes service discovery.
     """
     async def load(self):
-        await kubernetes.config.load_incluster_config()
+        kubernetes.config.load_incluster_config()
 
 
 class KubeConfig(ClusterAuth):
