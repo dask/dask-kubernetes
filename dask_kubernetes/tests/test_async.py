@@ -381,7 +381,7 @@ async def test_reject_evicted_workers(cluster):
 
     # Wait until pod is evicted
     start = time()
-    while (await cluster.pods())[0].status.phase in ('Pending', 'Running'):
+    while any(pod.status.phase in ('Pending', 'Running') for pod in (await cluster.pods())):
         await gen.sleep(0.1)
         assert time() < start + 60
 
