@@ -371,6 +371,7 @@ class KubeCluster(Cluster):
             return {
                 pod.status.pod_ip: await self._logs(pod)
                 for pod in pods
+                if pod.status != 'Pending'
             }
 
         return await self.core_api.read_namespaced_pod_log(
