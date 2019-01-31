@@ -431,7 +431,7 @@ class KubeCluster(Cluster):
             if pending_pods:
                 pending_to_delete = pending_pods[:n_to_delete]
                 logger.debug("Deleting pending pods: %s", pending_to_delete)
-                self._delete_pods(pending_to_delete)
+                await self._delete_pods(pending_to_delete)
                 n_to_delete = n_to_delete - len(pending_to_delete)
                 if n_to_delete <= 0:
                     return
@@ -444,7 +444,8 @@ class KubeCluster(Cluster):
                 @gen.coroutine
                 def f(to_close):
                     yield self.scheduler.retire_workers(
-                        workers=to_close, remove=True, close_workers=True)
+                        workers=to_close, remove=True, close_workers=True
+                    )
                     yield offload(self.scale_down, to_close)
 
                 self.scheduler.loop.add_callback(f, to_close)
@@ -494,20 +495,21 @@ class KubeCluster(Cluster):
             pods = await self._pods()
             pods = await self._cleanup_terminated_pods(pods)
 
-        to_create = n - len(pods)
-        new_pods = []
         for i in range(3):
             try:
-                for _ in range(to_create):
-                    new_pods.append(await self.core_api.create_namespaced_pod(
-                        self.namespace, self.pod_template))
-                    to_create -= 1
+                new_pods = await asyncio.gather(*[
+                    self.core_api.create_namespaced_pod(self.namespace, self.pod_template)
+                    for _ in range(n - len(pods))
+                ])
+                logger.debug("Added %d new pods", len(new_pods))
                 break
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 500 and 'ServerTimeout' in e.body:
                     logger.info("Server timeout, retry #%d", i + 1)
                     time.sleep(1)
                     last_exception = e
+                    pods = await self._pods()
+                    pods = await self._cleanup_terminated_pods(pods)
                     continue
                 else:
                     raise
@@ -549,6 +551,8 @@ class KubeCluster(Cluster):
         to_delete = [p for p in pods if p.status.pod_ip in ips]
         if not to_delete:
             return
+        else:
+            logger.debug("Deleting %d pods", len(to_delete))
         return await self._delete_pods(to_delete)
 
     def __enter__(self):

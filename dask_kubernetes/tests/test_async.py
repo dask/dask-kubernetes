@@ -450,7 +450,7 @@ async def test_scale_up_down_fast(cluster, client):
     # pressure on kubernetes but this should never fail nor delete our worker
     # with the temporary result.
     for i in range(10):
-        cluster.scale(4)
+        await cluster._scale_up(4)
         await gen.sleep(random.random() / 2)
         cluster.scale(1)
         await gen.sleep(random.random() / 2)
