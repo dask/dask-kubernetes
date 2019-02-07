@@ -1,14 +1,18 @@
 name: dask-kubernetes-test
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - flake8
   - ipywidgets
-  - dask=0.19.4
-  - distributed=1.23.3
+  - dask=1.1.1
+  - distributed=1.25.3
   - nomkl
   - pytest
   - python=3.6
   - pyyaml
   - pip:
     - kubernetes==6
+    - kubernetes-asyncio
+    - pytest-asyncio
+    - git+https://github.com/tornadoweb/tornado@975e9168560cc03f6210d0d3aab10c870bd47080

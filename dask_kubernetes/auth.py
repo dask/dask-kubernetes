@@ -3,7 +3,7 @@ Defines different methods to configure a connection to a Kubernetes cluster.
 """
 import logging
 
-import kubernetes
+import kubernetes_asyncio as kubernetes
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class ClusterAuth(object):
 
 
     @staticmethod
-    def load_first(auth=None):
+    async def load_first(auth=None):
         """
         Load the first valid configuration in the list *auth*. A single
         configuration method can be passed.
@@ -64,7 +64,7 @@ class ClusterAuth(object):
         auth_exc = None
         for auth_instance in auth:
             try:
-                auth_instance.load()
+                await auth_instance.load()
             except kubernetes.config.ConfigException as exc:
                 logger.debug('Failed to load configuration with %s method: %s', auth_instance.__class__, exc)
                 auth_exc = exc
@@ -82,7 +82,7 @@ class InCluster(ClusterAuth):
     This loads the mounted service account token and discovers the Kubernetes
     API via Kubernetes service discovery.
     """
-    def load(self):
+    async def load(self):
         kubernetes.config.load_incluster_config()
 
 
@@ -107,8 +107,8 @@ class KubeConfig(ClusterAuth):
         self.context = context
         self.persist_config = persist_config
 
-    def load(self):
-        kubernetes.config.load_kube_config(self.config_file, self.context,
+    async def load(self):
+        await kubernetes.config.load_kube_config(self.config_file, self.context,
                                            None, self.persist_config)
 
 
@@ -150,7 +150,7 @@ class KubeAuth(ClusterAuth):
             setattr(config, key, value)
         self.config = config
 
-    def load(self):
+    async def load(self):
         kubernetes.client.Configuration.set_default(self.config)
 
 
