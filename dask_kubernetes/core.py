@@ -238,7 +238,8 @@ class KubeCluster(Cluster):
         await ClusterAuth.load_first(self.auth)
         self.core_api = kubernetes.client.CoreV1Api()
 
-        finalize(self, _cleanup_pods_sync, self.namespace, self.pod_template.metadata.labels)
+        finalize(self, _cleanup_pods_sync, self.namespace,
+                self.pod_template.metadata.labels)
 
         if self.n_workers:
             await self.scale(self.n_workers)
@@ -368,11 +369,13 @@ class KubeCluster(Cluster):
     async def _logs(self, pod=None):
         if pod is None:
             pods = await self._pods()
-            return {
+            result = {
                 pod.status.pod_ip: await self._logs(pod)
                 for pod in pods
-                if pod.status != 'Pending'
+                if pod.status.phase != 'Pending'
             }
+            assert None not in result
+            return result
 
         return await self.core_api.read_namespaced_pod_log(
             pod.metadata.name,
@@ -568,25 +571,22 @@ class KubeCluster(Cluster):
         return self.sync(self._close, **kwargs)
 
     def __exit__(self, type, value, traceback):
-        self.sync(_cleanup_pods, self.namespace, self.pod_template.metadata.labels)
+        _cleanup_pods_sync(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
 
 def _cleanup_pods_sync(namespace, labels):
-    loop = asyncio.get_event_loop()
+    import kubernetes
     try:
-        loop.run_until_complete(_cleanup_pods(namespace, labels))
-    except RuntimeError:
-        loop.call_soon(_cleanup_pods, namespace, labels)
-
-async def _cleanup_pods(namespace, labels):
-    """ Remove all pods with these labels in this namespace """
+        kubernetes.config.load_incluster_config()
+    except kubernetes.config.ConfigException:
+        kubernetes.config.load_kube_config()
     api = kubernetes.client.CoreV1Api()
-    pods = await api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
+    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
-            await api.delete_namespaced_pod(pod.metadata.name, namespace,
-                                            kubernetes.client.V1DeleteOptions())
+            api.delete_namespaced_pod(pod.metadata.name, namespace,
+                                      kubernetes.client.V1DeleteOptions())
             logger.info('Deleted pod: %s', pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
