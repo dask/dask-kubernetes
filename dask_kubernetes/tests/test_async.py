@@ -38,9 +38,10 @@ async def api():
     return kubernetes.client.CoreV1Api()
 
 
-async def test_cleanup_namespaces(api):
+@pytest.fixture
+async def cleanup_namespaces(api):
     """ We only use this for the side effects """
-    for ns in await api.list_namespace().items:
+    for ns in (await api.list_namespace()).items:
         if 'test-dask-kubernets' in ns.metadata.name:
             await api.delete_namespace(ns.metadata.name, kubernetes.client.V1DeleteOptions())
 
@@ -487,7 +488,7 @@ async def test_scale_up_down_fast(cluster, client):
 
 
 @pytest.mark.asyncio
-async def test_scale_down_pending(cluster, client):
+async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     # Try to scale the cluster to use more pods than available
     nodes = (await cluster.core_api.list_node()).items
     max_pods = sum(int(node.status.allocatable['pods']) for node in nodes)
