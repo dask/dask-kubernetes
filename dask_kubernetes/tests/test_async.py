@@ -487,6 +487,7 @@ async def test_scale_up_down_fast(cluster, client):
     assert len(await future) == int(1e6)
 
 
+@pytest.mark.xfail(reason='scaling has some unfortunate state')
 @pytest.mark.asyncio
 async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     # Try to scale the cluster to use more pods than available
