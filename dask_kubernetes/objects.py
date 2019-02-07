@@ -41,7 +41,9 @@ def _set_k8s_attribute(obj, attribute, value):
             attribute_name = python_attribute
             break
     else:
-        raise ValueError('Attribute must be one of {}'.format(obj.attribute_map.values()))
+        raise ValueError(
+            "Attribute must be one of {}".format(obj.attribute_map.values())
+        )
 
     if hasattr(obj, attribute_name):
         current_value = getattr(obj, attribute_name)
@@ -77,33 +79,35 @@ def merge_dictionaries(a, b, path=None, update=True):
             if isinstance(a[key], dict) and isinstance(b[key], dict):
                 merge_dictionaries(a[key], b[key], path + [str(key)])
             elif a[key] == b[key]:
-                pass # same leaf value
+                pass  # same leaf value
             elif isinstance(a[key], list) and isinstance(b[key], list):
                 for idx, val in enumerate(b[key]):
-                    a[key][idx] = merge_dictionaries(a[key][idx],
-                                                     b[key][idx],
-                                                     path + [str(key), str(idx)],
-                                                     update=update)
+                    a[key][idx] = merge_dictionaries(
+                        a[key][idx],
+                        b[key][idx],
+                        path + [str(key), str(idx)],
+                        update=update,
+                    )
             elif update:
                 a[key] = b[key]
             else:
-                raise Exception('Conflict at %s' % '.'.join(path + [str(key)]))
+                raise Exception("Conflict at %s" % ".".join(path + [str(key)]))
         else:
             a[key] = b[key]
     return a
 
 
 def make_pod_spec(
-        image,
-        labels={},
-        threads_per_worker=1,
-        env={},
-        extra_container_config={},
-        extra_pod_config={},
-        memory_limit=None,
-        memory_request=None,
-        cpu_limit=None,
-        cpu_request=None,
+    image,
+    labels={},
+    threads_per_worker=1,
+    env={},
+    extra_container_config={},
+    extra_pod_config={},
+    memory_limit=None,
+    memory_request=None,
+    cpu_limit=None,
+    cpu_request=None,
 ):
     """
     Create generic pod template from input parameters
@@ -113,101 +117,95 @@ def make_pod_spec(
     >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
     """
     args = [
-        'dask-worker',
-        '$(DASK_SCHEDULER_ADDRESS)',
-        '--nthreads', str(threads_per_worker),
-        '--death-timeout', '60',
+        "dask-worker",
+        "$(DASK_SCHEDULER_ADDRESS)",
+        "--nthreads",
+        str(threads_per_worker),
+        "--death-timeout",
+        "60",
     ]
     if memory_limit:
-        args.extend(['--memory-limit', str(memory_limit)])
+        args.extend(["--memory-limit", str(memory_limit)])
     pod = client.V1Pod(
-        metadata=client.V1ObjectMeta(
-            labels=labels
-        ),
+        metadata=client.V1ObjectMeta(labels=labels),
         spec=client.V1PodSpec(
-            restart_policy='Never',
+            restart_policy="Never",
             containers=[
                 client.V1Container(
-                    name='dask-worker',
+                    name="dask-worker",
                     image=image,
                     args=args,
-                    env=[client.V1EnvVar(name=k, value=v)
-                            for k, v in env.items()],
+                    env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],
                 )
             ],
             tolerations=[
                 client.V1Toleration(
-                    key='k8s.dask.org/dedicated',
-                    operator='Equal',
-                    value='worker',
-                    effect='NoSchedule',
+                    key="k8s.dask.org/dedicated",
+                    operator="Equal",
+                    value="worker",
+                    effect="NoSchedule",
                 ),
                 # GKE currently does not permit creating taints on a node pool
                 # with a `/` in the key field
                 client.V1Toleration(
-                    key='k8s.dask.org_dedicated',
-                    operator='Equal',
-                    value='worker',
-                    effect='NoSchedule',
+                    key="k8s.dask.org_dedicated",
+                    operator="Equal",
+                    value="worker",
+                    effect="NoSchedule",
                 ),
-            ]
-        )
+            ],
+        ),
     )
 
     resources = client.V1ResourceRequirements(limits={}, requests={})
 
     if cpu_request:
-        resources.requests['cpu'] = cpu_request
+        resources.requests["cpu"] = cpu_request
     if memory_request:
-        resources.requests['memory'] = memory_request
+        resources.requests["memory"] = memory_request
 
     if cpu_limit:
-        resources.limits['cpu'] = cpu_limit
+        resources.limits["cpu"] = cpu_limit
     if memory_limit:
-        resources.limits['memory'] = memory_limit
+        resources.limits["memory"] = memory_limit
 
     pod.spec.containers[0].resources = resources
 
     for key, value in extra_container_config.items():
-        _set_k8s_attribute(
-            pod.spec.containers[0],
-            key,
-            value
-        )
+        _set_k8s_attribute(pod.spec.containers[0], key, value)
 
     for key, value in extra_pod_config.items():
-        _set_k8s_attribute(
-            pod.spec,
-            key,
-            value
-        )
+        _set_k8s_attribute(pod.spec, key, value)
     return pod
 
 
-_FakeResponse = namedtuple('_FakeResponse', ['data'])
+_FakeResponse = namedtuple("_FakeResponse", ["data"])
 
 
 def make_pod_from_dict(dict_):
     # FIXME: We can't use the 'deserialize' function since
     # that expects a response object!
     return SERIALIZATION_API_CLIENT.deserialize(
-        _FakeResponse(data=json.dumps(dict_)),
-        client.V1Pod
+        _FakeResponse(data=json.dumps(dict_)), client.V1Pod
     )
 
 
 def clean_pod_template(pod_template):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
-        msg = ('Expected a kubernetes.client.V1Pod object, got %s'
-               'If trying to pass a yaml filename then use '
-               'KubeCluster.from_yaml')
+        msg = (
+            "Expected a kubernetes.client.V1Pod object, got %s"
+            "If trying to pass a yaml filename then use "
+            "KubeCluster.from_yaml"
+        )
         raise TypeError(msg % pod_template)
 
     if isinstance(pod_template, dict):
-        msg = ('Expected a kubernetes.client.V1Pod object, got %s'
-               'If trying to pass a dictionary specification then use '
-               'KubeCluster.from_dict')
+        msg = (
+            "Expected a kubernetes.client.V1Pod object, got %s"
+            "If trying to pass a dictionary specification then use "
+            "KubeCluster.from_dict"
+        )
         raise TypeError(msg % str(pod_template))
 
     pod_template = copy.deepcopy(pod_template)
