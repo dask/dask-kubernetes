@@ -38,6 +38,13 @@ async def api():
     return kubernetes.client.CoreV1Api()
 
 
+async def test_cleanup_namespaces(api):
+    """ We only use this for the side effects """
+    for ns in await api.list_namespace().items:
+        if 'test-dask-kubernets' in ns.metadata.name:
+            await api.delete_namespace(ns.metadata.name, kubernetes.client.V1DeleteOptions())
+
+
 @pytest.fixture
 async def ns(api):
     name = 'test-dask-kubernetes' + str(uuid.uuid4())[:10]
