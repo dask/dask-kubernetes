@@ -519,13 +519,13 @@ async def test_scale_down_pending(cluster, client):
     cluster.scale(len(running_workers))
 
     start = time()
-    pod_statuses = [p.status.phase for p in cluster.pods()]
+    pod_statuses = [p.status.phase for p in await cluster.pods()]
     while len(pod_statuses) != len(running_workers):
         if time() - start > 60:
             raise AssertionError("Expected %d running pods but got %r"
                                  % (len(running_workers), pod_statuses))
         sleep(0.1)
-        pod_statuses = [p.status.phase for p in cluster.pods()]
+        pod_statuses = [p.status.phase for p in await cluster.pods()]
 
     assert pod_statuses == ['Running'] * len(running_workers)
     assert list(cluster.scheduler.workers.keys()) == running_workers
