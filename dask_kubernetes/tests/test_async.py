@@ -107,8 +107,12 @@ async def test_logs(cluster):
     assert 'distributed.worker' in logs
 
     pods = await cluster.pods()
+
+    start = time()
+    while len(await cluster.logs()) < 2:
+        await gen.sleep(0.1)
+
     logs = await cluster.logs()
-    assert len(logs) == 2, logs
     for pod in logs:
         assert 'distributed.worker' in logs[pod]
 

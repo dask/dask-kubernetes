@@ -300,7 +300,7 @@ def test_scale_up_down(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 2:
         sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 10
 
     a, b = list(cluster.scheduler.workers)
     x = client.submit(np.ones, 1, workers=a)
