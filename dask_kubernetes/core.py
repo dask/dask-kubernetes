@@ -56,7 +56,7 @@ class KubeCluster(Cluster):
 
     Parameters
     ----------
-    pod_template: kubernetes.client.V1PodSpec
+    pod_template: kubernetes.client.V1Pod
         A Kubernetes specification for a Pod for a dask worker.
     name: str (optional)
         Name given to the pods.  Defaults to ``dask-$USER-random``
