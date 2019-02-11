@@ -61,6 +61,8 @@ Quickstart
 .. code-block:: python
 
         # Example usage
+        import distributed
+        import dask.array as da
 
         # Connect dask to the cluster
         client = distributed.Client(cluster)
