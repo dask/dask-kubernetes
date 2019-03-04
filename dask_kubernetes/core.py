@@ -262,7 +262,7 @@ class KubeCluster(Cluster):
         )
 
         if self.n_workers:
-            await self.scale(self.n_workers)
+            await self._scale(self.n_workers)
 
     def start(self):
         if self._asynchronous:
