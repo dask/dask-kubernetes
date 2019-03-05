@@ -767,3 +767,13 @@ async def test_auth_explicit():
     assert config.get_basic_auth_token() == "Basic {}".format(
         base64.b64encode(b"abc:some-password").decode("ascii")
     )
+
+
+@pytest.mark.asyncio
+async def test_start_with_workers(pod_spec, ns):
+    async with KubeCluster(
+        pod_spec, n_workers=2, namespace=ns, **cluster_kwargs
+    ) as cluster:
+        async with Client(cluster, asynchronous=True) as client:
+            while len(cluster.scheduler.workers) != 2:
+                await gen.sleep(0.1)

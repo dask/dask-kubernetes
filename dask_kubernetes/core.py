@@ -262,7 +262,7 @@ class KubeCluster(Cluster):
         )
 
         if self.n_workers:
-            await self.scale(self.n_workers)
+            await self._scale(self.n_workers)
 
     def start(self):
         if self._asynchronous:
@@ -443,7 +443,7 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = self._cleanup_terminated_pods(self.pods())
+        pods = await self._cleanup_terminated_pods(await self.pods())
         if n >= len(pods):
             return await self._scale_up(n, pods=pods)
         else:
