@@ -772,7 +772,7 @@ async def test_auth_explicit():
 @pytest.mark.asyncio
 async def test_start_with_workers(pod_spec, ns):
     async with KubeCluster(
-        n_workers=2, pod_spec, namespace=ns, **cluster_kwargs
+        pod_spec, n_workers=2, namespace=ns, **cluster_kwargs
     ) as cluster:
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler.workers) != 2:
