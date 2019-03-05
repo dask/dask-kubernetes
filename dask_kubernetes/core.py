@@ -443,7 +443,7 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = self._cleanup_terminated_pods(self.pods())
+        pods = await self._cleanup_terminated_pods(await self.pods())
         if n >= len(pods):
             return await self._scale_up(n, pods=pods)
         else:
