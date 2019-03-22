@@ -477,9 +477,7 @@ async def test_scale_up_down(cluster, client):
     assert set(cluster.scheduler.workers) == {b}
 
 
-@pytest.mark.xfail(
-    reason="The delay between scaling up, starting a worker, and then scale down causes issues"
-)
+
 @pytest.mark.asyncio
 async def test_scale_up_down_fast(cluster, client):
     cluster.scale(1)

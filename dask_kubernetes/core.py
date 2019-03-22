@@ -508,6 +508,35 @@ class KubeCluster(Cluster):
     def scale_up(self, n, **kwargs):
         self.scheduler.loop.add_callback(self._scale_up, n, **kwargs)
 
+    async def _pod_status(self, pods):
+
+        status = {}
+        for p in pods:
+            status[p.metadata.name] = p.status.phase
+        return status
+
+    async def check_status(self):
+        while True:
+            pods = await self._pods()
+            p_status = await self._pod_status(pods)
+            result = ['Running' == status for name, status in p_status.items()]
+            await asyncio.sleep(3.2)
+            if not all(result):
+                continue
+            else:
+                return True
+
+    async def status_with_timeout(self, pods, timeout=0.2):
+        t = asyncio.create_task(self.check_status())
+        done, pending = await asyncio.wait({t}, timeout=timeout)
+
+        # if there are any pending tasks we have timed out
+        if len(pending):
+            return False
+
+        assert all([d.result() for d in done])
+        return True
+
     async def _scale_up(self, n, pods=None, **kwargs):
         """
         Use the ``.scale`` method instead
@@ -533,6 +562,11 @@ class KubeCluster(Cluster):
                     ]
                 )
                 logger.debug("Added %d new pods", len(new_pods))
+                status = await self.status_with_timeout(new_pods, 20.0)
+                last_exception = 'foo bar'
+                if not status:
+                    continue
+                await asyncio.sleep(0.5)
                 break
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 500 and "ServerTimeout" in e.body:
@@ -614,7 +648,7 @@ def _cleanup_pods_sync(namespace, labels):
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(
-                pod.metadata.name, namespace, kubernetes.client.V1DeleteOptions()
+                name=pod.metadata.name, namespace=namespace, body=kubernetes.client.V1DeleteOptions()
             )
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
