@@ -7,6 +7,7 @@ import threading
 import time
 from urllib.parse import urlparse
 import uuid
+from enum import Enum
 from weakref import finalize
 import asyncio
 
@@ -27,6 +28,14 @@ from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
 
+class PodStatus(Enum):
+    pending = 'Pending'
+    running = 'Running'
+    succeeded = 'Succeeded'
+    failed = 'Failed'
+    unknown = 'Unknown'
+    completed = 'Completed'
+    crashloopbackoff = 'CrashLoopBackOff'
 
 class KubeCluster(Cluster):
     """ Launch a Dask cluster on Kubernetes
@@ -212,6 +221,8 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.labels["component"] = "dask-worker"
         self.pod_template.metadata.namespace = namespace
         self.pod_template.metadata.generate_name = name
+
+        self._manual_scale_target = 0
 
         self.cluster = LocalCluster(
             ip=self.host or socket.gethostname(),
@@ -444,8 +455,9 @@ class KubeCluster(Cluster):
         KubeCluster.scale_down
         """
         pods = await self._cleanup_terminated_pods(await self.pods())
+        self._manual_scale_target = n
         if n >= len(pods):
-            return await self._scale_up(n, pods=pods)
+            return await self._scale_up(pods=pods)
         else:
             n_to_delete = len(pods) - n
             # Before trying to close running workers, check if we can cancel
@@ -500,33 +512,32 @@ class KubeCluster(Cluster):
                     raise
 
     async def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {"Succeeded", "Failed"}
+        terminated_phases = {PodStatus.succeeded, PodStatus.failed}
         terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         await self._delete_pods(terminated_pods)
-        return [p for p in pods if p.status.phase not in terminated_phases]
+        pods = [p for p in pods if p.status.phase not in terminated_phases]
+        return pods
 
     def scale_up(self, n, **kwargs):
-        self.scheduler.loop.add_callback(self._scale_up, n, **kwargs)
+        self._manual_scale_target = n
+        self.scheduler.loop.add_callback(self._scale_up, **kwargs)
 
-    async def _pod_status(self, pods):
-
-        status = {}
-        for p in pods:
-            status[p.metadata.name] = p.status.phase
-        return status
-
-    async def check_status(self):
+    async def check_status(self, status_check=PodStatus.running):
         while True:
             pods = await self._pods()
-            p_status = await self._pod_status(pods)
-            result = ['Running' == status for name, status in p_status.items()]
-            await asyncio.sleep(3.2)
-            if not all(result):
+            status = {p.metadata.name: p.status.phase for p in pods}
+            result = [status_check == s for name, s in status.items()]
+
+            # throttle loop
+            await asyncio.sleep(0.5)
+            if result is None:
+                continue
+            elif sum(result) < self._manual_scale_target:
                 continue
             else:
                 return True
 
-    async def status_with_timeout(self, pods, timeout=0.2):
+    async def status_with_timeout(self, timeout):
         t = asyncio.create_task(self.check_status())
         done, pending = await asyncio.wait({t}, timeout=timeout)
 
@@ -537,11 +548,14 @@ class KubeCluster(Cluster):
         assert all([d.result() for d in done])
         return True
 
-    async def _scale_up(self, n, pods=None, **kwargs):
+    async def _scale_up(self, pods=None, **kwargs):
         """
         Use the ``.scale`` method instead
         """
         maximum = dask.config.get("kubernetes.count.max")
+        status_timeout = dask.config.get("kubernetes.status-timeout", 5)
+        last_exception = Exception("Failed to Scale up")
+
         if maximum is not None and maximum < n:
             logger.info(
                 "Tried to scale beyond maximum number of workers %d > %d", n, maximum
@@ -549,7 +563,7 @@ class KubeCluster(Cluster):
             n = maximum
         if not pods:
             pods = await self._pods()
-            pods = await self._cleanup_terminated_pods(pods)
+            current_pod_size = len(pods)
 
         for i in range(3):
             try:
@@ -558,16 +572,19 @@ class KubeCluster(Cluster):
                         self.core_api.create_namespaced_pod(
                             self.namespace, self.pod_template
                         )
-                        for _ in range(n - len(pods))
+                        for _ in range(self._manual_scale_target - len(pods))
                     ]
                 )
-                logger.debug("Added %d new pods", len(new_pods))
-                status = await self.status_with_timeout(new_pods, 20.0)
-                last_exception = 'foo bar'
+                status = await self.status_with_timeout(status_timeout)
+
+                new_pod_size = len(new_pods)
+                logger.debug("Added %d new pods", new_pod_size)
+
+                # timeout after status_timeout (in seconds)
                 if not status:
-                    continue
-                await asyncio.sleep(0.5)
-                break
+                    msg = "Async Timeout -- Pod Size: %d New Pod Size: %d" % (current_pod_size, new_pod_size)
+                    print(msg)
+                    raise asyncio.TimeoutError(msg)
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 500 and "ServerTimeout" in e.body:
                     logger.info("Server timeout, retry #%d", i + 1)
@@ -575,10 +592,11 @@ class KubeCluster(Cluster):
                     last_exception = e
                     pods = await self._pods()
                     pods = await self._cleanup_terminated_pods(pods)
-                    continue
                 else:
                     raise
         else:
+            _pods = await self._pods()
+            status = {p.metadata.name: p.status.phase for p in _pods}
             raise last_exception
 
         return new_pods

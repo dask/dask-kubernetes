@@ -477,7 +477,6 @@ async def test_scale_up_down(cluster, client):
     assert set(cluster.scheduler.workers) == {b}
 
 
-
 @pytest.mark.asyncio
 async def test_scale_up_down_fast(cluster, client):
     cluster.scale(1)
@@ -498,7 +497,7 @@ async def test_scale_up_down_fast(cluster, client):
     # pressure on kubernetes but this should never fail nor delete our worker
     # with the temporary result.
     for i in range(10):
-        await cluster._scale_up(4)
+        cluster.scale(4)
         await gen.sleep(random.random() / 2)
         cluster.scale(1)
         await gen.sleep(random.random() / 2)
@@ -515,7 +514,6 @@ async def test_scale_up_down_fast(cluster, client):
     assert len(await future) == int(1e6)
 
 
-@pytest.mark.xfail(reason="scaling has some unfortunate state")
 @pytest.mark.asyncio
 async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     # Try to scale the cluster to use more pods than available

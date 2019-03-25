@@ -7,6 +7,7 @@ kubernetes:
   host: '0.0.0.0'
   port: 0
   env: {}
+  status-timeout: 5
 
   worker-template-path: null
 
