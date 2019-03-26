@@ -421,7 +421,6 @@ async def test_reject_evicted_workers(cluster):
             metadata=worker.metadata,
         ),
     )
-
     # Wait until pod is evicted
     start = time()
     while any(
@@ -569,6 +568,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     assert list(cluster.scheduler.workers.keys()) == running_workers
 
     # Terminate everything
+    breakpoint()
     cluster.scale(0)
 
     start = time()

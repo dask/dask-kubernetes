@@ -28,6 +28,7 @@ from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
 
+
 class PodStatus(Enum):
     pending = 'Pending'
     running = 'Running'
@@ -36,6 +37,7 @@ class PodStatus(Enum):
     unknown = 'Unknown'
     completed = 'Completed'
     crashloopbackoff = 'CrashLoopBackOff'
+
 
 class KubeCluster(Cluster):
     """ Launch a Dask cluster on Kubernetes
@@ -222,7 +224,7 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.namespace = namespace
         self.pod_template.metadata.generate_name = name
 
-        self._manual_scale_target = 0
+        self._manual_scale_target = n_workers or 0
 
         self.cluster = LocalCluster(
             ip=self.host or socket.gethostname(),
@@ -512,7 +514,7 @@ class KubeCluster(Cluster):
                     raise
 
     async def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {PodStatus.succeeded, PodStatus.failed}
+        terminated_phases = {PodStatus.succeeded.value, PodStatus.failed.value}
         terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         await self._delete_pods(terminated_pods)
         pods = [p for p in pods if p.status.phase not in terminated_phases]
@@ -525,8 +527,8 @@ class KubeCluster(Cluster):
     async def check_status(self, status_check=PodStatus.running):
         while True:
             pods = await self._pods()
-            status = {p.metadata.name: p.status.phase for p in pods}
-            result = [status_check == s for name, s in status.items()]
+            phases = {p.metadata.name: p.status.phase for p in pods}
+            result = [status_check.value == status for name, status in phases.items()]
 
             # throttle loop
             await asyncio.sleep(0.5)
@@ -556,14 +558,14 @@ class KubeCluster(Cluster):
         status_timeout = dask.config.get("kubernetes.status-timeout", 5)
         last_exception = Exception("Failed to Scale up")
 
-        if maximum is not None and maximum < n:
+        if maximum is not None and maximum < self._manual_scale_target:
             logger.info(
-                "Tried to scale beyond maximum number of workers %d > %d", n, maximum
+                "Tried to scale beyond maximum number of workers %d > %d", self._manual_scale_target, maximum
             )
-            n = maximum
+            self._manual_scale_target = maximum
         if not pods:
-            pods = await self._pods()
-            current_pod_size = len(pods)
+            _pods = await self._pods()
+            current_pod_size = len(_pods)
 
         for i in range(3):
             try:
@@ -572,7 +574,7 @@ class KubeCluster(Cluster):
                         self.core_api.create_namespaced_pod(
                             self.namespace, self.pod_template
                         )
-                        for _ in range(self._manual_scale_target - len(pods))
+                        for _ in range(self._manual_scale_target - len(_pods))
                     ]
                 )
                 status = await self.status_with_timeout(status_timeout)
@@ -583,8 +585,9 @@ class KubeCluster(Cluster):
                 # timeout after status_timeout (in seconds)
                 if not status:
                     msg = "Async Timeout -- Pod Size: %d New Pod Size: %d" % (current_pod_size, new_pod_size)
-                    print(msg)
                     raise asyncio.TimeoutError(msg)
+
+                return new_pods
             except kubernetes.client.rest.ApiException as e:
                 if e.status == 500 and "ServerTimeout" in e.body:
                     logger.info("Server timeout, retry #%d", i + 1)
@@ -595,12 +598,7 @@ class KubeCluster(Cluster):
                 else:
                     raise
         else:
-            _pods = await self._pods()
-            status = {p.metadata.name: p.status.phase for p in _pods}
             raise last_exception
-
-        return new_pods
-        # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers, pods=None):
         """ Remove the pods for the requested list of workers
