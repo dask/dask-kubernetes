@@ -504,7 +504,8 @@ async def test_scale_up_down_fast(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         await gen.sleep(0.1)
-        assert time() < start + 20
+        print(len(cluster.scheduler.workers))
+        assert time() < start + 30
 
     # The original task result is still stored on the original worker: this pod
     # has never been deleted when rescaling the cluster and the result can
@@ -519,13 +520,13 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     nodes = (await cluster.core_api.list_node()).items
     max_pods = sum(int(node.status.allocatable["pods"]) for node in nodes)
     if max_pods > 50:
-        # It's probably not reasonable to run this test against a large
-        # kubernetes cluster.
-        pytest.skip("Require a small test kubernetes cluster (maxpod <= 50)")
+        # It's probably not reasonable to run this test against a larger clusters
+        # artificially restrict to 50 pods
+        max_pods = 50
+
     extra_pods = 5
     requested_pods = max_pods + extra_pods
-    cluster.scale(requested_pods)
-
+    cluster.scale(20)
     start = time()
     while len(cluster.scheduler.workers) < 2:
         await gen.sleep(0.1)
@@ -533,10 +534,15 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         # the requested pods as we requested a large number of pods.
         assert time() < start + 60
 
+    _pods = await cluster.pods()
+    running_status = [p.status.phase for p in _pods]
+
     pending_pods = [p for p in (await cluster.pods()) if p.status.phase == "Pending"]
+    # breakpoint()
     assert len(pending_pods) >= extra_pods
 
     running_workers = list(cluster.scheduler.workers.keys())
+    print(running_workers)
     assert len(running_workers) >= 2
 
     # Put some data on those workers to make them important to keep as long
@@ -552,9 +558,9 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     # Reduce the cluster size down to the actually useful nodes: pending pods
     # and running pods without results should be shutdown and removed first:
     cluster.scale(len(running_workers))
-
     start = time()
     pod_statuses = [p.status.phase for p in await cluster.pods()]
+    print(f"Number of Running workers: {len(running_workers)} Target Size: {cluster._manual_scale_target}")
     while len(pod_statuses) != len(running_workers):
         if time() - start > 60:
             raise AssertionError(
@@ -565,10 +571,17 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         pod_statuses = [p.status.phase for p in await cluster.pods()]
 
     assert pod_statuses == ["Running"] * len(running_workers)
+    # Put some data on this worker
+    # future = client.submit(lambda: b"\x00" * int(1e6))
+    for f in futures:
+        breakpoint()
+        print(cluster.scheduler.tasks[future.key].who_has)
+    # assert worker in cluster.scheduler.tasks[future.key].who_has
+
+
     assert list(cluster.scheduler.workers.keys()) == running_workers
 
     # Terminate everything
-    breakpoint()
     cluster.scale(0)
 
     start = time()

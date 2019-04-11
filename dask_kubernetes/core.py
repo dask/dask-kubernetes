@@ -29,14 +29,15 @@ from .auth import ClusterAuth
 logger = logging.getLogger(__name__)
 
 
-class PodStatus(Enum):
-    pending = 'Pending'
-    running = 'Running'
-    succeeded = 'Succeeded'
-    failed = 'Failed'
-    unknown = 'Unknown'
-    completed = 'Completed'
-    crashloopbackoff = 'CrashLoopBackOff'
+
+# k8s pod states
+PENDING = 'Pending'
+RUNNING = 'Running'
+SUCCEEDED = 'Succeeded'
+FAILED = 'Failed'
+UNKOWN = 'Unknown'
+COMPLETED = 'Completed'
+CRAHLOOPBACKOFF = 'CrashLoopBackOff'
 
 
 class KubeCluster(Cluster):
@@ -225,6 +226,8 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.generate_name = name
 
         self._manual_scale_target = n_workers or 0
+        self._periodic_task = None
+        self._in_periodic_check = False
 
         self.cluster = LocalCluster(
             ip=self.host or socket.gethostname(),
@@ -277,9 +280,35 @@ class KubeCluster(Cluster):
         if self.n_workers:
             await self._scale(self.n_workers)
 
+    async def periodic(self):
+        """Periodic Callback to check cluster has the correct size
+        """
+        # peridically check cluster is at the correct size
+        # don't assign member variables or collisions may happen
+        while True:
+            pods = await self._pods()
+            n = self._manual_scale_target
+            t = asyncio.all_tasks()
+            print(f"Current Cluster Size: {len(pods)} Cluster Target: {n}")
+
+            # flag = all(['periodic' in t.__doc__ for t in all_tasks]
+            # scale_up/scale_down
+            # semaphore!
+            if self._in_periodic_check:
+                pass
+            else:
+                self._in_periodic_check = True
+                if n >= len(pods):
+                    await self._scale_up(pods=pods)
+                else:
+                    await self._scale_down_with_pending_check(pods, n)
+            await asyncio.sleep(3)
+            self._in_periodic_check = False
+
     def start(self):
         if self._asynchronous:
             self._started = self._start()
+            self._periodic_task = asyncio.create_task(self.periodic())
         else:
             return self.sync(self._start)
 
@@ -456,43 +485,51 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = await self._cleanup_terminated_pods(await self.pods())
         self._manual_scale_target = n
+        pods = await self._cleanup_terminated_pods(await self.pods())
         if n >= len(pods):
             return await self._scale_up(pods=pods)
         else:
-            n_to_delete = len(pods) - n
-            # Before trying to close running workers, check if we can cancel
-            # pending pods (in case the kubernetes cluster was too full to
-            # provision those pods in the first place).
-            running_workers = list(self.scheduler.workers.keys())
-            running_ips = set(urlparse(worker).hostname for worker in running_workers)
-            pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
-            if pending_pods:
-                pending_to_delete = pending_pods[:n_to_delete]
-                logger.debug("Deleting pending pods: %s", pending_to_delete)
-                await self._delete_pods(pending_to_delete)
-                n_to_delete = n_to_delete - len(pending_to_delete)
-                if n_to_delete <= 0:
-                    return
+            return await self._scale_down_with_pending_check(pods, n)
 
-            to_close = select_workers_to_close(self.scheduler, n_to_delete)
-            logger.debug("Closing workers: %s", to_close)
-            if len(to_close) < len(self.scheduler.workers):
-                # Close workers cleanly to migrate any temporary results to
-                # remaining workers.
-                @gen.coroutine
-                def f(to_close):
-                    yield self.scheduler.retire_workers(
-                        workers=to_close, remove=True, close_workers=True
-                    )
-                    yield offload(self.scale_down, to_close)
 
-                self.scheduler.loop.add_callback(f, to_close)
+    async def _scale_down_with_pending_check(self, pods, n):
+        n_to_delete = len(pods) - n
+        # Before trying to close running workers, check if we can cancel
+        # pending pods (in case the kubernetes cluster was too full to
+        # provision those pods in the first place).
+        running_workers = list(self.scheduler.workers.keys())
+        running_ips = set(urlparse(worker).hostname for worker in running_workers)
+        pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
+        if pending_pods:
+            # ['tcp://10.244.0.2:36657', 'tcp://10.244.0.3:34937', 'tcp://10.244.0.4:37518']
+            pending_to_delete = pending_pods[:n_to_delete]
+            for p in pending_to_delete:
+                print(p.metadata.name, p.status.pod_ip)
+            if p.status.pod_ip:
+                breakpoint()
+            logger.debug("Deleting pending pods: %s", pending_to_delete)
+            await self._delete_pods(pending_to_delete)
+            n_to_delete = n_to_delete - len(pending_to_delete)
+            if n_to_delete <= 0:
                 return
+        to_close = select_workers_to_close(self.scheduler, n_to_delete)
+        print("Closing workers: %s", to_close)
+        if len(to_close) < len(self.scheduler.workers):
+            # Close workers cleanly to migrate any temporary results to
+            # remaining workers.
+            @gen.coroutine
+            def f(to_close):
+                yield self.scheduler.retire_workers(
+                    workers=to_close, remove=True, close_workers=True
+                )
+                yield offload(self.scale_down, to_close)
 
-            # Terminate all pods without waiting for clean worker shutdown
-            self.scale_down(to_close)
+            self.scheduler.loop.add_callback(f, to_close)
+            return
+
+        # Terminate all pods without waiting for clean worker shutdown
+        return self.scale_down(to_close)
 
     async def _delete_pods(self, to_delete):
         for pod in to_delete:
@@ -511,10 +548,10 @@ class KubeCluster(Cluster):
             except kubernetes.client.rest.ApiException as e:
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
-                    raise
+                    raise kubernetes.client.rest.ApiException(e)
 
     async def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {PodStatus.succeeded.value, PodStatus.failed.value}
+        terminated_phases = {SUCCEEDED, FAILED, COMPLETED}
         terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         await self._delete_pods(terminated_pods)
         pods = [p for p in pods if p.status.phase not in terminated_phases]
@@ -524,32 +561,6 @@ class KubeCluster(Cluster):
         self._manual_scale_target = n
         self.scheduler.loop.add_callback(self._scale_up, **kwargs)
 
-    async def check_status(self, status_check=PodStatus.running):
-        while True:
-            pods = await self._pods()
-            phases = {p.metadata.name: p.status.phase for p in pods}
-            result = [status_check.value == status for name, status in phases.items()]
-
-            # throttle loop
-            await asyncio.sleep(0.5)
-            if result is None:
-                continue
-            elif sum(result) < self._manual_scale_target:
-                continue
-            else:
-                return True
-
-    async def status_with_timeout(self, timeout):
-        t = asyncio.create_task(self.check_status())
-        done, pending = await asyncio.wait({t}, timeout=timeout)
-
-        # if there are any pending tasks we have timed out
-        if len(pending):
-            return False
-
-        assert all([d.result() for d in done])
-        return True
-
     async def _scale_up(self, pods=None, **kwargs):
         """
         Use the ``.scale`` method instead
@@ -558,47 +569,51 @@ class KubeCluster(Cluster):
         status_timeout = dask.config.get("kubernetes.status-timeout", 5)
         last_exception = Exception("Failed to Scale up")
 
+        if not pods:
+            pods = await self._pods()
+            current_pod_size = len(pods)
+
+        # if cluster is scaling up/down quickly we may already have
+        # met requirements
+        if len(pods) >= target_size:
+            return pods
+
+        target_size = self._manual_scale_target
+
         if maximum is not None and maximum < self._manual_scale_target:
             logger.info(
                 "Tried to scale beyond maximum number of workers %d > %d", self._manual_scale_target, maximum
             )
-            self._manual_scale_target = maximum
-        if not pods:
-            _pods = await self._pods()
-            current_pod_size = len(_pods)
+            target_size = maximum
 
-        for i in range(3):
-            try:
-                new_pods = await asyncio.gather(
-                    *[
-                        self.core_api.create_namespaced_pod(
-                            self.namespace, self.pod_template
-                        )
-                        for _ in range(self._manual_scale_target - len(_pods))
-                    ]
-                )
-                status = await self.status_with_timeout(status_timeout)
+        async def _():
+            for i in range(3):
+                try:
+                    new_pod = await self.core_api.create_namespaced_pod(
+                                self.namespace, self.pod_template
+                            )
+                    logger.debug("Added 1 new pod")
+                    break
+                except kubernetes.client.rest.ApiException as e:
+                    if e.status == 500 and "ServerTimeout" in e.body:
+                        logger.info("Server timeout, retry #%d", i + 1)
+                        asyncio.sleep(1)
+                        last_exception = e
+                        pods = await self._pods()
+                        pods = await self._cleanup_terminated_pods(pods)
+                        continue
+                    else:
+                        raise
+            else:
+                raise last_exception
 
-                new_pod_size = len(new_pods)
-                logger.debug("Added %d new pods", new_pod_size)
 
-                # timeout after status_timeout (in seconds)
-                if not status:
-                    msg = "Async Timeout -- Pod Size: %d New Pod Size: %d" % (current_pod_size, new_pod_size)
-                    raise asyncio.TimeoutError(msg)
 
-                return new_pods
-            except kubernetes.client.rest.ApiException as e:
-                if e.status == 500 and "ServerTimeout" in e.body:
-                    logger.info("Server timeout, retry #%d", i + 1)
-                    time.sleep(1)
-                    last_exception = e
-                    pods = await self._pods()
-                    pods = await self._cleanup_terminated_pods(pods)
-                else:
-                    raise
-        else:
-            raise last_exception
+        # create pods concurrently
+        results = await asyncio.gather(*[_() for p in range(target_size)], return_exceptions=True)
+        pods = await self._pods()
+        assert len(pods) >= target_size
+        return pods
 
     def scale_down(self, workers, pods=None):
         """ Remove the pods for the requested list of workers
@@ -617,6 +632,7 @@ class KubeCluster(Cluster):
         ----------
         workers: List[str] List of addresses of workers to close
         """
+        # self._manual_scale_target = len(workers)
         return self.sync(self._scale_down, workers, pods)
 
     async def _scale_down(self, workers, pods=None):
@@ -634,12 +650,15 @@ class KubeCluster(Cluster):
             return
         else:
             logger.debug("Deleting %d pods", len(to_delete))
-        return await self._delete_pods(to_delete)
+        deleted_pods = await self._delete_pods(to_delete)
+        return deleted_pods
 
     def __enter__(self):
         return self
 
     async def _close(self, **kwargs):
+        if self._periodic_task:
+            self._periodic_task.cancel()
         await self.scale_down(self.cluster.scheduler.workers)
         return self.cluster.close(**kwargs)
 
