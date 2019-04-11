@@ -525,7 +525,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
     extra_pods = 5
     requested_pods = max_pods + extra_pods
-    cluster.scale(20)
+    cluster.scale(requested_pods)
     start = time()
     while len(cluster.scheduler.workers) < 2:
         await gen.sleep(0.1)
@@ -534,13 +534,12 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         assert time() < start + 60
 
     _pods = await cluster.pods()
-    running_status = [p.status.phase for p in _pods]
-
     pending_pods = [p for p in (await cluster.pods()) if p.status.phase == "Pending"]
     assert len(pending_pods) >= extra_pods
 
     running_workers = list(cluster.scheduler.workers.keys())
     print(running_workers)
+    print(cluster.scheduler.workers[running_workers[0]].name)
     assert len(running_workers) >= 2
 
     # Put some data on those workers to make them important to keep as long
@@ -570,6 +569,12 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
     assert pod_statuses == ["Running"] * len(running_workers)
     assert list(cluster.scheduler.workers.keys()) == running_workers
+
+    # Put some data on this worker
+    # future = client.submit(lambda: b"\x00" * int(1e6))
+    # for f in futures:
+        # print(cluster.scheduler.tasks[future.key].who_has)
+    # assert worker in cluster.scheduler.tasks[future.key].who_has
 
     # Terminate everything
     cluster.scale(0)
