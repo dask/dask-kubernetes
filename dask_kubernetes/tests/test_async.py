@@ -504,7 +504,6 @@ async def test_scale_up_down_fast(cluster, client):
     start = time()
     while len(cluster.scheduler.workers) != 1:
         await gen.sleep(0.1)
-        print(len(cluster.scheduler.workers))
         assert time() < start + 30
 
     # The original task result is still stored on the original worker: this pod
@@ -538,7 +537,6 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     running_status = [p.status.phase for p in _pods]
 
     pending_pods = [p for p in (await cluster.pods()) if p.status.phase == "Pending"]
-    # breakpoint()
     assert len(pending_pods) >= extra_pods
 
     running_workers = list(cluster.scheduler.workers.keys())
@@ -571,14 +569,6 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         pod_statuses = [p.status.phase for p in await cluster.pods()]
 
     assert pod_statuses == ["Running"] * len(running_workers)
-    # Put some data on this worker
-    # future = client.submit(lambda: b"\x00" * int(1e6))
-    for f in futures:
-        breakpoint()
-        print(cluster.scheduler.tasks[future.key].who_has)
-    # assert worker in cluster.scheduler.tasks[future.key].who_has
-
-
     assert list(cluster.scheduler.workers.keys()) == running_workers
 
     # Terminate everything
