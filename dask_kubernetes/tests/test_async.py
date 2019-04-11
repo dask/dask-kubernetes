@@ -570,12 +570,6 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     assert pod_statuses == ["Running"] * len(running_workers)
     assert list(cluster.scheduler.workers.keys()) == running_workers
 
-    # Put some data on this worker
-    # future = client.submit(lambda: b"\x00" * int(1e6))
-    # for f in futures:
-        # print(cluster.scheduler.tasks[future.key].who_has)
-    # assert worker in cluster.scheduler.tasks[future.key].who_has
-
     # Terminate everything
     cluster.scale(0)
 
