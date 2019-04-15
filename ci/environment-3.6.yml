@@ -12,6 +12,6 @@ dependencies:
   - python=3.6
   - pyyaml
   - pip:
-    - kubernetes==6
-    - kubernetes-asyncio
+    - kubernetes==9
+    - kubernetes-asyncio==8.1.0
     - pytest-asyncio
