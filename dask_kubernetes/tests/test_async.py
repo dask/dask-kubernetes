@@ -40,7 +40,10 @@ def pod_spec(image_name):
 @pytest.fixture
 async def api():
     await ClusterAuth.load_first()
-    return kubernetes.client.CoreV1Api()
+    v1 = kubernetes.client.CoreV1Api()
+    yield v1
+    del v1
+
 
 
 @pytest.fixture
@@ -82,12 +85,22 @@ async def client(cluster):
 
 
 @pytest.mark.asyncio
+async def test_do_nothing(cluster, client):
+    cluster.scale(1)
+    result = await client.submit(lambda x: x + 1, 10)
+    assert result == 11
+
+
+
+
+@pytest.mark.asyncio
 async def test_cluster_create(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         cluster.scale(1)
         async with Client(cluster, asynchronous=True) as client:
             result = await client.submit(lambda x: x + 1, 10)
             assert result == 11
+
 
 
 @pytest.mark.asyncio

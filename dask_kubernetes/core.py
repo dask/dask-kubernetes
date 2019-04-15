@@ -225,6 +225,7 @@ class KubeCluster(Cluster):
         self._periodic_task = None
         self.task_queue = asyncio.Queue()
         self.task_worker = None
+        self.core_api = None # async k8s client
 
         self.cluster = LocalCluster(
             ip=self.host or socket.gethostname(),
@@ -659,7 +660,11 @@ f
         if self._periodic_task:
             self._periodic_task.cancel()
         await self.scale_down(self.cluster.scheduler.workers)
+        # https://github.com/tomplus/kubernetes_asyncio/issues/25
+        # maybe we need to delete the client on close
+        del self.core_api
         return self.cluster.close(**kwargs)
+
 
     def close(self, **kwargs):
         """ Close this cluster """
@@ -689,7 +694,7 @@ def _cleanup_pods_sync(namespace, labels):
             # ignore error if pod is already removed
             if e.status != 404:
                 raise
-
+    del api
 
 def format_labels(labels):
     """ Convert a dictionary of labels into a comma separated string """
