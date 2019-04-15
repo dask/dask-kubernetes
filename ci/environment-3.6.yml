@@ -7,7 +7,6 @@ dependencies:
   - ipywidgets
   - dask=1.2.0
   - distributed=1.27.0
-  - tornado=5
   - nomkl
   - pytest
   - python=3.6
@@ -16,4 +15,3 @@ dependencies:
     - kubernetes==6
     - kubernetes-asyncio
     - pytest-asyncio
-    - git+https://github.com/tornadoweb/tornado@975e9168560cc03f6210d0d3aab10c870bd47080
