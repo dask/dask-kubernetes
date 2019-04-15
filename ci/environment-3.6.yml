@@ -5,8 +5,8 @@ channels:
 dependencies:
   - flake8
   - ipywidgets
-  - dask=1.1.1
-  - distributed=1.25.3
+  - dask=1.2.0
+  - distributed=1.27.0
   - nomkl
   - pytest
   - python=3.6

@@ -63,9 +63,7 @@ jobs:
                 pip install --no-deps --quiet -e .
               fi
               conda env list
-              conda list ${ENV_NAME}
-              conda list dask-kubernetes-test
-              echo ${ENV_NAME}
+              conda list -n ${ENV_NAME}
       - save_cache:
           key: miniconda-v1-{{ checksum "ci/environment-3.6.yml" }}
           paths:
