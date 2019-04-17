@@ -85,11 +85,10 @@ async def client(cluster):
 
 
 @pytest.mark.asyncio
-async def test_do_nothing(cluster, client):
+async def test_do_nothing(cluster, client, cleanup_namespaces):
     cluster.scale(1)
     result = await client.submit(lambda x: x + 1, 10)
     assert result == 11
-
 
 
 

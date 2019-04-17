@@ -659,7 +659,7 @@ f
     async def _close(self, **kwargs):
         if self._periodic_task:
             self._periodic_task.cancel()
-        await self.scale_down(self.cluster.scheduler.workers)
+        self.scale_down(self.cluster.scheduler.workers)
         # https://github.com/tomplus/kubernetes_asyncio/issues/25
         # maybe we need to delete the client on close
         del self.core_api

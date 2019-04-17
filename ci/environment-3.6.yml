@@ -7,8 +7,9 @@ dependencies:
   - ipywidgets
   - dask=1.2.0
   - distributed=1.27.0
+  - tornado=6
   - nomkl
-  - pytest
+  - pytest=4.2.0
   - python=3.6
   - pyyaml
   - pip:
