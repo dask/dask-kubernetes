@@ -251,8 +251,14 @@ class KubeCluster(Cluster):
         metadata_name = kubernetes.client.V1ObjectFieldSelector(field_path='metadata.name')
         env_var_source = kubernetes.client.V1EnvVarSource(field_ref=metadata_name)
         hostname = kubernetes.client.V1EnvVar(name='HOSTNAME', value_from=env_var_source)
+
         self.pod_template.spec.containers[0].env.extend([hostname])
-        self.pod_template.spec.containers[0].args.extend(['--name', "$(HOSTNAME)"])
+
+        additional_args = ['--name', "$(HOSTNAME)"]
+        if not self.pod_template.spec.containers[0].args:
+            self.pod_template.spec.containers[0].args = additional_args
+        else:
+            self.pod_template.spec.containers[0].args.extend(additional_args)
 
         self.start()
 
@@ -313,7 +319,7 @@ class KubeCluster(Cluster):
     def start(self):
         if self._asynchronous:
             self._started = self._start()
-            self._periodic_task = asyncio.create_task(self.periodic())
+            self._periodic_task = asyncio.ensure_future(self.periodic())
 
         else:
             return self.sync(self._start)

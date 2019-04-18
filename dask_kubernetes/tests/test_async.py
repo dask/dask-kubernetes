@@ -85,21 +85,12 @@ async def client(cluster):
 
 
 @pytest.mark.asyncio
-async def test_do_nothing(cluster, client, cleanup_namespaces):
-    cluster.scale(1)
-    result = await client.submit(lambda x: x + 1, 10)
-    assert result == 11
-
-
-
-@pytest.mark.asyncio
 async def test_cluster_create(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         cluster.scale(1)
         async with Client(cluster, asynchronous=True) as client:
             result = await client.submit(lambda x: x + 1, 10)
             assert result == 11
-
 
 
 @pytest.mark.asyncio
