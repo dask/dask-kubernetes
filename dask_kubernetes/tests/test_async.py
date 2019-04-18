@@ -559,7 +559,9 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     cluster.scale(len(running_workers))
     start = time()
     pod_statuses = [p.status.phase for p in await cluster.pods()]
-    print(f"Number of Running workers: {len(running_workers)} Target Size: {cluster._manual_scale_target}")
+    print(
+        f"Number of Running workers: {len(running_workers)} Target Size: {cluster._manual_scale_target}"
+    )
     while len(pod_statuses) != len(running_workers):
         if time() - start > 60:
             raise AssertionError(

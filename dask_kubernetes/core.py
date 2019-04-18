@@ -26,13 +26,13 @@ from .auth import ClusterAuth
 logger = logging.getLogger(__name__)
 
 # k8s pod states
-PENDING = 'Pending'
-RUNNING = 'Running'
-SUCCEEDED = 'Succeeded'
-FAILED = 'Failed'
-UNKOWN = 'Unknown'
-COMPLETED = 'Completed'
-CRAHLOOPBACKOFF = 'CrashLoopBackOff'
+PENDING = "Pending"
+RUNNING = "Running"
+SUCCEEDED = "Succeeded"
+FAILED = "Failed"
+UNKOWN = "Unknown"
+COMPLETED = "Completed"
+CRAHLOOPBACKOFF = "CrashLoopBackOff"
 
 
 class KubeCluster(Cluster):
@@ -163,7 +163,7 @@ class KubeCluster(Cluster):
         env=None,
         auth=ClusterAuth.DEFAULT,
         asynchronous=False,
-        **kwargs
+        **kwargs,
     ):
         name = name or dask.config.get("kubernetes.name")
         namespace = namespace or dask.config.get("kubernetes.namespace")
@@ -225,14 +225,14 @@ class KubeCluster(Cluster):
         self._periodic_task = None
         self.task_queue = asyncio.Queue()
         self.task_worker = None
-        self.core_api = None # async k8s client
+        self.core_api = None  # async k8s client
 
         self.cluster = LocalCluster(
             ip=self.host or socket.gethostname(),
             scheduler_port=self.port,
             n_workers=0,
             asynchronous=asynchronous,
-            **self.cluster_kwargs
+            **self.cluster_kwargs,
         )
 
         self.pod_template.spec.containers[0].env.append(
@@ -248,13 +248,17 @@ class KubeCluster(Cluster):
                 ]
             )
 
-        metadata_name = kubernetes.client.V1ObjectFieldSelector(field_path='metadata.name')
+        metadata_name = kubernetes.client.V1ObjectFieldSelector(
+            field_path="metadata.name"
+        )
         env_var_source = kubernetes.client.V1EnvVarSource(field_ref=metadata_name)
-        hostname = kubernetes.client.V1EnvVar(name='HOSTNAME', value_from=env_var_source)
+        hostname = kubernetes.client.V1EnvVar(
+            name="HOSTNAME", value_from=env_var_source
+        )
 
         self.pod_template.spec.containers[0].env.extend([hostname])
 
-        additional_args = ['--name', "$(HOSTNAME)"]
+        additional_args = ["--name", "$(HOSTNAME)"]
         if not self.pod_template.spec.containers[0].args:
             self.pod_template.spec.containers[0].args = additional_args
         else:
@@ -301,9 +305,11 @@ class KubeCluster(Cluster):
             # cleanup messy pods
             pods = await self._cleanup_terminated_pods(pods)
 
-            logger.debug(f"Current Cluster Size: {len(pods)} Cluster Target: {self._manual_scale_target}")
+            logger.debug(
+                f"Current Cluster Size: {len(pods)} Cluster Target: {self._manual_scale_target}"
+            )
             if self.task_queue.empty():
-                if (len(pods) != self._manual_scale_target):
+                if len(pods) != self._manual_scale_target:
                     self.scale(self._manual_scale_target)
             else:
                 # Get a scale_up/down out of the queue.
@@ -515,14 +521,20 @@ f
         # provision those pods in the first place).
         running_workers = list(self.scheduler.workers.keys())
         running_ips = set(urlparse(worker).hostname for worker in running_workers)
-        running_names = [v.name for w, v in self.scheduler.workers.items() if v.has_what]
+        running_names = [
+            v.name for w, v in self.scheduler.workers.items() if v.has_what
+        ]
 
         # Dask is Fast! A worker can register with the scheduler before k8s
         # moves the pod from `PENDING` to `RUNNING` below we remove
         # any workers in a `PENDING` state which have non-zero
         # memory or currently processing a task
-        pending_pods = [p for p in pods if (p.status.pod_ip not in running_ips)
-                                           and (p.metadata.name not in running_names)]
+        pending_pods = [
+            p
+            for p in pods
+            if (p.status.pod_ip not in running_ips)
+            and (p.metadata.name not in running_names)
+        ]
         if pending_pods:
             pending_to_delete = pending_pods[:n_to_delete]
 
@@ -591,7 +603,9 @@ f
 
         if maximum is not None and maximum < self._manual_scale_target:
             logger.info(
-                "Tried to scale beyond maximum number of workers %d > %d", self._manual_scale_target, maximum
+                "Tried to scale beyond maximum number of workers %d > %d",
+                self._manual_scale_target,
+                maximum,
             )
             target_size = maximum
 
@@ -599,8 +613,8 @@ f
             for i in range(3):
                 try:
                     new_pod = await self.core_api.create_namespaced_pod(
-                                self.namespace, self.pod_template
-                            )
+                        self.namespace, self.pod_template
+                    )
                     logger.debug("Added 1 new pod")
                     break
                 except kubernetes.client.rest.ApiException as e:
@@ -617,7 +631,9 @@ f
                 raise last_exception
 
         # create pods concurrently
-        results = await asyncio.gather(*[_() for p in range(target_size)], return_exceptions=True)
+        results = await asyncio.gather(
+            *[_() for p in range(target_size)], return_exceptions=True
+        )
         pods = await self._pods()
         assert len(pods) >= target_size
         return pods
@@ -692,7 +708,9 @@ def _cleanup_pods_sync(namespace, labels):
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(
-                name=pod.metadata.name, namespace=namespace, body=kubernetes.client.V1DeleteOptions()
+                name=pod.metadata.name,
+                namespace=namespace,
+                body=kubernetes.client.V1DeleteOptions(),
             )
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
