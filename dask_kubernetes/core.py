@@ -319,7 +319,7 @@ class KubeCluster(Cluster):
                 await self._run_queued_func()
 
     def start(self):
-        if self._asynchronous:
+        if self.asynchronous:
             self._periodic_task = asyncio.ensure_future(self.periodic())
             self._started = self._start()
         else:
@@ -505,8 +505,18 @@ f
             else:
                 self.task_queue.put_nowait((self._scale_down_with_pending_check))
 
-            if not self._asynchronous:
-                self.sync(self._run_queued_func, True)
+            self._sync_tasks()
+
+    def _sync_tasks(self):
+        """Internal function to synchronously execut all queued task.
+        Used in synchronous scale functions.
+        """
+        if not self.asynchronous:
+            self.sync(self._run_queued_func, True)
+        if not self._periodic_task:
+            # probably coming in from adapt()
+            # not periodic checking for the queue
+            self.loop.add_callback(self._run_queued_func, True)
 
     async def _scale_down_with_pending_check(self):
         pods = await self._pods()
@@ -576,13 +586,10 @@ f
         pods = [p for p in pods if p.status.phase not in terminated_phases]
         return pods
 
-    def adapt(self):
-        # place holder for now
-        breakpoint()
-
     def scale_up(self, n, **kwargs):
         self._manual_scale_target = n
         self.task_queue.put_nowait(self._scale_up)
+        return self._sync_tasks()
 
     async def _scale_up(self, pods=None, **kwargs):
         """
@@ -658,7 +665,8 @@ f
         ----------
         workers: List[str] List of addresses of workers to close
         """
-        return self.sync(self._scale_down, workers, pods)
+        self.sync(self._scale_down, workers, pods)
+        self._sync_tasks()
 
     async def _scale_down(self, workers, pods=None):
         # Get the existing worker pods
