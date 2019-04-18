@@ -320,9 +320,8 @@ class KubeCluster(Cluster):
 
     def start(self):
         if self._asynchronous:
-            self._started = self._start()
             self._periodic_task = asyncio.ensure_future(self.periodic())
-
+            self._started = self._start()
         else:
             return self.sync(self._start)
 
@@ -506,6 +505,9 @@ f
             else:
                 self.task_queue.put_nowait((self._scale_down_with_pending_check))
 
+            if not self._asynchronous:
+                self.sync(self._run_queued_func, True)
+
     async def _scale_down_with_pending_check(self):
         pods = await self._pods()
         pods = await self._cleanup_terminated_pods(pods)
@@ -573,6 +575,10 @@ f
         await self._delete_pods(terminated_pods)
         pods = [p for p in pods if p.status.phase not in terminated_phases]
         return pods
+
+    def adapt(self):
+        # place holder for now
+        breakpoint()
 
     def scale_up(self, n, **kwargs):
         self._manual_scale_target = n
