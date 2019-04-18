@@ -308,15 +308,15 @@ class KubeCluster(Cluster):
             logger.debug(
                 f"Current Cluster Size: {len(pods)} Cluster Target: {self._manual_scale_target}"
             )
+
             if self.task_queue.empty():
                 if len(pods) != self._manual_scale_target:
                     self.scale(self._manual_scale_target)
+                # wait a tick if there is nothing left in the queue
+                await asyncio.sleep(0.5)
+
             else:
                 await self._run_queued_func()
-
-            # wait a tick if there is nothing left in the queue
-            if self.task_queue.empty():
-                await asyncio.sleep(0.5)
 
     def start(self):
         if self._asynchronous:
