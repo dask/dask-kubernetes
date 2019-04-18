@@ -572,6 +572,8 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         pod_statuses = [p.status.phase for p in await cluster.pods()]
 
     assert pod_statuses == ["Running"] * len(running_workers)
+    print(running_workers)
+    print(list(cluster.scheduler.workers.keys()))
     assert list(cluster.scheduler.workers.keys()) == running_workers
 
     # Terminate everything

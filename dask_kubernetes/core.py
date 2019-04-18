@@ -312,11 +312,7 @@ class KubeCluster(Cluster):
                 if len(pods) != self._manual_scale_target:
                     self.scale(self._manual_scale_target)
             else:
-                # Get a scale_up/down out of the queue.
-                func = await self.task_queue.get()
-                # execute function
-                await func()
-                self.task_queue.task_done()
+                await self._run_queued_func()
 
             # wait a tick if there is nothing left in the queue
             if self.task_queue.empty():
@@ -679,10 +675,26 @@ f
     def __enter__(self):
         return self
 
+    async def _run_queued_func(self, all=False):
+        func = await self.task_queue.get()
+        # execute function
+        await func()
+        self.task_queue.task_done()
+
+        if all:
+            while not self.task_queue.empty():
+                self._run_queued_func(all=True)
+
     async def _close(self, **kwargs):
+        self.scale_down(self.cluster.scheduler.workers)
+
         if self._periodic_task:
             self._periodic_task.cancel()
-        self.scale_down(self.cluster.scheduler.workers)
+
+        # run everything in the queue
+        if not self.task_queue.empty():
+            await self._run_queued_func(all=True)
+
         # https://github.com/tomplus/kubernetes_asyncio/issues/25
         # maybe we need to delete the client on close
         del self.core_api
