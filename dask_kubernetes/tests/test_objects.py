@@ -86,7 +86,11 @@ def test_extra_container_config_merge(image_name, loop):
         {"name": "BOO", "value": "FOO"},
     ]
 
-    assert pod.spec.containers[0].args[-1] == "last-item"
+    assert "last-item" in pod.spec.containers[0].args
+
+    # "last-item" no longer last -- we now append ["--name", "$(HOSTNAME)"]
+    # for the dask worker for better name management
+    assert pod.spec.containers[0].args[-3] == "last-item"
 
 
 def test_extra_container_config_merge(image_name, loop):
@@ -111,7 +115,8 @@ def test_extra_container_config_merge(image_name, loop):
     for e in [{"name": "TEST", "value": "HI"}, {"name": "BOO", "value": "FOO"}]:
         assert e in pod.spec.containers[0].env
 
-    assert pod.spec.containers[0].args[-1] == "last-item"
+    assert "last-item" in pod.spec.containers[0].args
+    assert pod.spec.containers[0].args[-3] == "last-item"
 
 
 def test_make_pod_from_dict():
