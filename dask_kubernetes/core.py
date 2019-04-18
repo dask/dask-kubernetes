@@ -163,7 +163,7 @@ class KubeCluster(Cluster):
         env=None,
         auth=ClusterAuth.DEFAULT,
         asynchronous=False,
-        **kwargs,
+        **kwargs
     ):
         name = name or dask.config.get("kubernetes.name")
         namespace = namespace or dask.config.get("kubernetes.namespace")
@@ -500,7 +500,7 @@ f
 
         See Also
         --------
-        KubeCluster.scale_upc
+        KubeCluster.scale_up
         KubeCluster.scale_down
         """
         self._manual_scale_target = n
