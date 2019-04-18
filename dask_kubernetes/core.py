@@ -594,20 +594,21 @@ f
             pods = await self._pods()
             current_pod_size = len(pods)
 
-        target_size = self._manual_scale_target
-
-        # if cluster is scaling up/down quickly we may already have
-        # met requirements
-        if len(pods) >= target_size:
-            return pods
-
         if maximum is not None and maximum < self._manual_scale_target:
             logger.info(
                 "Tried to scale beyond maximum number of workers %d > %d",
                 self._manual_scale_target,
                 maximum,
             )
-            target_size = maximum
+            logger.info("Resetting target to: %d", self._manual_scale_target)
+            self._manual_scale_target = maximum
+
+        target_size = self._manual_scale_target
+
+        # if cluster is scaling up/down quickly we may already have
+        # met requirements
+        if len(pods) >= target_size:
+            return pods
 
         async def _():
             for i in range(3):
