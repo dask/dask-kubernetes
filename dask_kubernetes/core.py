@@ -671,7 +671,6 @@ f
         del self.core_api
         return self.cluster.close(**kwargs)
 
-
     def close(self, **kwargs):
         """ Close this cluster """
         return self.sync(self._close, **kwargs)
@@ -701,6 +700,7 @@ def _cleanup_pods_sync(namespace, labels):
             if e.status != 404:
                 raise
     del api
+
 
 def format_labels(labels):
     """ Convert a dictionary of labels into a comma separated string """

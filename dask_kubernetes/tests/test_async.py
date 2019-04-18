@@ -45,7 +45,6 @@ async def api():
     del v1
 
 
-
 @pytest.fixture
 async def cleanup_namespaces(api):
     """ We only use this for the side effects """
