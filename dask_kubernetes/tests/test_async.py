@@ -75,12 +75,14 @@ cluster_kwargs = {"asynchronous": True, "diagnostics_port": None}
 async def cluster(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         yield cluster
+        del cluster
 
 
 @pytest.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
+        del client
 
 
 @pytest.mark.asyncio
@@ -781,3 +783,7 @@ async def test_start_with_workers(pod_spec, ns):
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler.workers) != 2:
                 await gen.sleep(0.1)
+
+            assert len(cluster.scheduler.workers) == 2
+            cluster.scale(0)
+            await gen.sleep(0.2)
