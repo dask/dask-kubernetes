@@ -49,7 +49,8 @@ async def api():
 async def cleanup_namespaces(api):
     """ We only use this for the side effects """
     for ns in (await api.list_namespace()).items:
-        if "test-dask-kubernets" in ns.metadata.name:
+        print(ns)
+        if "test-dask" in ns.metadata.name:
             await api.delete_namespace(
                 ns.metadata.name, kubernetes.client.V1DeleteOptions()
             )
@@ -407,7 +408,7 @@ async def test_constructor_parameters(pod_spec, ns):
 
 
 @pytest.mark.asyncio
-async def test_reject_evicted_workers(cluster):
+async def test_reject_evicted_workers(cluster, cleanup_namespaces):
     cluster.scale(1)
 
     start = time()

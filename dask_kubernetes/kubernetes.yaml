@@ -1,5 +1,5 @@
 kubernetes:
-  name: "dask-{user}-{uuid}"
+  name: "test-dask-{user}-{uuid}"
   namespace: null
   count:
     start: 0
