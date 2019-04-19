@@ -49,8 +49,7 @@ async def api():
 async def cleanup_namespaces(api):
     """ We only use this for the side effects """
     for ns in (await api.list_namespace()).items:
-        print(ns)
-        if "test-dask" in ns.metadata.name:
+        if "test-dask-kubernets" in ns.metadata.name:
             await api.delete_namespace(
                 ns.metadata.name, kubernetes.client.V1DeleteOptions()
             )
@@ -76,14 +75,12 @@ cluster_kwargs = {"asynchronous": True, "diagnostics_port": None}
 async def cluster(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         yield cluster
-        del cluster
 
 
 @pytest.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
-        del client
 
 
 @pytest.mark.asyncio
@@ -408,7 +405,7 @@ async def test_constructor_parameters(pod_spec, ns):
 
 
 @pytest.mark.asyncio
-async def test_reject_evicted_workers(cluster, cleanup_namespaces):
+async def test_reject_evicted_workers(cluster):
     cluster.scale(1)
 
     start = time()
@@ -544,8 +541,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
     running_workers = list(cluster.scheduler.workers.keys())
     print(running_workers)
-    for w in running_workers:
-        print(cluster.scheduler.workers[w].name)
+    print(cluster.scheduler.workers[running_workers[0]].name)
     assert len(running_workers) >= 2
 
     # Put some data on those workers to make them important to keep as long
@@ -785,7 +781,3 @@ async def test_start_with_workers(pod_spec, ns):
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler.workers) != 2:
                 await gen.sleep(0.1)
-
-            assert len(cluster.scheduler.workers) == 2
-            cluster.scale(0)
-            await gen.sleep(0.2)
