@@ -12,7 +12,7 @@ dependencies:
   - python=3.6
   - pyyaml
   - pip:
-    - kubernetes==6
+    - kubernetes==9
     - kubernetes-asyncio
     - pytest-asyncio
     - git+https://github.com/tornadoweb/tornado@975e9168560cc03f6210d0d3aab10c870bd47080
