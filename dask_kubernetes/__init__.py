@@ -5,4 +5,6 @@ from .objects import make_pod_spec, make_pod_from_dict
 
 __all__ = [KubeCluster]
 
-__version__ = '0.7.0'
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
