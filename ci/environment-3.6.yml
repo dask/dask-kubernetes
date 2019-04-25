@@ -11,4 +11,4 @@ dependencies:
   - python=3.6
   - pyyaml
   - pip:
-    - kubernetes==6
+    - kubernetes==9
