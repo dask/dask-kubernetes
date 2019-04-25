@@ -70,7 +70,7 @@ jobs:
             - "/home/circleci/miniconda"
       - run:
           command: |
-            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/py.test dask_kubernetes --verbose --worker-image daskdev/dask:1.1.1
+            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/py.test dask_kubernetes --verbose --worker-image daskdev/dask:1.2.0
       - run:
           command: |
             /home/circleci/miniconda/envs/dask-kubernetes-test/bin/flake8 dask-kubernetes
