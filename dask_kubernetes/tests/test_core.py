@@ -35,7 +35,7 @@ def ns(api):
     try:
         yield name
     finally:
-        api.delete_namespace(name, kubernetes.client.V1DeleteOptions())
+        api.delete_namespace(name)
 
 
 @pytest.fixture
