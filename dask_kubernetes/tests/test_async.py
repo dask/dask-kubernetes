@@ -447,7 +447,7 @@ async def test_reject_evicted_workers(cluster):
 
 
 @pytest.mark.asyncio
-async def test_scale_up_down(cluster, client):
+async def test_scale_up_down(cluster, client, cleanup_namespaces):
     np = pytest.importorskip("numpy")
     cluster.scale(2)
 
@@ -481,7 +481,7 @@ async def test_scale_up_down(cluster, client):
 
 
 @pytest.mark.asyncio
-async def test_scale_up_down_fast(cluster, client):
+async def test_scale_up_down_fast(cluster, client, cleanup_namespaces):
     cluster.scale(1)
 
     start = time()
@@ -515,6 +515,14 @@ async def test_scale_up_down_fast(cluster, client):
     # still be fetched back.
     assert worker in cluster.scheduler.tasks[future.key].who_has
     assert len(await future) == int(1e6)
+
+    # Terminate everything
+    cluster.scale(0)
+
+    start = time()
+    while len(cluster.scheduler.workers) > 0:
+        await gen.sleep(0.1)
+        assert time() < start + 60
 
 
 @pytest.mark.asyncio

@@ -508,7 +508,7 @@ f
             self._sync_tasks()
 
     def _sync_tasks(self):
-        """Internal function to synchronously execut all queued task.
+        """Internal function to synchronously execute all queued task.
         Used in synchronous scale functions.
         """
         if not self.asynchronous:
