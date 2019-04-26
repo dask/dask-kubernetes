@@ -66,7 +66,7 @@ class KubeCluster(Cluster):
 
     Parameters
     ----------
-    pod_template: kubernetes_asyncio.client.V1PodSpec
+    pod_template: kubernetes.client.V1PodSpec
         A Kubernetes specification for a Pod for a dask worker.
     name: str (optional)
         Name given to the pods.  Defaults to ``dask-$USER-random``
@@ -569,7 +569,6 @@ f
                 await self.core_api.delete_namespaced_pod(
                     pod.metadata.name,
                     self.namespace,
-                    kubernetes.client.V1DeleteOptions(),
                 )
                 pod_info = pod.metadata.name
                 if pod.status.reason:
@@ -740,7 +739,6 @@ def _cleanup_pods_sync(namespace, labels):
             api.delete_namespaced_pod(
                 name=pod.metadata.name,
                 namespace=namespace,
-                body=kubernetes.client.V1DeleteOptions(),
             )
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:

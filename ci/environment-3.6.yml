@@ -6,7 +6,6 @@ dependencies:
   - flake8
   - ipywidgets
   - dask=1.2.0
-  - distributed=1.27.0
   - tornado=6
   - nomkl
   - pytest=4.2.0
