@@ -542,8 +542,6 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     assert len(pending_pods) >= extra_pods
 
     running_workers = list(cluster.scheduler.workers.keys())
-    print(running_workers)
-    print(cluster.scheduler.workers[running_workers[0]].name)
     assert len(running_workers) >= 2
 
     # Put some data on those workers to make them important to keep as long

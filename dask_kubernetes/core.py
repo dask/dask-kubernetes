@@ -532,7 +532,10 @@ f
         running_names = [
             v.name for w, v in self.scheduler.workers.items() if v.has_what
         ]
-
+        running_things = [
+            (w, v.name) for w, v in self.scheduler.workers.items() if v.has_what
+        ]
+        print(running_things)
         # Dask is Fast! A worker can register with the scheduler before k8s
         # moves the pod from `PENDING` to `RUNNING` below we remove
         # any workers in a `PENDING` state which have non-zero
