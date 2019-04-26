@@ -65,7 +65,7 @@ async def ns(api):
     try:
         yield name
     finally:
-        await api.delete_namespace(name, kubernetes.client.V1DeleteOptions())
+        await api.delete_namespace(name=name, body=kubernetes.client.V1DeleteOptions())
 
 
 cluster_kwargs = {"asynchronous": True, "diagnostics_port": None}
@@ -75,12 +75,14 @@ cluster_kwargs = {"asynchronous": True, "diagnostics_port": None}
 async def cluster(pod_spec, ns):
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         yield cluster
+        del cluster
 
 
 @pytest.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
+        del client
 
 
 @pytest.mark.asyncio
