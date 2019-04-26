@@ -571,6 +571,17 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
         await gen.sleep(0.1)
         pod_statuses = [p.status.phase for p in await cluster.pods()]
 
+    # wait a bit for pods to be in running state
+    # k8s sometimes needs a little bit of time
+    while not all([p == 'Running' for p in pod_statuses]):
+        if time() - start > 60:
+            raise AssertionError(
+                "Expected %d running pods but got %r"
+                % (len(running_workers), pod_statuses)
+            )
+        await gen.sleep(0.1)
+        pod_statuses = [p.status.phase for p in await cluster.pods()]
+
     assert pod_statuses == ["Running"] * len(running_workers)
     print(running_workers)
     print(list(cluster.scheduler.workers.keys()))
