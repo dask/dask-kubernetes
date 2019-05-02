@@ -452,7 +452,6 @@ class KubeCluster(Cluster):
         else:
             raise last_exception
 
-        return
         # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers, pods=None):
