@@ -134,22 +134,6 @@ def make_pod_spec(
                     env=[client.V1EnvVar(name=k, value=v)
                             for k, v in env.items()],
                 )
-            ],
-            tolerations=[
-                client.V1Toleration(
-                    key='k8s.dask.org/dedicated',
-                    operator='Equal',
-                    value='worker',
-                    effect='NoSchedule',
-                ),
-                # GKE currently does not permit creating taints on a node pool
-                # with a `/` in the key field
-                client.V1Toleration(
-                    key='k8s.dask.org_dedicated',
-                    operator='Equal',
-                    value='worker',
-                    effect='NoSchedule',
-                ),
             ]
         )
     )
@@ -221,5 +205,28 @@ def clean_pod_template(pod_template):
 
     if pod_template.spec.containers[0].env is None:
         pod_template.spec.containers[0].env = []
+
+    # add default tolerations
+    tolerations = [
+        client.V1Toleration(
+            key='k8s.dask.org/dedicated',
+            operator='Equal',
+            value='worker',
+            effect='NoSchedule',
+        ),
+        # GKE currently does not permit creating taints on a node pool
+        # with a `/` in the key field
+        client.V1Toleration(
+            key='k8s.dask.org_dedicated',
+            operator='Equal',
+            value='worker',
+            effect='NoSchedule',
+        ),
+    ]
+
+    if pod_template.spec.tolerations is None:
+        pod_template.spec.tolerations = tolerations
+    else:
+        pod_template.spec.tolerations.extend(tolerations)
 
     return pod_template

@@ -8,6 +8,7 @@ import yaml
 import dask
 import pytest
 from dask_kubernetes import KubeCluster, make_pod_spec, ClusterAuth, KubeConfig, KubeAuth
+from dask_kubernetes.objects import clean_pod_template
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
@@ -44,6 +45,10 @@ def pod_spec(image_name):
         image=image_name,
         extra_container_config={'imagePullPolicy': 'IfNotPresent'}
     )
+
+@pytest.fixture
+def clean_pod_spec(pod_spec):
+    yield clean_pod_template(pod_spec)
 
 
 @pytest.fixture
@@ -567,8 +572,8 @@ def test_maximum(cluster):
         assert "scale beyond maximum number of workers" in result.lower()
 
 
-def test_default_toleration(pod_spec):
-    tolerations = pod_spec.to_dict()['spec']['tolerations']
+def test_default_toleration(clean_pod_spec):
+    tolerations = clean_pod_spec.to_dict()['spec']['tolerations']
     assert {
         'key': 'k8s.dask.org/dedicated',
         'operator': 'Equal',
@@ -598,18 +603,21 @@ def test_default_toleration_preserved(image_name):
             ],
         }
     )
-    tolerations = pod_spec.to_dict()['spec']['tolerations']
+    cluster = KubeCluster(pod_spec)
+    tolerations = cluster.pod_template.to_dict()['spec']['tolerations']
     assert {
         'key': 'k8s.dask.org/dedicated',
         'operator': 'Equal',
         'value': 'worker',
         'effect': 'NoSchedule',
+        'toleration_seconds': None
     } in tolerations
     assert {
         'key': 'k8s.dask.org_dedicated',
         'operator': 'Equal',
         'value': 'worker',
         'effect': 'NoSchedule',
+        'toleration_seconds': None
     } in tolerations
     assert {
         'key': 'example.org/toleration',
