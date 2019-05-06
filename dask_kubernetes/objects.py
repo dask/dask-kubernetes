@@ -230,7 +230,7 @@ def clean_pod_template(pod_template):
         pod_template.spec.tolerations.extend(tolerations)
 
     affinity = client.V1PreferredSchedulingTerm(
-        weight=1,
+        weight=100,
         preference=client.V1NodeSelectorTerm(
             match_expressions=[
                 client.V1NodeSelectorRequirement(
