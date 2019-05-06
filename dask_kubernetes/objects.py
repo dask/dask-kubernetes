@@ -229,4 +229,22 @@ def clean_pod_template(pod_template):
     else:
         pod_template.spec.tolerations.extend(tolerations)
 
+    pod_template.spec.affinity = client.V1Affinity(
+        pod_affinity=client.V1PodAntiAffinity(
+            preferred_during_scheduling_ignored_during_execution=[
+                client.V1WeightedPodAffinityTerm(
+                    weight=1,
+                    pod_affinity_term=client.V1PodAffinityTerm(
+                        topology_key="k8s.dask.org/node-purpose",
+                        label_selector=client.V1LabelSelector(
+                            match_labels=dict(
+                                component='worker'
+                            )
+                        )
+                    )
+                )
+            ]
+        )
+    )
+
     return pod_template
