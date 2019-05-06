@@ -229,25 +229,26 @@ def clean_pod_template(pod_template):
     else:
         pod_template.spec.tolerations.extend(tolerations)
 
-    affinity = client.V1WeightedPodAffinityTerm(
+    affinity = client.V1PreferredSchedulingTerm(
         weight=1,
-        pod_affinity_term=client.V1PodAffinityTerm(
-            topology_key="k8s.dask.org/node-purpose",
-            label_selector=client.V1LabelSelector(
-                match_labels=dict(
-                    component='worker'
+        preference=client.V1NodeSelectorTerm(
+            match_expressions=[
+                client.V1NodeSelectorRequirement(
+                    key='k8s.dask.org/node-purpose',
+                    operator='In',
+                    values=['worker']
                 )
-            )
+            ]
         )
     )
-
+    
     if pod_template.spec.affinity is None:
         pod_template.spec.affinity = client.V1Affinity(
-            pod_affinity=client.V1PodAntiAffinity(
-                preferred_during_scheduling_ignored_during_execution=[affinity]
+                node_affinity=client.V1PodAntiAffinity(
+                    preferred_during_scheduling_ignored_during_execution=[affinity]
+                )
             )
-        )
     else:
-        pod_template.spec.affinity.pod_affinity.preferred_during_scheduling_ignored_during_execution.append(affinity)
+        print('TODO: need to handle the various partial states here')
 
     return pod_template
