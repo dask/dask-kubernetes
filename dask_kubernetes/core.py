@@ -358,7 +358,7 @@ class KubeCluster(Cluster):
         """
         pods = self._cleanup_terminated_pods(self.pods())
         if n >= len(pods):
-            return self.scale_up(n, pods=pods)
+            return
         else:
             n_to_delete = len(pods) - n
             # Before trying to close running workers, check if we can cancel
@@ -452,6 +452,7 @@ class KubeCluster(Cluster):
         else:
             raise last_exception
 
+        return
         # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers, pods=None):
