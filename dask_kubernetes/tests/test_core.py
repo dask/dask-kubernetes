@@ -628,20 +628,15 @@ def test_default_toleration_preserved(image_name):
 
 def test_default_affinity(clean_pod_spec):
     affinity = clean_pod_spec.to_dict()['spec']['affinity']
+
     assert {
-        'preferred_during_scheduling_ignored_during_execution': [{
-            'preference': {
-                'match_expressions': [{
-                    'key': 'k8s.dask.org/node-purpose',
-                    'operator': 'In',
-                    'values': ['worker']
-                }],
-                'match_fields': None
-            },
-            'weight': 100
-        }],
-        'required_during_scheduling_ignored_during_execution': None
-    } in affinity['node_affinity']
+        'key': 'k8s.dask.org/node-purpose',
+        'operator': 'In',
+        'values': ['worker']
+    } in affinity['node_affinity']['preferred_during_scheduling_ignored_during_execution'][0]['preference']['match_expressions']
+    assert affinity['node_affinity']['preferred_during_scheduling_ignored_during_execution'][0]['weight'] == 100
+    assert affinity['node_affinity']['required_during_scheduling_ignored_during_execution'] is None
+    assert affinity['pod_affinity'] is None
 
 
 def test_auth_missing(pod_spec, ns, loop):
