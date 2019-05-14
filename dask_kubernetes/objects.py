@@ -180,7 +180,7 @@ def make_pod_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template):
+def clean_pod_template(pod_template, match_node_purpose='prefer'):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
         msg = ('Expected a kubernetes.client.V1Pod object, got %s'
@@ -229,26 +229,56 @@ def clean_pod_template(pod_template):
     else:
         pod_template.spec.tolerations.extend(tolerations)
 
-    affinity = client.V1PreferredSchedulingTerm(
-        weight=100,
-        preference=client.V1NodeSelectorTerm(
+    # add default node affinity to k8s.dask.org/node-purpose=worker
+    if match_node_purpose is not "ignore":
+        # for readability
+        affinity = pod_template.spec.affinity
+
+        if affinity is None:
+            affinity = client.V1Affinity()
+        if affinity.node_affinity is None:
+            affinity.node_affinity = client.V1NodeAffinity()
+
+        # a common object for both a preferred and a required node affinity
+        node_selector_term = client.V1NodeSelectorTerm(
             match_expressions=[
                 client.V1NodeSelectorRequirement(
-                    key='k8s.dask.org/node-purpose',
-                    operator='In',
-                    values=['worker']
+                    key="k8s.dask.org/node-purpose", operator="In", values=["worker"]
                 )
             ]
         )
-    )
-    
-    if pod_template.spec.affinity is None:
-        pod_template.spec.affinity = client.V1Affinity(
-                node_affinity=client.V1PodAntiAffinity(
-                    preferred_during_scheduling_ignored_during_execution=[affinity]
+
+        if match_node_purpose == "require":
+            if (
+                affinity.node_affinity.required_during_scheduling_ignored_during_execution
+                is None
+            ):
+                affinity.node_affinity.required_during_scheduling_ignored_during_execution = client.V1NodeSelector(
+                    node_selector_terms=[]
                 )
+            affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms.append(
+                node_selector_term
             )
-    else:
-        print('TODO: need to handle the various partial states here')
+        elif match_node_purpose == "prefer":
+            if (
+                affinity.node_affinity.preferred_during_scheduling_ignored_during_execution
+                is None
+            ):
+                affinity.node_affinity.preferred_during_scheduling_ignored_during_execution = (
+                    []
+                )
+            preferred_scheduling_terms = [
+                client.V1PreferredSchedulingTerm(
+                    preference=node_selector_term, weight=100
+                )
+            ]
+            affinity.node_affinity.preferred_during_scheduling_ignored_during_execution.extend(
+                preferred_scheduling_terms
+            )
+        else:
+            raise ValueError(
+                'Attribute must be one of "ignore", "prefer", or "require".'
+            )
+        pod_template.spec.affinity = affinity
 
     return pod_template
