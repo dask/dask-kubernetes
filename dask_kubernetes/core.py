@@ -86,7 +86,7 @@ class KubeCluster(Cluster):
     ...                          cpu_limit=1, cpu_request=1,
     ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
     >>> cluster = KubeCluster(pod_spec)
-    >>> cluster.scale_up(10)
+    >>> cluster.scale(10)
 
     You can also create clusters with worker pod specifications as dictionaries
     or stored in YAML files
@@ -358,7 +358,8 @@ class KubeCluster(Cluster):
         """
         pods = self._cleanup_terminated_pods(self.pods())
         if n >= len(pods):
-            return self.scale_up(n, pods=pods)
+            self.scale_up(n, pods=pods)
+            return
         else:
             n_to_delete = len(pods) - n
             # Before trying to close running workers, check if we can cancel
@@ -451,9 +452,6 @@ class KubeCluster(Cluster):
                     raise
         else:
             raise last_exception
-
-        return new_pods
-        # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers, pods=None):
         """ Remove the pods for the requested list of workers
