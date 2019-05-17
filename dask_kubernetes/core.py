@@ -21,6 +21,7 @@ from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
 from .auth import ClusterAuth
+from .logs import Log, Logs
 
 logger = logging.getLogger(__name__)
 
@@ -334,10 +335,10 @@ class KubeCluster(Cluster):
         Client.get_worker_logs
         """
         if pod is None:
-            return {pod.status.pod_ip: self.logs(pod) for pod in self.pods()}
+            return Logs({pod.status.pod_ip: self.logs(pod) for pod in self.pods()})
 
-        return self.core_api.read_namespaced_pod_log(pod.metadata.name,
-                                                     pod.metadata.namespace)
+        return Log(self.core_api.read_namespaced_pod_log(pod.metadata.name,
+                                                         pod.metadata.namespace))
 
     def scale(self, n):
         """ Scale cluster to n workers
