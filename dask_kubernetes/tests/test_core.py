@@ -626,6 +626,19 @@ def test_default_toleration_preserved(image_name):
     } in tolerations
 
 
+def test_default_affinity(clean_pod_spec):
+    affinity = clean_pod_spec.to_dict()['spec']['affinity']
+
+    assert {
+        'key': 'k8s.dask.org/node-purpose',
+        'operator': 'In',
+        'values': ['worker']
+    } in affinity['node_affinity']['preferred_during_scheduling_ignored_during_execution'][0]['preference']['match_expressions']
+    assert affinity['node_affinity']['preferred_during_scheduling_ignored_during_execution'][0]['weight'] == 100
+    assert affinity['node_affinity']['required_during_scheduling_ignored_during_execution'] is None
+    assert affinity['pod_affinity'] is None
+
+
 def test_auth_missing(pod_spec, ns, loop):
     with pytest.raises(kubernetes.config.ConfigException) as info:
         KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)
