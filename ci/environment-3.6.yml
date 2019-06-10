@@ -8,6 +8,7 @@ dependencies:
   - distributed=1.23.3
   - nomkl
   - pytest
+  - black
   - python=3.6
   - pyyaml
   - pip:
