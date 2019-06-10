@@ -24,6 +24,7 @@ from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
 from .auth import ClusterAuth
+from .logs import Log, Logs
 
 logger = logging.getLogger(__name__)
 
@@ -400,11 +401,13 @@ class KubeCluster(Cluster):
                 if pod.status.phase != "Pending"
             }
             assert None not in result
+            result = Logs(result)
             return result
 
-        return await self.core_api.read_namespaced_pod_log(
+        result = await self.core_api.read_namespaced_pod_log(
             pod.metadata.name, pod.metadata.namespace
         )
+        return Log(result)
 
     def logs(self, pod=None):
         """ Logs from a worker pod
@@ -445,7 +448,8 @@ class KubeCluster(Cluster):
         """
         pods = await self._cleanup_terminated_pods(await self.pods())
         if n >= len(pods):
-            return await self._scale_up(n, pods=pods)
+            await self._scale_up(n, pods=pods)
+            return
         else:
             n_to_delete = len(pods) - n
             # Before trying to close running workers, check if we can cancel
@@ -545,9 +549,6 @@ class KubeCluster(Cluster):
                     raise
         else:
             raise last_exception
-
-        return new_pods
-        # fixme: wait for this to be ready before returning!
 
     def scale_down(self, workers, pods=None):
         """ Remove the pods for the requested list of workers

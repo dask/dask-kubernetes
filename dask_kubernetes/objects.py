@@ -137,24 +137,8 @@ def make_pod_spec(
                     args=args,
                     env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],
                 )
-            ],
-            tolerations=[
-                client.V1Toleration(
-                    key="k8s.dask.org/dedicated",
-                    operator="Equal",
-                    value="worker",
-                    effect="NoSchedule",
-                ),
-                # GKE currently does not permit creating taints on a node pool
-                # with a `/` in the key field
-                client.V1Toleration(
-                    key="k8s.dask.org_dedicated",
-                    operator="Equal",
-                    value="worker",
-                    effect="NoSchedule",
-                ),
-            ],
-        ),
+            ]
+        )
     )
 
     resources = client.V1ResourceRequirements(limits={}, requests={})
@@ -190,7 +174,7 @@ def make_pod_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template):
+def clean_pod_template(pod_template, match_node_purpose='prefer'):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
         msg = (
@@ -219,5 +203,80 @@ def clean_pod_template(pod_template):
 
     if pod_template.spec.containers[0].env is None:
         pod_template.spec.containers[0].env = []
+
+    # add default tolerations
+    tolerations = [
+        client.V1Toleration(
+            key='k8s.dask.org/dedicated',
+            operator='Equal',
+            value='worker',
+            effect='NoSchedule',
+        ),
+        # GKE currently does not permit creating taints on a node pool
+        # with a `/` in the key field
+        client.V1Toleration(
+            key='k8s.dask.org_dedicated',
+            operator='Equal',
+            value='worker',
+            effect='NoSchedule',
+        ),
+    ]
+
+    if pod_template.spec.tolerations is None:
+        pod_template.spec.tolerations = tolerations
+    else:
+        pod_template.spec.tolerations.extend(tolerations)
+
+    # add default node affinity to k8s.dask.org/node-purpose=worker
+    if match_node_purpose is not "ignore":
+        # for readability
+        affinity = pod_template.spec.affinity
+
+        if affinity is None:
+            affinity = client.V1Affinity()
+        if affinity.node_affinity is None:
+            affinity.node_affinity = client.V1NodeAffinity()
+
+        # a common object for both a preferred and a required node affinity
+        node_selector_term = client.V1NodeSelectorTerm(
+            match_expressions=[
+                client.V1NodeSelectorRequirement(
+                    key="k8s.dask.org/node-purpose", operator="In", values=["worker"]
+                )
+            ]
+        )
+
+        if match_node_purpose == "require":
+            if (
+                affinity.node_affinity.required_during_scheduling_ignored_during_execution
+                is None
+            ):
+                affinity.node_affinity.required_during_scheduling_ignored_during_execution = client.V1NodeSelector(
+                    node_selector_terms=[]
+                )
+            affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms.append(
+                node_selector_term
+            )
+        elif match_node_purpose == "prefer":
+            if (
+                affinity.node_affinity.preferred_during_scheduling_ignored_during_execution
+                is None
+            ):
+                affinity.node_affinity.preferred_during_scheduling_ignored_during_execution = (
+                    []
+                )
+            preferred_scheduling_terms = [
+                client.V1PreferredSchedulingTerm(
+                    preference=node_selector_term, weight=100
+                )
+            ]
+            affinity.node_affinity.preferred_during_scheduling_ignored_during_execution.extend(
+                preferred_scheduling_terms
+            )
+        else:
+            raise ValueError(
+                'Attribute must be one of "ignore", "prefer", or "require".'
+            )
+        pod_template.spec.affinity = affinity
 
     return pod_template
