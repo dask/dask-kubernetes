@@ -142,33 +142,41 @@ class KubeCluster(Cluster):
     KubeCluster.from_dict
     KubeCluster.adapt
     """
-    def __init__(
-            self,
-            pod_template=None,
-            name=None,
-            namespace=None,
-            n_workers=None,
-            host=None,
-            port=None,
-            env=None,
-            auth=ClusterAuth.DEFAULT,
-            **kwargs
-    ):
-        name = name or dask.config.get('kubernetes.name')
-        namespace = namespace or dask.config.get('kubernetes.namespace')
-        n_workers = n_workers if n_workers is not None else dask.config.get('kubernetes.count.start')
-        host = host or dask.config.get('kubernetes.host')
-        port = port if port is not None else dask.config.get('kubernetes.port')
-        env = env if env is not None else dask.config.get('kubernetes.env')
 
-        if not pod_template and dask.config.get('kubernetes.worker-template', None):
-            d = dask.config.get('kubernetes.worker-template')
+    def __init__(
+        self,
+        pod_template=None,
+        name=None,
+        namespace=None,
+        n_workers=None,
+        host=None,
+        port=None,
+        env=None,
+        auth=ClusterAuth.DEFAULT,
+        **kwargs
+    ):
+        name = name or dask.config.get("kubernetes.name")
+        namespace = namespace or dask.config.get("kubernetes.namespace")
+        n_workers = (
+            n_workers
+            if n_workers is not None
+            else dask.config.get("kubernetes.count.start")
+        )
+        host = host or dask.config.get("kubernetes.host")
+        port = port if port is not None else dask.config.get("kubernetes.port")
+        env = env if env is not None else dask.config.get("kubernetes.env")
+
+        if not pod_template and dask.config.get("kubernetes.worker-template", None):
+            d = dask.config.get("kubernetes.worker-template")
             d = dask.config.expand_environment_variables(d)
             pod_template = make_pod_from_dict(d)
 
-        if not pod_template and dask.config.get('kubernetes.worker-template-path', None):
+        if not pod_template and dask.config.get(
+            "kubernetes.worker-template-path", None
+        ):
             import yaml
-            fn = dask.config.get('kubernetes.worker-template-path')
+
+            fn = dask.config.get("kubernetes.worker-template-path")
             fn = fn.format(**os.environ)
             with open(fn) as f:
                 d = yaml.safe_load(f)
@@ -176,13 +184,15 @@ class KubeCluster(Cluster):
             pod_template = make_pod_from_dict(d)
 
         if not pod_template:
-            msg = ("Worker pod specification not provided. See KubeCluster "
-                   "docstring for ways to specify workers")
+            msg = (
+                "Worker pod specification not provided. See KubeCluster "
+                "docstring for ways to specify workers"
+            )
             raise ValueError(msg)
 
-        self.cluster = LocalCluster(ip=host or socket.gethostname(),
-                                    scheduler_port=port,
-                                    n_workers=0, **kwargs)
+        self.cluster = LocalCluster(
+            ip=host or socket.gethostname(), scheduler_port=port, n_workers=0, **kwargs
+        )
 
         ClusterAuth.load_first(auth)
 
@@ -191,28 +201,31 @@ class KubeCluster(Cluster):
         if namespace is None:
             namespace = _namespace_default()
 
-        name = name.format(user=getpass.getuser(),
-                           uuid=str(uuid.uuid4())[:10],
-                           **os.environ)
+        name = name.format(
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+        )
         name = escape(name)
 
         self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
-        self.pod_template.metadata.labels['dask.org/cluster-name'] = name
-        self.pod_template.metadata.labels['user'] = escape(getpass.getuser())
-        self.pod_template.metadata.labels['app'] = 'dask'
-        self.pod_template.metadata.labels['component'] = 'dask-worker'
+        self.pod_template.metadata.labels["dask.org/cluster-name"] = name
+        self.pod_template.metadata.labels["user"] = escape(getpass.getuser())
+        self.pod_template.metadata.labels["app"] = "dask"
+        self.pod_template.metadata.labels["component"] = "dask-worker"
         self.pod_template.metadata.namespace = namespace
 
         self.pod_template.spec.containers[0].env.append(
-            kubernetes.client.V1EnvVar(name='DASK_SCHEDULER_ADDRESS',
-                                       value=self.scheduler_address)
+            kubernetes.client.V1EnvVar(
+                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
+            )
         )
         if env:
-            self.pod_template.spec.containers[0].env.extend([
-                kubernetes.client.V1EnvVar(name=k, value=str(v))
-                for k, v in env.items()
-            ])
+            self.pod_template.spec.containers[0].env.extend(
+                [
+                    kubernetes.client.V1EnvVar(name=k, value=str(v))
+                    for k, v in env.items()
+                ]
+            )
         self.pod_template.metadata.generate_name = name
 
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
@@ -278,7 +291,9 @@ class KubeCluster(Cluster):
         KubeCluster.from_dict
         """
         if not yaml:
-            raise ImportError("PyYaml is required to use yaml functionality, please install it!")
+            raise ImportError(
+                "PyYaml is required to use yaml functionality, please install it!"
+            )
         with open(yaml_path) as f:
             d = yaml.safe_load(f)
             d = dask.config.expand_environment_variables(d)
@@ -293,8 +308,10 @@ class KubeCluster(Cluster):
         return self.pod_template.metadata.generate_name
 
     def __repr__(self):
-        return 'KubeCluster("%s", workers=%d)' % (self.scheduler.address,
-                                                  len(self.pods()))
+        return 'KubeCluster("%s", workers=%d)' % (
+            self.scheduler.address,
+            len(self.pods()),
+        )
 
     @property
     def scheduler(self):
@@ -313,7 +330,7 @@ class KubeCluster(Cluster):
         """
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.pod_template.metadata.labels)
+            label_selector=format_labels(self.pod_template.metadata.labels),
         ).items
 
     def logs(self, pod=None):
@@ -337,8 +354,11 @@ class KubeCluster(Cluster):
         if pod is None:
             return Logs({pod.status.pod_ip: self.logs(pod) for pod in self.pods()})
 
-        return Log(self.core_api.read_namespaced_pod_log(pod.metadata.name,
-                                                         pod.metadata.namespace))
+        return Log(
+            self.core_api.read_namespaced_pod_log(
+                pod.metadata.name, pod.metadata.namespace
+            )
+        )
 
     def scale(self, n):
         """ Scale cluster to n workers
@@ -367,10 +387,8 @@ class KubeCluster(Cluster):
             # pending pods (in case the kubernetes cluster was too full to
             # provision those pods in the first place).
             running_workers = list(self.scheduler.workers.keys())
-            running_ips = set(urlparse(worker).hostname
-                              for worker in running_workers)
-            pending_pods = [p for p in pods
-                            if p.status.pod_ip not in running_ips]
+            running_ips = set(urlparse(worker).hostname for worker in running_workers)
+            pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
             if pending_pods:
                 pending_to_delete = pending_pods[:n_to_delete]
                 logger.debug("Deleting pending pods: %s", pending_to_delete)
@@ -387,7 +405,8 @@ class KubeCluster(Cluster):
                 @gen.coroutine
                 def f(to_close):
                     yield self.scheduler.retire_workers(
-                        workers=to_close, remove=True, close_workers=True)
+                        workers=to_close, remove=True, close_workers=True
+                    )
                     yield offload(self.scale_down, to_close)
 
                 self.scheduler.loop.add_callback(f, to_close)
@@ -399,23 +418,20 @@ class KubeCluster(Cluster):
     def _delete_pods(self, to_delete):
         for pod in to_delete:
             try:
-                self.core_api.delete_namespaced_pod(
-                    pod.metadata.name,
-                    self.namespace
-                )
+                self.core_api.delete_namespaced_pod(pod.metadata.name, self.namespace)
                 pod_info = pod.metadata.name
                 if pod.status.reason:
-                    pod_info += ' [{}]'.format(pod.status.reason)
+                    pod_info += " [{}]".format(pod.status.reason)
                 if pod.status.message:
-                    pod_info += ' {}'.format(pod.status.message)
-                logger.info('Deleted pod: %s', pod_info)
+                    pod_info += " {}".format(pod.status.message)
+                logger.info("Deleted pod: %s", pod_info)
             except kubernetes.client.rest.ApiException as e:
                 # If a pod has already been removed, just ignore the error
                 if e.status != 404:
                     raise
 
     def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {'Succeeded', 'Failed'}
+        terminated_phases = {"Succeeded", "Failed"}
         terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         self._delete_pods(terminated_pods)
         return [p for p in pods if p.status.phase not in terminated_phases]
@@ -428,10 +444,11 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.scale_up(20)  # ask for twenty workers
         """
-        maximum = dask.config.get('kubernetes.count.max')
+        maximum = dask.config.get("kubernetes.count.max")
         if maximum is not None and maximum < n:
-            logger.info("Tried to scale beyond maximum number of workers %d > %d",
-                        n, maximum)
+            logger.info(
+                "Tried to scale beyond maximum number of workers %d > %d", n, maximum
+            )
             n = maximum
         pods = pods or self._cleanup_terminated_pods(self.pods())
         to_create = n - len(pods)
@@ -439,12 +456,15 @@ class KubeCluster(Cluster):
         for i in range(3):
             try:
                 for _ in range(to_create):
-                    new_pods.append(self.core_api.create_namespaced_pod(
-                        self.namespace, self.pod_template))
+                    new_pods.append(
+                        self.core_api.create_namespaced_pod(
+                            self.namespace, self.pod_template
+                        )
+                    )
                     to_create -= 1
                 break
             except kubernetes.client.rest.ApiException as e:
-                if e.status == 500 and 'ServerTimeout' in e.body:
+                if e.status == 500 and "ServerTimeout" in e.body:
                     logger.info("Server timeout, retry #%d", i + 1)
                     time.sleep(1)
                     last_exception = e
@@ -503,7 +523,7 @@ def _cleanup_pods(namespace, labels):
     for pod in pods.items:
         try:
             api.delete_namespaced_pod(pod.metadata.name, namespace)
-            logger.info('Deleted pod: %s', pod.metadata.name)
+            logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
             if e.status != 404:
@@ -513,9 +533,9 @@ def _cleanup_pods(namespace, labels):
 def format_labels(labels):
     """ Convert a dictionary of labels into a comma separated string """
     if labels:
-        return ','.join(['{}={}'.format(k, v) for k, v in labels.items()])
+        return ",".join(["{}={}".format(k, v) for k, v in labels.items()])
     else:
-        return ''
+        return ""
 
 
 def _namespace_default():
@@ -527,18 +547,18 @@ def _namespace_default():
 
     Taken from https://github.com/jupyterhub/kubespawner/blob/master/kubespawner/spawner.py#L125
     """
-    ns_path = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'
+    ns_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
     if os.path.exists(ns_path):
         with open(ns_path) as f:
             return f.read().strip()
-    return 'default'
+    return "default"
 
 
 def select_workers_to_close(scheduler, n_to_close):
     """ Select n workers to close from scheduler """
     workers = list(scheduler.workers.values())
     assert n_to_close <= len(workers)
-    key = lambda ws: ws.metrics['memory']
+    key = lambda ws: ws.metrics["memory"]
     to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
 
     if len(to_close) < n_to_close:
@@ -549,8 +569,8 @@ def select_workers_to_close(scheduler, n_to_close):
     return [ws.address for ws in to_close]
 
 
-valid_characters = string.ascii_letters + string.digits + '_-.'
+valid_characters = string.ascii_letters + string.digits + "_-."
 
 
 def escape(s):
-    return ''.join(c for c in s if c in valid_characters)
+    return "".join(c for c in s if c in valid_characters)

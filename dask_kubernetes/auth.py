@@ -34,7 +34,6 @@ class ClusterAuth(object):
         """
         raise NotImplementedError()
 
-
     @staticmethod
     def load_first(auth=None):
         """
@@ -55,10 +54,14 @@ class ClusterAuth(object):
             auth = [auth]
         elif isinstance(auth, list):
             if not auth:
-                raise kubernetes.config.ConfigException('No authorization methods were provided')
+                raise kubernetes.config.ConfigException(
+                    "No authorization methods were provided"
+                )
         else:
-            msg = ("Invalid authorization method provided. See ClusterAuth "
-                   "docstring for ways to specify authentication methods")
+            msg = (
+                "Invalid authorization method provided. See ClusterAuth "
+                "docstring for ways to specify authentication methods"
+            )
             raise ValueError(msg)
 
         auth_exc = None
@@ -66,7 +69,11 @@ class ClusterAuth(object):
             try:
                 auth_instance.load()
             except kubernetes.config.ConfigException as exc:
-                logger.debug('Failed to load configuration with %s method: %s', auth_instance.__class__, exc)
+                logger.debug(
+                    "Failed to load configuration with %s method: %s",
+                    auth_instance.__class__,
+                    exc,
+                )
                 auth_exc = exc
             else:
                 break
@@ -82,6 +89,7 @@ class InCluster(ClusterAuth):
     This loads the mounted service account token and discovers the Kubernetes
     API via Kubernetes service discovery.
     """
+
     def load(self):
         kubernetes.config.load_incluster_config()
 
@@ -102,14 +110,16 @@ class KubeConfig(ClusterAuth):
         GCP token refresh).  Defaults to ``True``.
 
     """
+
     def __init__(self, config_file=None, context=None, persist_config=True):
         self.config_file = config_file
         self.context = context
         self.persist_config = persist_config
 
     def load(self):
-        kubernetes.config.load_kube_config(self.config_file, self.context,
-                                           None, self.persist_config)
+        kubernetes.config.load_kube_config(
+            self.config_file, self.context, None, self.persist_config
+        )
 
 
 class KubeAuth(ClusterAuth):
@@ -140,6 +150,7 @@ class KubeAuth(ClusterAuth):
     proxy: str (optional)
         URL for a proxy to connect through
     """
+
     def __init__(self, host, **kwargs):
         # We need to create a new configuration in this way, because if we just
         # instantiate a new Configuration object we will get the default
