@@ -1,6 +1,7 @@
 name: dask-kubernetes-test
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - flake8
   - ipywidgets
@@ -8,6 +9,7 @@ dependencies:
   - distributed=1.23.3
   - nomkl
   - pytest
+  - black
   - python=3.6
   - pyyaml
   - pip:
