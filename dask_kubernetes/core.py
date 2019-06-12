@@ -488,8 +488,7 @@ class KubeCluster(Cluster):
         for pod in to_delete:
             try:
                 await self.core_api.delete_namespaced_pod(
-                    pod.metadata.name,
-                    self.namespace,
+                    pod.metadata.name, self.namespace
                 )
                 pod_info = pod.metadata.name
                 if pod.status.reason:
@@ -613,9 +612,7 @@ def _cleanup_pods_sync(namespace, labels):
     pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
-            api.delete_namespaced_pod(
-                pod.metadata.name, namespace,
-            )
+            api.delete_namespaced_pod(pod.metadata.name, namespace)
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed

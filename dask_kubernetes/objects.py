@@ -137,8 +137,8 @@ def make_pod_spec(
                     args=args,
                     env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],
                 )
-            ]
-        )
+            ],
+        ),
     )
 
     resources = client.V1ResourceRequirements(limits={}, requests={})
@@ -174,7 +174,7 @@ def make_pod_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template, match_node_purpose='prefer'):
+def clean_pod_template(pod_template, match_node_purpose="prefer"):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
         msg = (
@@ -207,18 +207,18 @@ def clean_pod_template(pod_template, match_node_purpose='prefer'):
     # add default tolerations
     tolerations = [
         client.V1Toleration(
-            key='k8s.dask.org/dedicated',
-            operator='Equal',
-            value='worker',
-            effect='NoSchedule',
+            key="k8s.dask.org/dedicated",
+            operator="Equal",
+            value="worker",
+            effect="NoSchedule",
         ),
         # GKE currently does not permit creating taints on a node pool
         # with a `/` in the key field
         client.V1Toleration(
-            key='k8s.dask.org_dedicated',
-            operator='Equal',
-            value='worker',
-            effect='NoSchedule',
+            key="k8s.dask.org_dedicated",
+            operator="Equal",
+            value="worker",
+            effect="NoSchedule",
         ),
     ]
 
