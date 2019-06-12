@@ -74,3 +74,4 @@ jobs:
       - run:
           command: |
             /home/circleci/miniconda/envs/dask-kubernetes-test/bin/flake8 dask-kubernetes
+            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/black --check dask_kubernetes setup.py

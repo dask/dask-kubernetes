@@ -8,6 +8,7 @@ dependencies:
   - dask=1.2.0
   - nomkl
   - pytest
+  - black
   - python=3.6
   - pyyaml
   - pip:

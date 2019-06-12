@@ -508,12 +508,12 @@ class KubeCluster(Cluster):
         return [p for p in pods if p.status.phase not in terminated_phases]
 
     def scale_up(self, n, **kwargs):
+        """
+        Use :meth:`KubeCluster.scale` instead
+        """
         self.scheduler.loop.add_callback(self._scale_up, n, **kwargs)
 
     async def _scale_up(self, n, pods=None, **kwargs):
-        """
-        Use the ``.scale`` method instead
-        """
         maximum = dask.config.get("kubernetes.count.max")
         if maximum is not None and maximum < n:
             logger.info(
