@@ -132,6 +132,7 @@ def test_dask_worker_name_env_variable(pod_spec, loop, ns):
 
 def test_diagnostics_link_env_variable(pod_spec, loop, ns):
     pytest.importorskip("bokeh")
+    pytest.importorskip("ipywidgets")
     with dask.config.set({"distributed.dashboard.link": "foo-{USER}-{port}"}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             port = cluster.scheduler.services["bokeh"].port
