@@ -333,6 +333,10 @@ class KubeCluster(Cluster):
             label_selector=format_labels(self.pod_template.metadata.labels),
         ).items
 
+    @property
+    def workers(self):
+        return self.pods()
+
     def logs(self, pod=None):
         """ Logs from a worker pod
 
