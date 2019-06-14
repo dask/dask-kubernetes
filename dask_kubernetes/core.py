@@ -191,7 +191,7 @@ class KubeCluster(Cluster):
             raise ValueError(msg)
 
         self.cluster = LocalCluster(
-            ip=host or socket.gethostname(), scheduler_port=port, n_workers=0, **kwargs
+            host=host or socket.gethostname(), scheduler_port=port, n_workers=0, **kwargs
         )
 
         ClusterAuth.load_first(auth)

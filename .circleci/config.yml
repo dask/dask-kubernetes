@@ -7,7 +7,7 @@ jobs:
       MINIKUBE_WANTUPDATENOTIFICATION: false
       MINIKUBE_WANTREPORTERRORPROMPT: false
       CHANGE_MINIKUBE_NONE_USER: true
-      PYTHON: "3.6"
+      PYTHON: "3.7"
       ENV_NAME: "dask-kubernetes-test"
 
     steps:
@@ -41,7 +41,7 @@ jobs:
             sudo kubectl get deployment
       - restore_cache:
           keys:
-            - miniconda-v1-{{ checksum "ci/environment-3.6.yml" }}
+            - miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
       - run:
           name: install miniconda
           command: |
@@ -65,7 +65,7 @@ jobs:
               conda env list
               conda list ${ENV_NAME}
       - save_cache:
-          key: miniconda-v1-{{ checksum "ci/environment-3.6.yml" }}
+          key: miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
           paths:
             - "/home/circleci/miniconda"
       - run:
