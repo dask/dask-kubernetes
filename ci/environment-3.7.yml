@@ -14,5 +14,3 @@ dependencies:
   - pyyaml
   - pip:
     - kubernetes==9
-    - git+https://github.com/dask/distributed.git
-    - git+https://github.com/dask/dask.git
