@@ -29,5 +29,5 @@ dependencies:
   - zict >=0.1.3
   - pip:
     - kubernetes==9
-    - git+https://github.com/dask/dask --no-deps
-    - git+https://github.com/dask/distributed --no-deps
+    - git+https://github.com/dask/dask
+    - git+https://github.com/dask/distributed
