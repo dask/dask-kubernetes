@@ -69,8 +69,12 @@ jobs:
           paths:
             - "/home/circleci/miniconda"
       - run:
+          name: build docker
           command: |
-            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/py.test dask_kubernetes -s --verbose --worker-image daskdev/dask:0.19.4
+              docker build -t daskdev/dask:dev docker/
+      - run:
+          command: |
+            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/py.test dask_kubernetes -s --verbose --worker-image daskdev/dask:dev
       - run:
           command: |
             /home/circleci/miniconda/envs/dask-kubernetes-test/bin/flake8 dask-kubernetes
