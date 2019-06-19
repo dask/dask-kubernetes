@@ -211,6 +211,15 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.labels["component"] = "dask-worker"
         self.pod_template.metadata.namespace = namespace
 
+        self.cluster = LocalCluster(
+            host=host or socket.gethostname(),
+            scheduler_port=port,
+            n_workers=0,
+            **kwargs
+        )
+
+        # TODO: handle any exceptions here, ensure self.cluster is properly
+        # cleaned up.
         self.pod_template.spec.containers[0].env.append(
             kubernetes.client.V1EnvVar(
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
@@ -226,15 +235,6 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.generate_name = name
 
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
-
-        # We do this at the end, primarily to pass distributed's test check around
-        # proper cleanup.
-        self.cluster = LocalCluster(
-            host=host or socket.gethostname(),
-            scheduler_port=port,
-            n_workers=0,
-            **kwargs
-        )
 
         if n_workers:
             try:
