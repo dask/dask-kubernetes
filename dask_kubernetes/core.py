@@ -191,13 +191,6 @@ class KubeCluster(Cluster):
             raise ValueError(msg)
 
         pod_template = clean_pod_template(pod_template)
-        self.cluster = LocalCluster(
-            host=host or socket.gethostname(),
-            scheduler_port=port,
-            n_workers=0,
-            **kwargs
-        )
-
         ClusterAuth.load_first(auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
@@ -234,8 +227,21 @@ class KubeCluster(Cluster):
 
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
 
+        # We do this at the end, primarily to pass distributed's test check around
+        # proper cleanup.
+        self.cluster = LocalCluster(
+            host=host or socket.gethostname(),
+            scheduler_port=port,
+            n_workers=0,
+            **kwargs
+        )
+
         if n_workers:
-            self.scale(n_workers)
+            try:
+                self.scale(n_workers)
+            except Exception:
+                self.cluster.close()
+                raise
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
