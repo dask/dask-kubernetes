@@ -7,24 +7,24 @@ def test_extra_pod_config(image_name, loop):
     """
     Test that our pod config merging process works fine
     """
-    cluster = KubeCluster(
+    with KubeCluster(
         make_pod_spec(
             image_name, extra_pod_config={"automountServiceAccountToken": False}
         ),
         loop=loop,
         n_workers=0,
-    )
+    ) as cluster:
 
-    pod = cluster.pod_template
+        pod = cluster.pod_template
 
-    assert pod.spec.automount_service_account_token is False
+        assert pod.spec.automount_service_account_token is False
 
 
 def test_extra_container_config(image_name, loop):
     """
     Test that our container config merging process works fine
     """
-    cluster = KubeCluster(
+    with KubeCluster(
         make_pod_spec(
             image_name,
             extra_container_config={
@@ -34,39 +34,39 @@ def test_extra_container_config(image_name, loop):
         ),
         loop=loop,
         n_workers=0,
-    )
+    ) as cluster:
 
-    pod = cluster.pod_template
+        pod = cluster.pod_template
 
-    assert pod.spec.containers[0].image_pull_policy == "IfNotPresent"
-    assert pod.spec.containers[0].security_context == {"runAsUser": 0}
+        assert pod.spec.containers[0].image_pull_policy == "IfNotPresent"
+        assert pod.spec.containers[0].security_context == {"runAsUser": 0}
 
 
 def test_container_resources_config(image_name, loop):
     """
     Test container resource requests / limits being set properly
     """
-    cluster = KubeCluster(
+    with KubeCluster(
         make_pod_spec(
             image_name, memory_request="1G", memory_limit="2G", cpu_limit="2"
         ),
         loop=loop,
         n_workers=0,
-    )
+    ) as cluster:
 
-    pod = cluster.pod_template
+        pod = cluster.pod_template
 
-    assert pod.spec.containers[0].resources.requests["memory"] == "1G"
-    assert pod.spec.containers[0].resources.limits["memory"] == "2G"
-    assert pod.spec.containers[0].resources.limits["cpu"] == "2"
-    assert "cpu" not in pod.spec.containers[0].resources.requests
+        assert pod.spec.containers[0].resources.requests["memory"] == "1G"
+        assert pod.spec.containers[0].resources.limits["memory"] == "2G"
+        assert pod.spec.containers[0].resources.limits["cpu"] == "2"
+        assert "cpu" not in pod.spec.containers[0].resources.requests
 
 
 def test_extra_container_config_merge(image_name, loop):
     """
     Test that our container config merging process works recursively fine
     """
-    cluster = KubeCluster(
+    with KubeCluster(
         make_pod_spec(
             image_name,
             extra_container_config={
@@ -77,23 +77,23 @@ def test_extra_container_config_merge(image_name, loop):
         loop=loop,
         n_workers=0,
         env={"TEST": "HI"},
-    )
+    ) as cluster:
 
-    pod = cluster.pod_template
+        pod = cluster.pod_template
 
-    assert pod.spec.containers[0].env == [
-        {"name": "TEST", "value": "HI"},
-        {"name": "BOO", "value": "FOO"},
-    ]
+        assert pod.spec.containers[0].env == [
+            {"name": "TEST", "value": "HI"},
+            {"name": "BOO", "value": "FOO"},
+        ]
 
-    assert pod.spec.containers[0].args[-1] == "last-item"
+        assert pod.spec.containers[0].args[-1] == "last-item"
 
 
 def test_extra_container_config_merge(image_name, loop):
     """
     Test that our container config merging process works recursively fine
     """
-    cluster = KubeCluster(
+    with KubeCluster(
         make_pod_spec(
             image_name,
             env={"TEST": "HI"},
@@ -104,14 +104,14 @@ def test_extra_container_config_merge(image_name, loop):
         ),
         loop=loop,
         n_workers=0,
-    )
+    ) as cluster:
 
-    pod = cluster.pod_template
+        pod = cluster.pod_template
 
-    for e in [{"name": "TEST", "value": "HI"}, {"name": "BOO", "value": "FOO"}]:
-        assert e in pod.spec.containers[0].env
+        for e in [{"name": "TEST", "value": "HI"}, {"name": "BOO", "value": "FOO"}]:
+            assert e in pod.spec.containers[0].env
 
-    assert pod.spec.containers[0].args[-1] == "last-item"
+        assert pod.spec.containers[0].args[-1] == "last-item"
 
 
 def test_make_pod_from_dict():

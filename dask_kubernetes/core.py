@@ -190,10 +190,7 @@ class KubeCluster(Cluster):
             )
             raise ValueError(msg)
 
-        self.cluster = LocalCluster(
-            ip=host or socket.gethostname(), scheduler_port=port, n_workers=0, **kwargs
-        )
-
+        pod_template = clean_pod_template(pod_template)
         ClusterAuth.load_first(auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
@@ -205,8 +202,8 @@ class KubeCluster(Cluster):
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
         name = escape(name)
+        self.pod_template = pod_template
 
-        self.pod_template = clean_pod_template(pod_template)
         # Default labels that can't be overwritten
         self.pod_template.metadata.labels["dask.org/cluster-name"] = name
         self.pod_template.metadata.labels["user"] = escape(getpass.getuser())
@@ -214,6 +211,15 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.labels["component"] = "dask-worker"
         self.pod_template.metadata.namespace = namespace
 
+        self.cluster = LocalCluster(
+            host=host or socket.gethostname(),
+            scheduler_port=port,
+            n_workers=0,
+            **kwargs
+        )
+
+        # TODO: handle any exceptions here, ensure self.cluster is properly
+        # cleaned up.
         self.pod_template.spec.containers[0].env.append(
             kubernetes.client.V1EnvVar(
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
@@ -231,7 +237,11 @@ class KubeCluster(Cluster):
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
 
         if n_workers:
-            self.scale(n_workers)
+            try:
+                self.scale(n_workers)
+            except Exception:
+                self.cluster.close()
+                raise
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -332,6 +342,10 @@ class KubeCluster(Cluster):
             self.namespace,
             label_selector=format_labels(self.pod_template.metadata.labels),
         ).items
+
+    @property
+    def workers(self):
+        return self.pods()
 
     def logs(self, pod=None):
         """ Logs from a worker pod
