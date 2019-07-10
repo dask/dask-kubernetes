@@ -1,5 +1,4 @@
 import asyncio
-import async_timeout
 import getpass
 import logging
 import os
@@ -41,6 +40,9 @@ class Pod:
         self.lock = asyncio.Lock()
         self.pod = None
         self.status = "created"
+        self.core_api = None
+        self.pod_template = None
+        self.namespace = None
 
     def __await__(self):
         async def _():
@@ -51,14 +53,13 @@ class Pod:
         return _().__await__()
 
     async def start(self):
-        async with async_timeout.timeout(1):
-            self.pod = await self.core_api.create_namespaced_pod(
-                self.namespace, self.pod_template
-            )   
+        self.pod = await self.core_api.create_namespaced_pod(
+            self.namespace, self.pod_template
+        )   
         self.status = "running"
 
     async def close(self, **kwargs):
-        async with async_timeout.timeout(1):
+        if self.pod:
             await self.core_api.delete_namespaced_pod(self.pod.metadata.name, self.namespace)
         self.status = "closed"
 
@@ -81,6 +82,8 @@ class Worker(Pod):
     """
 
     def __init__(self, scheduler: str, core_api, pod_template, namespace, **kwargs):
+        super().__init__()
+        
         self.scheduler = scheduler
         self.core_api = core_api
         self.pod_template = pod_template
@@ -93,8 +96,6 @@ class Worker(Pod):
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
             )
         )
-
-        super().__init__()
 
 
 class Scheduler(Pod):
@@ -110,6 +111,8 @@ class Scheduler(Pod):
     """
 
     def __init__(self, core_api, pod_template, namespace, **kwargs):
+        super().__init__()
+
         self.kwargs = kwargs
         self.core_api = core_api
         self.pod_template = pod_template
@@ -117,8 +120,6 @@ class Scheduler(Pod):
 
         self.pod_template.metadata.labels["component"] = "dask-scheduler"
         self.pod_template.spec.containers[0].args = ['dask-scheduler']
-
-        super().__init__()
 
 
 class KubeCluster(SpecCluster):
