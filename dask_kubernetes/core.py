@@ -1,3 +1,5 @@
+import asyncio
+import async_timeout
 import getpass
 import logging
 import os
@@ -6,6 +8,7 @@ import string
 import time
 from urllib.parse import urlparse
 import uuid
+import weakref
 from weakref import finalize
 
 try:
@@ -14,9 +17,9 @@ except ImportError:
     yaml = False
 
 import dask
-from distributed.deploy import LocalCluster, Cluster
+from distributed.deploy import SpecCluster
 from distributed.comm.utils import offload
-import kubernetes
+import kubernetes_asyncio as kubernetes
 from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
@@ -26,7 +29,99 @@ from .logs import Log, Logs
 logger = logging.getLogger(__name__)
 
 
-class KubeCluster(Cluster):
+class Pod:
+    """ A superclass for Kubernetes Workers and Nannies
+    See Also
+    --------
+    Worker
+    Scheduler
+    """
+
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.pod = None
+        self.status = "created"
+
+    def __await__(self):
+        async def _():
+            async with self.lock:
+                await self.start()
+            return self
+
+        return _().__await__()
+
+    async def start(self):
+        async with async_timeout.timeout(1):
+            self.pod = await self.core_api.create_namespaced_pod(
+                self.namespace, self.pod_template
+            )   
+        self.status = "running"
+
+    async def close(self, **kwargs):
+        async with async_timeout.timeout(1):
+            await self.core_api.delete_namespaced_pod(self.pod.metadata.name, self.namespace)
+        self.status = "closed"
+
+    def __repr__(self):
+        return "<Pod %s: status=%s>" % (type(self).__name__, self.status)
+
+
+class Worker(Pod):
+    """ A Remote Dask Worker controled by SSH
+    Parameters
+    ----------
+    scheduler: str
+        The address of the scheduler
+    address: str
+        The hostname where we should run this worker
+    connect_kwargs: dict
+        kwargs to be passed to asyncssh connections
+    kwargs:
+        TODO
+    """
+
+    def __init__(self, scheduler: str, core_api, pod_template, namespace, **kwargs):
+        self.scheduler = scheduler
+        self.core_api = core_api
+        self.pod_template = pod_template
+        self.namespace = namespace
+        self.kwargs = kwargs
+
+        self.pod_template.metadata.labels["component"] = "dask-worker"
+        self.pod_template.spec.containers[0].env.append(
+            kubernetes.client.V1EnvVar(
+                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
+            )
+        )
+
+        super().__init__()
+
+
+class Scheduler(Pod):
+    """ A Remote Dask Scheduler controled by SSH
+    Parameters
+    ----------
+    address: str
+        The hostname where we should run this worker
+    connect_kwargs: dict
+        kwargs to be passed to asyncssh connections
+    kwargs:
+        TODO
+    """
+
+    def __init__(self, core_api, pod_template, namespace, **kwargs):
+        self.kwargs = kwargs
+        self.core_api = core_api
+        self.pod_template = pod_template
+        self.namespace = namespace
+
+        self.pod_template.metadata.labels["component"] = "dask-scheduler"
+        self.pod_template.spec.containers[0].args = ['dask-scheduler']
+
+        super().__init__()
+
+
+class KubeCluster(SpecCluster):
     """ Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
@@ -208,23 +303,8 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.labels["dask.org/cluster-name"] = name
         self.pod_template.metadata.labels["user"] = escape(getpass.getuser())
         self.pod_template.metadata.labels["app"] = "dask"
-        self.pod_template.metadata.labels["component"] = "dask-worker"
         self.pod_template.metadata.namespace = namespace
 
-        self.cluster = LocalCluster(
-            host=host or socket.gethostname(),
-            scheduler_port=port,
-            n_workers=0,
-            **kwargs
-        )
-
-        # TODO: handle any exceptions here, ensure self.cluster is properly
-        # cleaned up.
-        self.pod_template.spec.containers[0].env.append(
-            kubernetes.client.V1EnvVar(
-                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
-            )
-        )
         if env:
             self.pod_template.spec.containers[0].env.extend(
                 [
@@ -235,13 +315,25 @@ class KubeCluster(Cluster):
         self.pod_template.metadata.generate_name = name
 
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
-
-        if n_workers:
-            try:
-                self.scale(n_workers)
-            except Exception:
-                self.cluster.close()
-                raise
+        
+        scheduler = {
+            "cls": Scheduler,
+            "options": {
+                "core_api": self.core_api, 
+                "pod_template": self.pod_template,
+                "namespace": namespace
+                },
+        }
+        worker = {
+            "cls": Worker,
+            "options": {
+                "core_api": self.core_api, 
+                "pod_template": self.pod_template,
+                "namespace": namespace
+                },
+        }
+        
+        super().__init__({}, scheduler, worker, **kwargs)
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -323,14 +415,6 @@ class KubeCluster(Cluster):
             len(self.pods()),
         )
 
-    @property
-    def scheduler(self):
-        return self.cluster.scheduler
-
-    @property
-    def scheduler_address(self):
-        return self.scheduler.address
-
     def pods(self):
         """ A list of kubernetes pods corresponding to current workers
 
@@ -342,10 +426,6 @@ class KubeCluster(Cluster):
             self.namespace,
             label_selector=format_labels(self.pod_template.metadata.labels),
         ).items
-
-    @property
-    def workers(self):
-        return self.pods()
 
     def logs(self, pod=None):
         """ Logs from a worker pod
@@ -374,61 +454,6 @@ class KubeCluster(Cluster):
             )
         )
 
-    def scale(self, n):
-        """ Scale cluster to n workers
-
-        Parameters
-        ----------
-        n: int
-            Target number of workers
-
-        Example
-        -------
-        >>> cluster.scale(10)  # scale cluster to ten workers
-
-        See Also
-        --------
-        KubeCluster.scale_up
-        KubeCluster.scale_down
-        """
-        pods = self._cleanup_terminated_pods(self.pods())
-        if n >= len(pods):
-            self.scale_up(n, pods=pods)
-            return
-        else:
-            n_to_delete = len(pods) - n
-            # Before trying to close running workers, check if we can cancel
-            # pending pods (in case the kubernetes cluster was too full to
-            # provision those pods in the first place).
-            running_workers = list(self.scheduler.workers.keys())
-            running_ips = set(urlparse(worker).hostname for worker in running_workers)
-            pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
-            if pending_pods:
-                pending_to_delete = pending_pods[:n_to_delete]
-                logger.debug("Deleting pending pods: %s", pending_to_delete)
-                self._delete_pods(pending_to_delete)
-                n_to_delete = n_to_delete - len(pending_to_delete)
-                if n_to_delete <= 0:
-                    return
-
-            to_close = select_workers_to_close(self.scheduler, n_to_delete)
-            logger.debug("Closing workers: %s", to_close)
-            if len(to_close) < len(self.scheduler.workers):
-                # Close workers cleanly to migrate any temporary results to
-                # remaining workers.
-                @gen.coroutine
-                def f(to_close):
-                    yield self.scheduler.retire_workers(
-                        workers=to_close, remove=True, close_workers=True
-                    )
-                    yield offload(self.scale_down, to_close)
-
-                self.scheduler.loop.add_callback(f, to_close)
-                return
-
-            # Terminate all pods without waiting for clean worker shutdown
-            self.scale_down(to_close)
-
     def _delete_pods(self, to_delete):
         for pod in to_delete:
             try:
@@ -449,85 +474,6 @@ class KubeCluster(Cluster):
         terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
         self._delete_pods(terminated_pods)
         return [p for p in pods if p.status.phase not in terminated_phases]
-
-    def scale_up(self, n, pods=None, **kwargs):
-        """
-        Make sure we have n dask-workers available for this cluster
-
-        Examples
-        --------
-        >>> cluster.scale_up(20)  # ask for twenty workers
-        """
-        maximum = dask.config.get("kubernetes.count.max")
-        if maximum is not None and maximum < n:
-            logger.info(
-                "Tried to scale beyond maximum number of workers %d > %d", n, maximum
-            )
-            n = maximum
-        pods = pods or self._cleanup_terminated_pods(self.pods())
-        to_create = n - len(pods)
-        new_pods = []
-        for i in range(3):
-            try:
-                for _ in range(to_create):
-                    new_pods.append(
-                        self.core_api.create_namespaced_pod(
-                            self.namespace, self.pod_template
-                        )
-                    )
-                    to_create -= 1
-                break
-            except kubernetes.client.rest.ApiException as e:
-                if e.status == 500 and "ServerTimeout" in e.body:
-                    logger.info("Server timeout, retry #%d", i + 1)
-                    time.sleep(1)
-                    last_exception = e
-                    continue
-                else:
-                    raise
-        else:
-            raise last_exception
-
-    def scale_down(self, workers, pods=None):
-        """ Remove the pods for the requested list of workers
-
-        When scale_down is called by the _adapt async loop, the workers are
-        assumed to have been cleanly closed first and in-memory data has been
-        migrated to the remaining workers.
-
-        Note that when the worker process exits, Kubernetes leaves the pods in
-        a 'Succeeded' state that we collect here.
-
-        If some workers have not been closed, we just delete the pods with
-        matching ip addresses.
-
-        Parameters
-        ----------
-        workers: List[str] List of addresses of workers to close
-        """
-        # Get the existing worker pods
-        pods = pods or self._cleanup_terminated_pods(self.pods())
-
-        # Work out the list of pods that we are going to delete
-        # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
-        # Convert this to a set of IPs
-        ips = set(urlparse(worker).hostname for worker in workers)
-        to_delete = [p for p in pods if p.status.pod_ip in ips]
-        if not to_delete:
-            return
-        self._delete_pods(to_delete)
-
-    def __enter__(self):
-        return self
-
-    def close(self, **kwargs):
-        """ Close this cluster """
-        self.scale_down(self.cluster.scheduler.workers)
-        return self.cluster.close(**kwargs)
-
-    def __exit__(self, type, value, traceback):
-        _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
-        self.cluster.__exit__(type, value, traceback)
 
 
 def _cleanup_pods(namespace, labels):
@@ -566,21 +512,6 @@ def _namespace_default():
         with open(ns_path) as f:
             return f.read().strip()
     return "default"
-
-
-def select_workers_to_close(scheduler, n_to_close):
-    """ Select n workers to close from scheduler """
-    workers = list(scheduler.workers.values())
-    assert n_to_close <= len(workers)
-    key = lambda ws: ws.metrics["memory"]
-    to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
-
-    if len(to_close) < n_to_close:
-        rest = sorted(workers, key=key, reverse=True)
-        while len(to_close) < n_to_close:
-            to_close.add(rest.pop())
-
-    return [ws.address for ws in to_close]
 
 
 valid_characters = string.ascii_letters + string.digits + "_-."

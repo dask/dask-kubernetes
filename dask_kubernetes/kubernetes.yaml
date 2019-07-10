@@ -19,7 +19,8 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - image: daskdev/dask:latest
+    #   - name: dask
+    #     image: daskdev/dask:latest
     #     args:
     #       - dask-worker
     #       - --nthreads
