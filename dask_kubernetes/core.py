@@ -37,6 +37,7 @@ class Pod:
     """
 
     def __init__(self):
+        self.address = None
         self.lock = asyncio.Lock()
         self.pod = None
         self.status = "created"
@@ -56,6 +57,7 @@ class Pod:
         self.pod = await self.core_api.create_namespaced_pod(
             self.namespace, self.pod_template
         )   
+        self.address = self.pod.status.pod_ip
         self.status = "running"
 
     async def close(self, **kwargs):
@@ -83,7 +85,7 @@ class Worker(Pod):
 
     def __init__(self, scheduler: str, core_api, pod_template, namespace, **kwargs):
         super().__init__()
-        
+
         self.scheduler = scheduler
         self.core_api = core_api
         self.pod_template = pod_template
