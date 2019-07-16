@@ -672,6 +672,40 @@ def test_default_affinity(clean_pod_spec):
     assert affinity["pod_affinity"] is None
 
 
+def test_match_node_purpose(image_name, loop):
+    """
+    Test that our container config merging process works fine
+    """
+
+    def check_node_purpose(pod_template):
+        affinity = pod_template.spec.affinity.node_affinity
+        result = affinity.required_during_scheduling_ignored_during_execution.to_dict()
+        assert result == {
+            "node_selector_terms": [
+                {
+                    "match_expressions": [
+                        {
+                            "key": "k8s.dask.org/node-purpose",
+                            "operator": "In",
+                            "values": ["worker"],
+                        }
+                    ],
+                    "match_fields": None,
+                }
+            ]
+        }
+        assert affinity.preferred_during_scheduling_ignored_during_execution is None
+
+    with KubeCluster(
+        make_pod_spec(image_name), loop=loop, n_workers=0, match_node_purpose="require"
+    ) as cluster:
+        check_node_purpose(cluster.pod_template)
+
+    with dask.config.set(**{"kubernetes.match_node_purpose": "require"}):
+        with KubeCluster(make_pod_spec(image_name), loop=loop, n_workers=0) as cluster:
+            check_node_purpose(cluster.pod_template)
+
+
 def test_auth_missing(pod_spec, ns, loop):
     with pytest.raises(kubernetes.config.ConfigException) as info:
         KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)

@@ -76,6 +76,17 @@ class KubeCluster(Cluster):
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
+    match_node_purpose: {"prefer", "require", "ignore"}, optional
+        The node affinity for workers with the label ``k8s.dask.org/node-purpose="worker"``.
+        By default, this is taken from the dask config ``kubernetes.match_node_purpose``,
+        with a default of ``"prefer"``.
+
+        * "prefer" : Applies the ``preferredDuringSchedulingIgnoredDuringExecution``
+          affinity type.
+        * "require" : Applies the ``requiredDuringSchedulingIgnoredDuringExecution``
+          affinity type.
+        * "ignore" : Don't add any (additional) affinities to the pod template.
+
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -153,6 +164,7 @@ class KubeCluster(Cluster):
         port=None,
         env=None,
         auth=ClusterAuth.DEFAULT,
+        match_node_purpose=None,
         **kwargs
     ):
         name = name or dask.config.get("kubernetes.name")
@@ -165,6 +177,11 @@ class KubeCluster(Cluster):
         host = host or dask.config.get("kubernetes.host")
         port = port if port is not None else dask.config.get("kubernetes.port")
         env = env if env is not None else dask.config.get("kubernetes.env")
+        match_node_purpose = (
+            match_node_purpose
+            if match_node_purpose is not None
+            else dask.config.get("kubernetes.match_node_purpose", "prefer")
+        )
 
         if not pod_template and dask.config.get("kubernetes.worker-template", None):
             d = dask.config.get("kubernetes.worker-template")
@@ -190,7 +207,9 @@ class KubeCluster(Cluster):
             )
             raise ValueError(msg)
 
-        pod_template = clean_pod_template(pod_template)
+        pod_template = clean_pod_template(
+            pod_template, match_node_purpose=match_node_purpose
+        )
         ClusterAuth.load_first(auth)
 
         self.core_api = kubernetes.client.CoreV1Api()

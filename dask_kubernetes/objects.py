@@ -275,7 +275,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
             )
         else:
             raise ValueError(
-                'Attribute must be one of "ignore", "prefer", or "require".'
+                'Attribute "match_node_purpose" must be one of "ignore", "prefer", or "require".'
             )
         pod_template.spec.affinity = affinity
 
