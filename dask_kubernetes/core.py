@@ -329,7 +329,7 @@ class KubeCluster(Cluster):
 
     @property
     def loop(self):
-        return self.scheduler.loop
+        return self.cluster.loop
 
     @property
     def scheduler_address(self):
