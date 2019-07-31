@@ -328,6 +328,10 @@ class KubeCluster(Cluster):
         return self.cluster.scheduler
 
     @property
+    def loop(self):
+        return self.cluster.loop
+
+    @property
     def scheduler_address(self):
         return self.scheduler.address
 
@@ -528,6 +532,10 @@ class KubeCluster(Cluster):
     def __exit__(self, type, value, traceback):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
+
+    @property
+    def scheduler_comm(self):
+        return self.cluster.scheduler_comm
 
 
 def _cleanup_pods(namespace, labels):
