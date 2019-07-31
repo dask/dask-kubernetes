@@ -533,6 +533,10 @@ class KubeCluster(Cluster):
         _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
         self.cluster.__exit__(type, value, traceback)
 
+    @property
+    def scheduler_comm(self):
+        return self.cluster.scheduler_comm
+
 
 def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """
