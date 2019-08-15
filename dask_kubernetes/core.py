@@ -538,8 +538,8 @@ class KubeCluster(Cluster):
         return self.cluster.scheduler_comm
 
     @property
-    def worker_spec(self):
-        return self.cluster.worker_spec
+    def scheduler_info(self):
+        return self.cluster.scheduler_info
 
 
 def _cleanup_pods(namespace, labels):
