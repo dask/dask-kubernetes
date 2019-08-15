@@ -545,6 +545,10 @@ class KubeCluster(Cluster):
     def scheduler_info(self):
         return self.cluster.scheduler_info
 
+    @property
+    def periodic_callbacks(self):
+        return self.cluster.periodic_callbacks
+
 
 def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """
