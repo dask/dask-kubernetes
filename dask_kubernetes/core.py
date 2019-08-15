@@ -234,7 +234,7 @@ class KubeCluster(Cluster):
             )
         self.pod_template.metadata.generate_name = name
 
-        finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
+        finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels, self.core_api)
 
         if n_workers:
             try:
@@ -530,7 +530,7 @@ class KubeCluster(Cluster):
         return self.cluster.close(**kwargs)
 
     def __exit__(self, type, value, traceback):
-        _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
+        _cleanup_pods(self.namespace, self.pod_template.metadata.labels, self.core_api)
         self.cluster.__exit__(type, value, traceback)
 
     @property
@@ -538,9 +538,8 @@ class KubeCluster(Cluster):
         return self.cluster.scheduler_comm
 
 
-def _cleanup_pods(namespace, labels):
+def _cleanup_pods(namespace, labels, api):
     """ Remove all pods with these labels in this namespace """
-    api = kubernetes.client.CoreV1Api()
     pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
