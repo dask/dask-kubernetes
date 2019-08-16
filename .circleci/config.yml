@@ -39,9 +39,6 @@ jobs:
       - run:
           command: |
             sudo kubectl get deployment
-      - restore_cache:
-          keys:
-            - miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
       - run:
           name: install miniconda
           command: |
@@ -64,10 +61,6 @@ jobs:
               fi
               conda env list
               conda list ${ENV_NAME}
-      - save_cache:
-          key: miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
-          paths:
-            - "/home/circleci/miniconda"
       - run:
           name: build docker
           command: |

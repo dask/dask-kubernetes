@@ -22,6 +22,7 @@ from tornado import gen
 from .objects import make_pod_from_dict, clean_pod_template
 from .auth import ClusterAuth
 from .logs import Log, Logs
+from .adaptive import Adaptive
 
 logger = logging.getLogger(__name__)
 
@@ -378,6 +379,9 @@ class KubeCluster(Cluster):
             )
         )
 
+    def adapt(self, Adaptive=Adaptive, **kwargs):
+        return super().adapt(Adaptive=Adaptive, **kwargs)
+
     def scale(self, n):
         """ Scale cluster to n workers
 
@@ -536,6 +540,14 @@ class KubeCluster(Cluster):
     @property
     def scheduler_comm(self):
         return self.cluster.scheduler_comm
+
+    @property
+    def scheduler_info(self):
+        return self.cluster.scheduler_info
+
+    @property
+    def periodic_callbacks(self):
+        return self.cluster.periodic_callbacks
 
 
 def _cleanup_pods(namespace, labels):

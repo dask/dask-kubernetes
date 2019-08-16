@@ -580,7 +580,7 @@ def test_escape_name(pod_spec, loop, ns):
 
 
 def test_maximum(cluster):
-    with dask.config.set(**{"kubernetes.count.max": 1}):
+    with dask.config.set({"kubernetes.count.max": 1}):
         with captured_logger("dask_kubernetes") as logger:
             cluster.scale(10)
 
