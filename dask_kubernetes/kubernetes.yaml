@@ -8,6 +8,10 @@ kubernetes:
   port: 0
   env: {}
 
+  scheduler-service-type: null  # Defaults to ClusterIP when running in-cluster and NodePort when out-of-cluster
+
+  scheduler-service-template: {}
+
   worker-template-path: null
 
   worker-template: {}

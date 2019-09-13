@@ -16,54 +16,69 @@ except ImportError:
     yaml = False
 
 import dask
-from distributed.deploy import SpecCluster
+from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
+from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from tornado import gen
 
 from .objects import make_pod_from_dict, clean_pod_template
 from .auth import ClusterAuth
-from .logs import Log, Logs
 
 logger = logging.getLogger(__name__)
 
 
-class Pod:
-    """ A superclass for Kubernetes Workers and Nannies
+class Pod(ProcessInterface):
+    """ A superclass for Kubernetes Pods
     See Also
     --------
     Worker
     Scheduler
     """
 
-    def __init__(self):
-        self.address = None
-        self.lock = asyncio.Lock()
+    def __init__(self, loop=None):
         self.pod = None
-        self.status = "created"
         self.core_api = None
         self.pod_template = None
         self.namespace = None
+        self.name = None
+        self.loop = loop
+        super().__init__()
 
-    def __await__(self):
-        async def _():
-            async with self.lock:
-                await self.start()
-            return self
-
-        return _().__await__()
-
-    async def start(self):
+    async def start(self, **kwargs):
         self.pod = await self.core_api.create_namespaced_pod(
             self.namespace, self.pod_template
-        )   
-        self.address = self.pod.status.pod_ip
-        self.status = "running"
+        )
+
+        while self.pod.status.phase == "Pending":
+            self.pod = await self.core_api.read_namespaced_pod(
+                self.pod.metadata.name, self.namespace
+            )
+            await asyncio.sleep(0.1)
+
+        while self.address is None:
+            logs = await self.logs()
+            for line in logs.splitlines():
+                for query_string in ["worker at:", "Scheduler at:"]:
+                    if query_string in line:
+                        self.address = line.split(query_string)[1].strip()
+            await asyncio.sleep(0.1)
+
+        await super().start(**kwargs)
 
     async def close(self, **kwargs):
         if self.pod:
-            await self.core_api.delete_namespaced_pod(self.pod.metadata.name, self.namespace)
-        self.status = "closed"
+            await self.core_api.delete_namespaced_pod(
+                self.pod.metadata.name, self.namespace
+            )
+        await super().close(**kwargs)
+
+    async def logs(self):
+        return Log(
+            await self.core_api.read_namespaced_pod_log(
+                self.pod.metadata.name, self.namespace
+            )
+        )
 
     def __repr__(self):
         return "<Pod %s: status=%s>" % (type(self).__name__, self.status)
@@ -80,11 +95,11 @@ class Worker(Pod):
     connect_kwargs: dict
         kwargs to be passed to asyncssh connections
     kwargs:
-        TODO
+        TODO Document Worker kwargs
     """
 
     def __init__(self, scheduler: str, core_api, pod_template, namespace, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
 
         self.scheduler = scheduler
         self.core_api = core_api
@@ -92,7 +107,7 @@ class Worker(Pod):
         self.namespace = namespace
         self.kwargs = kwargs
 
-        self.pod_template.metadata.labels["component"] = "dask-worker"
+        self.pod_template.metadata.labels["component"] = "worker"
         self.pod_template.spec.containers[0].env.append(
             kubernetes.client.V1EnvVar(
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
@@ -109,19 +124,29 @@ class Scheduler(Pod):
     connect_kwargs: dict
         kwargs to be passed to asyncssh connections
     kwargs:
-        TODO
+        TODO Document Scheduler kwargs
     """
 
     def __init__(self, core_api, pod_template, namespace, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
 
         self.kwargs = kwargs
         self.core_api = core_api
         self.pod_template = pod_template
         self.namespace = namespace
 
-        self.pod_template.metadata.labels["component"] = "dask-scheduler"
-        self.pod_template.spec.containers[0].args = ['dask-scheduler']
+        self.pod_template.metadata.labels["component"] = "scheduler"
+        self.pod_template.spec.containers[0].args = [
+            "dask-scheduler"
+        ]  # TODO Add scheduler timeout
+
+    async def start(self, **kwargs):
+        await super().start(**kwargs)
+        # TODO Create a ClusterIP service for the workers to connect through
+        # TODO Create external service if appropriate
+        # If the user is out of cluster a NodePort service should be created
+        # which can be optionally overidden to be a LoadBalancer or something else
+        # TODO Create an optional Ingress just in case folks want to configure one
 
 
 class KubeCluster(SpecCluster):
@@ -253,23 +278,41 @@ class KubeCluster(SpecCluster):
         auth=ClusterAuth.DEFAULT,
         **kwargs
     ):
-        name = name or dask.config.get("kubernetes.name")
-        namespace = namespace or dask.config.get("kubernetes.namespace")
-        n_workers = (
-            n_workers
-            if n_workers is not None
+        self.pod_template = pod_template
+        self._generate_name = name
+        self._namespace = namespace
+        self._n_workers = n_workers
+        self.host = host
+        self.port = port
+        self.env = env
+        self.auth = auth
+        self.kwargs = kwargs
+        super().__init__(**self.kwargs)
+
+    async def _start(self):
+        self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
+        self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
+        self._n_workers = (
+            self._n_workers
+            if self._n_workers is not None
             else dask.config.get("kubernetes.count.start")
         )
-        host = host or dask.config.get("kubernetes.host")
-        port = port if port is not None else dask.config.get("kubernetes.port")
-        env = env if env is not None else dask.config.get("kubernetes.env")
+        self.host = self.host or dask.config.get("kubernetes.host")
+        self.port = (
+            self.port if self.port is not None else dask.config.get("kubernetes.port")
+        )
+        self.env = (
+            self.env if self.env is not None else dask.config.get("kubernetes.env")
+        )
 
-        if not pod_template and dask.config.get("kubernetes.worker-template", None):
+        if not self.pod_template and dask.config.get(
+            "kubernetes.worker-template", None
+        ):
             d = dask.config.get("kubernetes.worker-template")
             d = dask.config.expand_environment_variables(d)
-            pod_template = make_pod_from_dict(d)
+            self.pod_template = make_pod_from_dict(d)
 
-        if not pod_template and dask.config.get(
+        if not self.pod_template and dask.config.get(
             "kubernetes.worker-template-path", None
         ):
             import yaml
@@ -279,64 +322,64 @@ class KubeCluster(SpecCluster):
             with open(fn) as f:
                 d = yaml.safe_load(f)
             d = dask.config.expand_environment_variables(d)
-            pod_template = make_pod_from_dict(d)
+            self.pod_template = make_pod_from_dict(d)
 
-        if not pod_template:
+        if not self.pod_template:
             msg = (
                 "Worker pod specification not provided. See KubeCluster "
                 "docstring for ways to specify workers"
             )
             raise ValueError(msg)
 
-        pod_template = clean_pod_template(pod_template)
-        ClusterAuth.load_first(auth)
+        self.pod_template = clean_pod_template(self.pod_template)
+        await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
 
-        if namespace is None:
-            namespace = _namespace_default()
+        if self._namespace is None:
+            self._namespace = _namespace_default()
 
-        name = name.format(
+        self._generate_name = self._generate_name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
-        name = escape(name)
-        self.pod_template = pod_template
+        self._generate_name = escape(self._generate_name)
 
         # Default labels that can't be overwritten
-        self.pod_template.metadata.labels["dask.org/cluster-name"] = name
+        self.pod_template.metadata.labels["dask.org/cluster-name"] = self._generate_name
         self.pod_template.metadata.labels["user"] = escape(getpass.getuser())
         self.pod_template.metadata.labels["app"] = "dask"
-        self.pod_template.metadata.namespace = namespace
+        self.pod_template.metadata.namespace = self._namespace
 
-        if env:
+        if self.env:
             self.pod_template.spec.containers[0].env.extend(
                 [
                     kubernetes.client.V1EnvVar(name=k, value=str(v))
-                    for k, v in env.items()
+                    for k, v in self.env.items()
                 ]
             )
-        self.pod_template.metadata.generate_name = name
+        self.pod_template.metadata.generate_name = self._generate_name
 
-        finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
-        
-        scheduler = {
-            "cls": Scheduler,
-            "options": {
-                "core_api": self.core_api, 
-                "pod_template": self.pod_template,
-                "namespace": namespace
-                },
+        finalize(
+            self,
+            self.sync,
+            _cleanup_pods,
+            self.core_api,
+            self._namespace,
+            self.pod_template.metadata.labels,
+        )
+
+        common_options = {
+            "core_api": self.core_api,
+            "pod_template": self.pod_template,
+            "namespace": self._namespace,
+            "loop": self.loop,
         }
-        worker = {
-            "cls": Worker,
-            "options": {
-                "core_api": self.core_api, 
-                "pod_template": self.pod_template,
-                "namespace": namespace
-                },
-        }
-        
-        super().__init__({}, scheduler, worker, **kwargs)
+
+        self.scheduler_spec = {"cls": Scheduler, "options": {**common_options}}
+        self.new_spec = {"cls": Worker, "options": {**common_options}}
+        self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
+
+        await super()._start()
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -426,41 +469,40 @@ class KubeCluster(SpecCluster):
         KubeCluster.logs
         """
         return self.core_api.list_namespaced_pod(
-            self.namespace,
+            self._namespace,
             label_selector=format_labels(self.pod_template.metadata.labels),
         ).items
 
-    def logs(self, pod=None):
-        """ Logs from a worker pod
-
-        You can get this pod object from the ``pods`` method.
-
-        If no pod is specified all pod logs will be returned. On large clusters
-        this could end up being rather large.
-
+    async def _logs(self, scheduler=True, workers=True):
+        """ Return logs for the scheduler and workers
         Parameters
         ----------
-        pod: kubernetes.client.V1Pod
-            The pod from which we want to collect logs.
-
-        See Also
-        --------
-        KubeCluster.pods
-        Client.get_worker_logs
+        scheduler : boolean
+            Whether or not to collect logs for the scheduler
+        workers : boolean or Iterable[str], optional
+            A list of worker addresses to select.
+            Defaults to all workers if `True` or no workers if `False`
+        Returns
+        -------
+        logs: Dict[str]
+            A dictionary of logs, with one item for the scheduler and one for
+            each worker
         """
-        if pod is None:
-            return Logs({pod.status.pod_ip: self.logs(pod) for pod in self.pods()})
+        logs = Logs()
 
-        return Log(
-            self.core_api.read_namespaced_pod_log(
-                pod.metadata.name, pod.metadata.namespace
-            )
-        )
+        if scheduler:
+            logs["Scheduler"] = await self.scheduler.logs()
+
+        if workers:
+            for key, worker in self.workers.items():
+                logs[key] = await worker.logs()
+
+        return logs
 
     def _delete_pods(self, to_delete):
         for pod in to_delete:
             try:
-                self.core_api.delete_namespaced_pod(pod.metadata.name, self.namespace)
+                self.core_api.delete_namespaced_pod(pod.metadata.name, self._namespace)
                 pod_info = pod.metadata.name
                 if pod.status.reason:
                     pod_info += " [{}]".format(pod.status.reason)
@@ -479,13 +521,14 @@ class KubeCluster(SpecCluster):
         return [p for p in pods if p.status.phase not in terminated_phases]
 
 
-def _cleanup_pods(namespace, labels):
+async def _cleanup_pods(core_api, namespace, labels):
     """ Remove all pods with these labels in this namespace """
-    api = kubernetes.client.CoreV1Api()
-    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
+    pods = await core_api.list_namespaced_pod(
+        namespace, label_selector=format_labels(labels)
+    )
     for pod in pods.items:
         try:
-            api.delete_namespaced_pod(pod.metadata.name, namespace)
+            await core_api.delete_namespaced_pod(pod.metadata.name, namespace)
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
