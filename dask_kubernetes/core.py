@@ -167,6 +167,13 @@ class Scheduler(Pod):
 
         # TODO Create an optional Ingress just in case folks want to configure one
 
+    async def close(self, **kwargs):
+        if self.service:
+            await self.core_api.delete_namespaced_service(
+                self.cluster_name, self.namespace
+            )
+        await super().close(**kwargs)
+
     async def _create_service(self):
         service_template_dict = dask.config.get("kubernetes.scheduler-service-template")
         self.service_template = clean_service_template(
