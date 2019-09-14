@@ -179,7 +179,7 @@ def test_env(pod_spec, loop, ns):
 def test_pod_from_yaml(image_name, loop, ns):
     test_yaml = {
         "kind": "Pod",
-        "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
+        "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
         "spec": {
             "containers": [
                 {
@@ -226,7 +226,7 @@ def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
 
         test_yaml = {
             "kind": "Pod",
-            "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
+            "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
             "spec": {
                 "containers": [
                     {

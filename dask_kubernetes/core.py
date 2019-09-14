@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import getpass
 import logging
 import os
@@ -22,7 +23,12 @@ from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from tornado import gen
 
-from .objects import make_pod_from_dict, clean_pod_template
+from .objects import (
+    make_pod_from_dict,
+    make_service_from_dict,
+    clean_pod_template,
+    clean_service_template,
+)
 from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
@@ -36,14 +42,16 @@ class Pod(ProcessInterface):
     Scheduler
     """
 
-    def __init__(self, loop=None):
+    def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
         self.pod = None
-        self.core_api = None
-        self.pod_template = None
-        self.namespace = None
+        self.core_api = core_api
+        self.pod_template = copy.deepcopy(pod_template)
+        self.namespace = namespace
         self.name = None
         self.loop = loop
-        super().__init__()
+        self.kwargs = kwargs
+        self.cluster_name = self.pod_template.metadata.labels["dask.org/cluster-name"]
+        super().__init__(**kwargs)
 
     async def start(self, **kwargs):
         self.pod = await self.core_api.create_namespaced_pod(
@@ -98,16 +106,12 @@ class Worker(Pod):
         TODO Document Worker kwargs
     """
 
-    def __init__(self, scheduler: str, core_api, pod_template, namespace, **kwargs):
+    def __init__(self, scheduler: str, **kwargs):
         super().__init__(**kwargs)
 
         self.scheduler = scheduler
-        self.core_api = core_api
-        self.pod_template = pod_template
-        self.namespace = namespace
-        self.kwargs = kwargs
 
-        self.pod_template.metadata.labels["component"] = "worker"
+        self.pod_template.metadata.labels["dask.org/component"] = "worker"
         self.pod_template.spec.containers[0].env.append(
             kubernetes.client.V1EnvVar(
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
@@ -127,26 +131,59 @@ class Scheduler(Pod):
         TODO Document Scheduler kwargs
     """
 
-    def __init__(self, core_api, pod_template, namespace, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.service = None
 
-        self.kwargs = kwargs
-        self.core_api = core_api
-        self.pod_template = pod_template
-        self.namespace = namespace
-
-        self.pod_template.metadata.labels["component"] = "scheduler"
+        self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
         self.pod_template.spec.containers[0].args = [
             "dask-scheduler"
         ]  # TODO Add scheduler timeout
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
-        # TODO Create a ClusterIP service for the workers to connect through
-        # TODO Create external service if appropriate
-        # If the user is out of cluster a NodePort service should be created
-        # which can be optionally overidden to be a LoadBalancer or something else
+        self.service = await self._create_service()
+        self.address = "tcp://{name}.{namespace}:{port}".format(
+            name=self.service.metadata.name, namespace=self.namespace, port=8786
+        )
+        if self.service.spec.type == "LoadBalancer":
+            # Wait for load balancer to be assigned
+            while self.service.status.load_balancer.ingress is None:
+                # TODO Add timeout for getting loadbalancer
+                self.service = await self.core_api.read_namespaced_service(
+                    self.cluster_name, self.namespace
+                )
+                await asyncio.sleep(0.2)
+
+            [loadbalancer_ingress] = self.service.status.load_balancer.ingress
+            loadbalancer_host = loadbalancer_ingress.hostname or loadbalancer_ingress.ip
+            self.external_address = "tcp://{host}:{port}".format(
+                host=loadbalancer_host, port=8786
+            )
+        # TODO Set external address for nodeport type
+
         # TODO Create an optional Ingress just in case folks want to configure one
+
+    async def _create_service(self):
+        service_template_dict = dask.config.get("kubernetes.scheduler-service-template")
+        self.service_template = clean_service_template(
+            make_service_from_dict(service_template_dict)
+        )
+        self.service_template.metadata.name = self.cluster_name
+        self.service_template.metadata.labels[
+            "dask.org/cluster-name"
+        ] = self.cluster_name
+        self.service_template.spec.selector["dask.org/cluster-name"] = self.cluster_name
+        if self.service_template.spec.type is None:
+            self.service_template.spec.type = dask.config.get(
+                "kubernetes.scheduler-service-type"
+            )
+
+        return await self.core_api.create_namespaced_service(
+            self.namespace, self.service_template
+        )
+
+        # TODO Clean up services
 
 
 class KubeCluster(SpecCluster):
@@ -454,24 +491,6 @@ class KubeCluster(SpecCluster):
     @property
     def name(self):
         return self.pod_template.metadata.generate_name
-
-    def __repr__(self):
-        return 'KubeCluster("%s", workers=%d)' % (
-            self.scheduler.address,
-            len(self.pods()),
-        )
-
-    def pods(self):
-        """ A list of kubernetes pods corresponding to current workers
-
-        See Also
-        --------
-        KubeCluster.logs
-        """
-        return self.core_api.list_namespaced_pod(
-            self._namespace,
-            label_selector=format_labels(self.pod_template.metadata.labels),
-        ).items
 
     async def _logs(self, scheduler=True, workers=True):
         """ Return logs for the scheduler and workers

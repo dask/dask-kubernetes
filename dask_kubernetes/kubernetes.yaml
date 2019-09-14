@@ -8,9 +8,24 @@ kubernetes:
   port: 0
   env: {}
 
-  scheduler-service-type: null  # Defaults to ClusterIP when running in-cluster and NodePort when out-of-cluster
+  scheduler-service-type: 'ClusterIP'
 
-  scheduler-service-template: {}
+  scheduler-service-template:
+    apiVersion: v1
+    kind: Service
+    spec:
+      selector:
+        dask.org/cluster-name: ''  # Cluster name will be added automatically
+        dask.org/component: scheduler
+      ports:
+        - name: comm
+          protocol: TCP
+          port: 8786
+          targetPort: 8786
+        - name: dashboard
+          protocol: TCP
+          port: 8787
+          targetPort: 8787
 
   worker-template-path: null
 

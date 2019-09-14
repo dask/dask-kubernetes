@@ -117,7 +117,7 @@ def test_extra_container_config_merge(image_name, loop):
 def test_make_pod_from_dict():
     d = {
         "kind": "Pod",
-        "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
+        "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
         "spec": {
             "containers": [
                 {
