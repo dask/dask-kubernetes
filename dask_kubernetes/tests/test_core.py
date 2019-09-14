@@ -18,7 +18,7 @@ from dask_kubernetes.objects import clean_pod_template
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
-import kubernetes
+import kubernetes_asyncio as kubernetes
 from random import random
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
@@ -29,59 +29,61 @@ FAKE_CA = os.path.join(TEST_DIR, "fake-ca-file")
 
 
 @pytest.fixture
-def api():
-    ClusterAuth.load_first()
-    return kubernetes.client.CoreV1Api()
+async def api():
+    await ClusterAuth.load_first()
+    yield kubernetes.client.CoreV1Api()
 
 
 @pytest.fixture
-def ns(api):
-    name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
+async def ns(api):
+    name = "test-dask-kubernetes-" + str(uuid.uuid4())[:4]
     ns = kubernetes.client.V1Namespace(
         metadata=kubernetes.client.V1ObjectMeta(name=name)
     )
-    api.create_namespace(ns)
+    await api.create_namespace(ns)
     try:
         yield name
     finally:
-        api.delete_namespace(name)
+        await api.delete_namespace(name)
 
 
 @pytest.fixture
-def pod_spec(image_name):
+async def pod_spec(image_name):
     yield make_pod_spec(
         image=image_name, extra_container_config={"imagePullPolicy": "IfNotPresent"}
     )
 
 
 @pytest.fixture
-def clean_pod_spec(pod_spec):
+async def clean_pod_spec(pod_spec):
     yield clean_pod_template(pod_spec)
 
 
 @pytest.fixture
-def cluster(pod_spec, ns, loop):
-    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+async def cluster(pod_spec, ns):
+    with KubeCluster(pod_spec, namespace=ns) as cluster:
         yield cluster
 
 
 @pytest.fixture
-def client(cluster):
+async def client(cluster):
     with Client(cluster) as client:
         yield client
 
 
-def test_versions(client):
+@pytest.mark.asyncio
+async def test_versions(client):
     client.get_versions(check=True)
 
 
-def test_basic(cluster, client):
+@pytest.mark.asyncio
+async def test_basic(cluster, client):
     cluster.scale(2)
     future = client.submit(lambda x: x + 1, 10)
     result = future.result()
     assert result == 11
 
-    while len(cluster.scheduler.workers) < 2:
+    while len(cluster.workers) < 2:
         sleep(0.1)
 
     # Ensure that inter-worker communication works well
@@ -91,25 +93,28 @@ def test_basic(cluster, client):
     assert all(client.has_what().values())
 
 
-def test_logs(cluster):
+@pytest.mark.asyncio
+async def test_logs(cluster):
+    logs = cluster.logs()
+    assert len(logs) == 1
+    assert "distributed.scheduler" in next(iter(logs.values()))
+
     cluster.scale(2)
 
     start = time()
-    while len(cluster.scheduler.workers) < 2:
+    while len(cluster.workers) < 2:
         sleep(0.1)
         assert time() < start + 20
 
-    a, b = cluster.pods()
-    logs = cluster.logs(a)
-    assert "distributed.worker" in logs
-
     logs = cluster.logs()
-    assert len(logs) == 2
-    for pod in logs:
-        assert "distributed.worker" in logs[pod]
+    assert len(logs) == 3
+    for _, log in logs.items():
+        if "distributed.scheduler" not in log:
+            assert "distributed.worker" in log
 
 
-def test_ipython_display(cluster):
+@pytest.mark.asyncio
+async def test_ipython_display(cluster):
     ipywidgets = pytest.importorskip("ipywidgets")
     cluster.scale(1)
     cluster._ipython_display_()
@@ -124,13 +129,15 @@ def test_ipython_display(cluster):
         sleep(0.5)
 
 
-def test_dask_worker_name_env_variable(pod_spec, loop, ns):
+@pytest.mark.asyncio
+async def test_dask_worker_name_env_variable(pod_spec, loop, ns):
     with dask.config.set({"kubernetes.name": "foo-{USER}-{uuid}"}):
         with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
             assert "foo-" + getpass.getuser() in cluster.name
 
 
-def test_diagnostics_link_env_variable(pod_spec, loop, ns):
+@pytest.mark.asyncio
+async def test_diagnostics_link_env_variable(pod_spec, loop, ns):
     pytest.importorskip("bokeh")
     pytest.importorskip("ipywidgets")
     with dask.config.set({"distributed.dashboard.link": "foo-{USER}-{port}"}):
@@ -142,18 +149,15 @@ def test_diagnostics_link_env_variable(pod_spec, loop, ns):
             assert "foo-" + getpass.getuser() + "-" + str(port) in str(box)
 
 
-def test_namespace(pod_spec, loop, ns):
-    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+@pytest.mark.asyncio
+async def test_namespace(pod_spec, ns):
+    with KubeCluster(pod_spec, namespace=ns) as cluster:
         assert "dask" in cluster.name
         assert getpass.getuser() in cluster.name
-        with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster2:
-            assert cluster.name != cluster2.name
-
-            cluster2.scale(1)
-            [pod] = cluster2.pods()
 
 
-def test_adapt(cluster):
+@pytest.mark.asyncio
+async def test_adapt(cluster):
     cluster.adapt()
     with Client(cluster) as client:
         future = client.submit(lambda x: x + 1, 10)
@@ -161,22 +165,24 @@ def test_adapt(cluster):
         assert result == 11
 
     start = time()
-    while cluster.scheduler.workers:
+    while cluster.workers:
         sleep(0.1)
         assert time() < start + 10
 
 
-def test_env(pod_spec, loop, ns):
+@pytest.mark.asyncio
+async def test_env(pod_spec, loop, ns):
     with KubeCluster(pod_spec, env={"ABC": "DEF"}, loop=loop, namespace=ns) as cluster:
         cluster.scale(1)
         with Client(cluster) as client:
-            while not cluster.scheduler.workers:
+            while not cluster.workers:
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v["ABC"] == "DEF" for v in env.values())
 
 
-def test_pod_from_yaml(image_name, loop, ns):
+@pytest.mark.asyncio
+async def test_pod_from_yaml(image_name, loop, ns):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
@@ -209,7 +215,7 @@ def test_pod_from_yaml(image_name, loop, ns):
                 assert result == 11
 
                 start = time()
-                while len(cluster.scheduler.workers) < 2:
+                while len(cluster.workers) < 2:
                     sleep(0.1)
                     assert time() < start + 10, "timeout"
 
@@ -220,13 +226,16 @@ def test_pod_from_yaml(image_name, loop, ns):
                 assert all(client.has_what().values())
 
 
-def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
+@pytest.mark.asyncio
+async def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
     try:
         os.environ["FOO_IMAGE"] = image_name
 
         test_yaml = {
             "kind": "Pod",
-            "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
+            "metadata": {
+                "labels": {"app": "dask", "dask.org/component": "dask-worker"}
+            },
             "spec": {
                 "containers": [
                     {
@@ -253,7 +262,8 @@ def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
         del os.environ["FOO_IMAGE"]
 
 
-def test_pod_from_dict(image_name, loop, ns):
+@pytest.mark.asyncio
+async def test_pod_from_dict(image_name, loop, ns):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -284,7 +294,7 @@ def test_pod_from_dict(image_name, loop, ns):
             result = future.result()
             assert result == 11
 
-            while len(cluster.scheduler.workers) < 2:
+            while len(cluster.workers) < 2:
                 sleep(0.1)
 
             # Ensure that inter-worker communication works well
@@ -294,7 +304,8 @@ def test_pod_from_dict(image_name, loop, ns):
             assert all(client.has_what().values())
 
 
-def test_pod_from_minimal_dict(image_name, loop, ns):
+@pytest.mark.asyncio
+async def test_pod_from_minimal_dict(image_name, loop, ns):
     spec = {
         "spec": {
             "containers": [
@@ -324,15 +335,17 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
             assert result == 11
 
 
-def test_pod_template_from_conf():
-    spec = {"spec": {"containers": [{"name": "some-name"}]}}
+@pytest.mark.asyncio
+async def test_pod_template_from_conf(image_name):
+    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         with KubeCluster() as cluster:
             assert cluster.pod_template.spec.containers[0].name == "some-name"
 
 
-def test_bad_args(loop):
+@pytest.mark.asyncio
+async def test_bad_args():
     with pytest.raises(TypeError) as info:
         KubeCluster("myfile.yaml")
 
@@ -344,7 +357,8 @@ def test_bad_args(loop):
     assert "KubeCluster.from_dict" in str(info.value)
 
 
-def test_constructor_parameters(pod_spec, loop, ns):
+@pytest.mark.asyncio
+async def test_constructor_parameters(pod_spec, loop, ns):
     env = {"FOO": "BAR", "A": 1}
     with KubeCluster(
         pod_spec, name="myname", namespace=ns, loop=loop, env=env
@@ -361,11 +375,13 @@ def test_constructor_parameters(pod_spec, loop, ns):
         assert pod.metadata.generate_name == "myname"
 
 
-def test_reject_evicted_workers(cluster):
+@pytest.mark.skip  # TODO Needs rewriting to use new pod types
+@pytest.mark.asyncio
+async def test_reject_evicted_workers(cluster):
     cluster.scale(1)
 
     start = time()
-    while len(cluster.scheduler.workers) != 1:
+    while len(cluster.workers) != 1:
         sleep(0.1)
         assert time() < start + 60
 
@@ -382,7 +398,7 @@ def test_reject_evicted_workers(cluster):
 
     # Wait until pod is evicted
     start = time()
-    while cluster.pods()[0].status.phase == "Running":
+    while cluster.workers[0].pod.status.phase == "Running":
         sleep(0.1)
         assert time() < start + 60
 
@@ -399,48 +415,35 @@ def test_reject_evicted_workers(cluster):
         assert time() < start + 60
 
 
-def test_scale_up_down(cluster, client):
+@pytest.mark.asyncio
+async def test_scale_up_down(cluster, client):
     np = pytest.importorskip("numpy")
     cluster.scale(2)
 
     start = time()
-    while len(cluster.scheduler.workers) != 2:
+    while len(cluster.workers) != 2:
         sleep(0.1)
         assert time() < start + 10
-
-    a, b = list(cluster.scheduler.workers)
-    x = client.submit(np.ones, 1, workers=a)
-    y = client.submit(np.ones, 50_000_000, workers=b)
-
-    wait([x, y])
-
-    start = time()
-    while (
-        cluster.scheduler.workers[a].metrics["memory"]
-        > cluster.scheduler.workers[b].metrics["memory"]
-    ):
-        sleep(0.1)
-        assert time() < start + 1
 
     cluster.scale(1)
 
     start = time()
-    while len(cluster.scheduler.workers) != 1:
+    while len(cluster.workers) != 1:
         sleep(0.1)
         assert time() < start + 10
 
-    assert set(cluster.scheduler.workers) == {b}
 
-
-def test_scale_up_down_fast(cluster, client):
+@pytest.mark.skip  # This may not be relevant as scaling logic is now upstream
+@pytest.mark.asyncio
+async def test_scale_up_down_fast(cluster, client):
     cluster.scale(1)
 
     start = time()
-    while len(cluster.scheduler.workers) != 1:
+    while len(cluster.workers) != 1:
         sleep(0.1)
         assert time() < start + 10
 
-    worker = next(iter(cluster.scheduler.workers.values()))
+    worker = next(iter(cluster.workers.values()))
 
     # Put some data on this worker
     future = client.submit(lambda: b"\x00" * int(1e6))
@@ -468,9 +471,11 @@ def test_scale_up_down_fast(cluster, client):
     assert len(future.result()) == int(1e6)
 
 
-def test_scale_down_pending(cluster, client):
+@pytest.mark.skip  # This logic has likely been moved upstream
+@pytest.mark.asyncio
+async def test_scale_down_pending(cluster, client):
     # Try to scale the cluster to use more pods than available
-    nodes = cluster.core_api.list_node().items
+    nodes = (cluster.sync(cluster.core_api.list_node)).items
     max_pods = sum(int(node.status.allocatable["pods"]) for node in nodes)
     if max_pods > 50:
         # It's probably not reasonable to run this test against a large
@@ -481,7 +486,7 @@ def test_scale_down_pending(cluster, client):
     cluster.scale(requested_pods)
 
     start = time()
-    while len(cluster.scheduler.workers) < 2:
+    while len(cluster.workers) < 2:
         sleep(0.1)
         # Wait a bit because the kubernetes cluster can take time to provision
         # the requested pods as we requested a large number of pods.
@@ -530,7 +535,8 @@ def test_scale_down_pending(cluster, client):
         assert time() < start + 60
 
 
-def test_automatic_startup(image_name, loop, ns):
+@pytest.mark.asyncio
+async def test_automatic_startup(image_name, ns):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"foo": "bar"}},
@@ -554,49 +560,58 @@ def test_automatic_startup(image_name, loop, ns):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         with dask.config.set({"kubernetes.worker-template-path": fn}):
-            with KubeCluster(loop=loop, namespace=ns) as cluster:
+            with KubeCluster(namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels["foo"] == "bar"
 
 
-def test_repr(cluster):
+@pytest.mark.asyncio
+async def test_repr(cluster):
     for text in [repr(cluster), str(cluster)]:
         assert "Box" not in text
-        assert cluster.scheduler.address in text
+        assert (
+            cluster.scheduler.address in text
+            or cluster.scheduler.external_address in text
+        )
         assert "workers=0" in text
 
 
-def test_escape_username(pod_spec, loop, ns, monkeypatch):
+@pytest.mark.asyncio
+async def test_escape_username(pod_spec, ns, monkeypatch):
     monkeypatch.setenv("LOGNAME", "foo!")
 
-    with KubeCluster(pod_spec, loop=loop, namespace=ns) as cluster:
+    with KubeCluster(pod_spec, namespace=ns) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
         assert "foo" in cluster.pod_template.metadata.labels["user"]
 
 
-def test_escape_name(pod_spec, loop, ns):
-    with KubeCluster(pod_spec, loop=loop, namespace=ns, name="foo@bar") as cluster:
+@pytest.mark.asyncio
+async def test_escape_name(pod_spec, ns):
+    with KubeCluster(pod_spec, namespace=ns, name="foo@bar") as cluster:
         assert "@" not in str(cluster.pod_template)
 
 
-def test_maximum(cluster):
+@pytest.mark.skip  # https://github.com/dask/distributed/issues/3054
+@pytest.mark.asyncio
+async def test_maximum(cluster):
     with dask.config.set(**{"kubernetes.count.max": 1}):
         with captured_logger("dask_kubernetes") as logger:
-            cluster.scale(10)
+            cluster.scale(2)
 
             start = time()
-            while len(cluster.scheduler.workers) <= 0:
+            while len(cluster.workers) <= 0:
                 sleep(0.1)
                 assert time() < start + 60
 
             sleep(0.5)
-            assert len(cluster.scheduler.workers) == 1
+            assert len(cluster.workers) == 1
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
 
 
-def test_default_toleration(clean_pod_spec):
+@pytest.mark.asyncio
+async def test_default_toleration(clean_pod_spec):
     tolerations = clean_pod_spec.to_dict()["spec"]["tolerations"]
     assert {
         "key": "k8s.dask.org/dedicated",
@@ -614,7 +629,8 @@ def test_default_toleration(clean_pod_spec):
     } in tolerations
 
 
-def test_default_toleration_preserved(image_name):
+@pytest.mark.asyncio
+async def test_default_toleration_preserved(image_name):
     pod_spec = make_pod_spec(
         image=image_name,
         extra_pod_config={
@@ -650,7 +666,8 @@ def test_default_toleration_preserved(image_name):
     } in tolerations
 
 
-def test_default_affinity(clean_pod_spec):
+@pytest.mark.asyncio
+async def test_default_affinity(clean_pod_spec):
     affinity = clean_pod_spec.to_dict()["spec"]["affinity"]
 
     assert (
@@ -672,14 +689,16 @@ def test_default_affinity(clean_pod_spec):
     assert affinity["pod_affinity"] is None
 
 
-def test_auth_missing(pod_spec, ns, loop):
+@pytest.mark.asyncio
+async def test_auth_missing(pod_spec, ns):
     with pytest.raises(kubernetes.config.ConfigException) as info:
-        KubeCluster(pod_spec, auth=[], loop=loop, namespace=ns)
+        KubeCluster(pod_spec, auth=[], namespace=ns)
 
     assert "No authorization methods were provided" in str(info.value)
 
 
-def test_auth_tries_all_methods(pod_spec, ns, loop):
+@pytest.mark.asyncio
+async def test_auth_tries_all_methods(pod_spec, ns):
     fails = {"count": 0}
 
     class FailAuth(ClusterAuth):
@@ -688,14 +707,15 @@ def test_auth_tries_all_methods(pod_spec, ns, loop):
             raise kubernetes.config.ConfigException("Fail #{count}".format(**fails))
 
     with pytest.raises(kubernetes.config.ConfigException) as info:
-        KubeCluster(pod_spec, auth=[FailAuth()] * 3, loop=loop, namespace=ns)
+        KubeCluster(pod_spec, auth=[FailAuth()] * 3, namespace=ns)
 
     assert "Fail #3" in str(info.value)
     assert fails["count"] == 3
 
 
-def test_auth_kubeconfig_with_filename():
-    KubeConfig(config_file=CONFIG_DEMO).load()
+@pytest.mark.asyncio
+async def test_auth_kubeconfig_with_filename():
+    await KubeConfig(config_file=CONFIG_DEMO).load()
 
     # we've set the default configuration, so check that it is default
     config = kubernetes.client.Configuration()
@@ -705,8 +725,9 @@ def test_auth_kubeconfig_with_filename():
     assert config.ssl_ca_cert == FAKE_CA
 
 
-def test_auth_kubeconfig_with_context():
-    KubeConfig(config_file=CONFIG_DEMO, context="exp-scratch").load()
+@pytest.mark.asyncio
+async def test_auth_kubeconfig_with_context():
+    await KubeConfig(config_file=CONFIG_DEMO, context="exp-scratch").load()
 
     # we've set the default configuration, so check that it is default
     config = kubernetes.client.Configuration()
@@ -716,8 +737,12 @@ def test_auth_kubeconfig_with_context():
     )
 
 
-def test_auth_explicit():
-    KubeAuth(host="https://9.8.7.6", username="abc", password="some-password").load()
+@pytest.mark.skip  # The default configuration syntax has changed between kubernetes implementations, would be good to explore whether this is ever used
+@pytest.mark.asyncio
+async def test_auth_explicit():
+    await KubeAuth(
+        host="https://9.8.7.6", username="abc", password="some-password"
+    ).load()
 
     config = kubernetes.client.Configuration()
     assert config.host == "https://9.8.7.6"

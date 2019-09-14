@@ -50,7 +50,7 @@ class Pod(ProcessInterface):
         self.name = None
         self.loop = loop
         self.kwargs = kwargs
-        super().__init__(**kwargs)
+        super().__init__()
 
     @property
     def cluster_name(self):
