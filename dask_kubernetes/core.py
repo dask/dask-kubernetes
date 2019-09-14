@@ -50,8 +50,11 @@ class Pod(ProcessInterface):
         self.name = None
         self.loop = loop
         self.kwargs = kwargs
-        self.cluster_name = self.pod_template.metadata.labels["dask.org/cluster-name"]
         super().__init__(**kwargs)
+
+    @property
+    def cluster_name(self):
+        return self.pod_template.metadata.labels["dask.org/cluster-name"]
 
     async def start(self, **kwargs):
         self.pod = await self.core_api.create_namespaced_pod(
@@ -160,7 +163,7 @@ class Scheduler(Pod):
             self.external_address = "tcp://{host}:{port}".format(
                 host=loadbalancer_host, port=8786
             )
-        # TODO Set external address for nodeport type
+        # TODO Set external address when using nodeport service type
 
         # TODO Create an optional Ingress just in case folks want to configure one
 
@@ -518,27 +521,6 @@ class KubeCluster(SpecCluster):
 
         return logs
 
-    def _delete_pods(self, to_delete):
-        for pod in to_delete:
-            try:
-                self.core_api.delete_namespaced_pod(pod.metadata.name, self._namespace)
-                pod_info = pod.metadata.name
-                if pod.status.reason:
-                    pod_info += " [{}]".format(pod.status.reason)
-                if pod.status.message:
-                    pod_info += " {}".format(pod.status.message)
-                logger.info("Deleted pod: %s", pod_info)
-            except kubernetes.client.rest.ApiException as e:
-                # If a pod has already been removed, just ignore the error
-                if e.status != 404:
-                    raise
-
-    def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {"Succeeded", "Failed"}
-        terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
-        self._delete_pods(terminated_pods)
-        return [p for p in pods if p.status.phase not in terminated_phases]
-
 
 async def _cleanup_pods(core_api, namespace, labels):
     """ Remove all pods with these labels in this namespace """
@@ -579,8 +561,6 @@ def _namespace_default():
     return "default"
 
 
-valid_characters = string.ascii_letters + string.digits + "_-."
-
-
 def escape(s):
+    valid_characters = string.ascii_letters + string.digits + "_-."
     return "".join(c for c in s if c in valid_characters)
