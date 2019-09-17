@@ -61,13 +61,13 @@ async def clean_pod_spec(pod_spec):
 
 @pytest.fixture
 async def cluster(pod_spec, ns):
-    with KubeCluster(pod_spec, namespace=ns) as cluster:
+    async with KubeCluster(pod_spec, namespace=ns, asynchronous=True) as cluster:
         yield cluster
 
 
 @pytest.fixture
 async def client(cluster):
-    with Client(cluster) as client:
+    async with Client(cluster) as client:
         yield client
 
 
@@ -95,7 +95,7 @@ async def test_basic(cluster, client):
 
 @pytest.mark.asyncio
 async def test_logs(cluster):
-    logs = cluster.logs()
+    logs = await cluster.logs()
     assert len(logs) == 1
     assert "distributed.scheduler" in next(iter(logs.values()))
 
@@ -106,11 +106,10 @@ async def test_logs(cluster):
         sleep(0.1)
         assert time() < start + 20
 
-    logs = cluster.logs()
+    logs = await cluster.logs()
     assert len(logs) == 3
     for _, log in logs.items():
-        if "distributed.scheduler" not in log:
-            assert "distributed.worker" in log
+        assert "distributed.scheduler" in log or "distributed.worker" in log
 
 
 @pytest.mark.asyncio

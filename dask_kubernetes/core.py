@@ -61,20 +61,6 @@ class Pod(ProcessInterface):
             self.namespace, self.pod_template
         )
 
-        while self.pod.status.phase == "Pending":
-            self.pod = await self.core_api.read_namespaced_pod(
-                self.pod.metadata.name, self.namespace
-            )
-            await asyncio.sleep(0.1)
-
-        while self.address is None:
-            logs = await self.logs()
-            for line in logs.splitlines():
-                for query_string in ["worker at:", "Scheduler at:"]:
-                    if query_string in line:
-                        self.address = line.split(query_string)[1].strip()
-            await asyncio.sleep(0.1)
-
         await super().start(**kwargs)
 
     async def close(self, **kwargs):
@@ -145,6 +131,20 @@ class Scheduler(Pod):
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
+
+        while self.pod.status.phase == "Pending":
+            self.pod = await self.core_api.read_namespaced_pod(
+                self.pod.metadata.name, self.namespace
+            )
+            await asyncio.sleep(0.1)
+
+        while self.address is None:
+            logs = await self.logs()
+            for line in logs.splitlines():
+                if "Scheduler at:" in line:
+                    self.address = line.split("Scheduler at:")[1].strip()
+            await asyncio.sleep(0.1)
+
         self.service = await self._create_service()
         self.address = "tcp://{name}.{namespace}:{port}".format(
             name=self.service.metadata.name, namespace=self.namespace, port=8786
@@ -523,8 +523,11 @@ class KubeCluster(SpecCluster):
             logs["Scheduler"] = await self.scheduler.logs()
 
         if workers:
-            for key, worker in self.workers.items():
-                logs[key] = await worker.logs()
+            worker_logs = await asyncio.gather(
+                *[w.logs() for w in self.workers.values()]
+            )
+            for key, log in zip(self.workers, worker_logs):
+                logs[key] = log
 
         return logs
 
