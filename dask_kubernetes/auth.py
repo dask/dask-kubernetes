@@ -91,7 +91,7 @@ class InCluster(ClusterAuth):
     """
 
     async def load(self):
-        await kubernetes.config.load_incluster_config()
+        kubernetes.config.load_incluster_config()
 
 
 class KubeConfig(ClusterAuth):
