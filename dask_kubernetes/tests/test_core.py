@@ -67,20 +67,21 @@ async def cluster(pod_spec, ns):
 
 @pytest.fixture
 async def client(cluster):
-    async with Client(cluster) as client:
+    async with Client(cluster, asynchronous=True) as client:
         yield client
 
 
+@pytest.mark.skip  # Waiting on https://github.com/dask/distributed/pull/3064
 @pytest.mark.asyncio
 async def test_versions(client):
-    client.get_versions(check=True)
+    await client.get_versions(check=True)
 
 
 @pytest.mark.asyncio
 async def test_basic(cluster, client):
     cluster.scale(2)
     future = client.submit(lambda x: x + 1, 10)
-    result = future.result()
+    result = await future.result()
     assert result == 11
 
     while len(cluster.workers) < 2:
@@ -89,8 +90,8 @@ async def test_basic(cluster, client):
     # Ensure that inter-worker communication works well
     futures = client.map(lambda x: x + 1, range(10))
     total = client.submit(sum, futures)
-    assert total.result() == sum(map(lambda x: x + 1, range(10)))
-    assert all(client.has_what().values())
+    assert await total.result() == sum(map(lambda x: x + 1, range(10)))
+    assert all((await client.has_what()).values())
 
 
 @pytest.mark.asyncio
@@ -100,11 +101,12 @@ async def test_logs(cluster):
     assert "distributed.scheduler" in next(iter(logs.values()))
 
     cluster.scale(2)
+    await cluster
 
     start = time()
     while len(cluster.workers) < 2:
         sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 30
 
     logs = await cluster.logs()
     assert len(logs) == 3
