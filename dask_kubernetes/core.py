@@ -43,7 +43,7 @@ class Pod(ProcessInterface):
     """
 
     def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
-        self.pod = None
+        self._pod = None
         self.core_api = core_api
         self.pod_template = copy.deepcopy(pod_template)
         self.namespace = namespace
@@ -57,25 +57,31 @@ class Pod(ProcessInterface):
         return self.pod_template.metadata.labels["dask.org/cluster-name"]
 
     async def start(self, **kwargs):
-        self.pod = await self.core_api.create_namespaced_pod(
+        self._pod = await self.core_api.create_namespaced_pod(
             self.namespace, self.pod_template
         )
 
         await super().start(**kwargs)
 
     async def close(self, **kwargs):
-        if self.pod:
+        if self._pod:
             await self.core_api.delete_namespaced_pod(
-                self.pod.metadata.name, self.namespace
+                self._pod.metadata.name, self.namespace
             )
         await super().close(**kwargs)
 
     async def logs(self):
         return Log(
             await self.core_api.read_namespaced_pod_log(
-                self.pod.metadata.name, self.namespace
+                self._pod.metadata.name, self.namespace
             )
         )
+
+    async def describe_pod(self):
+        self._pod = await self.core_api.read_namespaced_pod(
+            self._pod.metadata.name, self.namespace
+        )
+        return self._pod
 
     def __repr__(self):
         return "<Pod %s: status=%s>" % (type(self).__name__, self.status)
@@ -132,10 +138,7 @@ class Scheduler(Pod):
     async def start(self, **kwargs):
         await super().start(**kwargs)
 
-        while self.pod.status.phase == "Pending":
-            self.pod = await self.core_api.read_namespaced_pod(
-                self.pod.metadata.name, self.namespace
-            )
+        while (await self.describe_pod()).status.phase == "Pending":
             await asyncio.sleep(0.1)
 
         while self.address is None:
@@ -501,6 +504,17 @@ class KubeCluster(SpecCluster):
     @property
     def name(self):
         return self.pod_template.metadata.generate_name
+
+    def scale(self, n):
+        # A shim to maintain backward compatibility
+        # https://github.com/dask/distributed/issues/3054
+        maximum = dask.config.get("kubernetes.count.max")
+        if maximum is not None and maximum < n:
+            logger.info(
+                "Tried to scale beyond maximum number of workers %d > %d", n, maximum
+            )
+            n = maximum
+        return super().scale(n)
 
     async def _logs(self, scheduler=True, workers=True):
         """ Return logs for the scheduler and workers
