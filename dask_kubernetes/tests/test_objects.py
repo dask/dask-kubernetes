@@ -48,7 +48,7 @@ def test_container_resources_config(image_name, loop):
     """
     with KubeCluster(
         make_pod_spec(
-            image_name, memory_request="1G", memory_limit="2G", cpu_limit="2"
+            image_name, memory_request="0.5G", memory_limit="1G", cpu_limit="1"
         ),
         loop=loop,
         n_workers=0,
@@ -56,9 +56,9 @@ def test_container_resources_config(image_name, loop):
 
         pod = cluster.pod_template
 
-        assert pod.spec.containers[0].resources.requests["memory"] == "1G"
-        assert pod.spec.containers[0].resources.limits["memory"] == "2G"
-        assert pod.spec.containers[0].resources.limits["cpu"] == "2"
+        assert pod.spec.containers[0].resources.requests["memory"] == "0.5G"
+        assert pod.spec.containers[0].resources.limits["memory"] == "1G"
+        assert pod.spec.containers[0].resources.limits["cpu"] == "1"
         assert "cpu" not in pod.spec.containers[0].resources.requests
 
 
