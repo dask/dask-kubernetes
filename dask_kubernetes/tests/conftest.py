@@ -9,8 +9,5 @@ def pytest_addoption(parser):
 def image_name(request):
     worker_image = request.config.getoption("--worker-image")
     if not worker_image:
-        pytest.fail(
-            "Need to pass --worker-image. "
-            "Image must have the same Python and dask versions as host"
-        )
+        return "daskdev/dask:dev"
     return worker_image
