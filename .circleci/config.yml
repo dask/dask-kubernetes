@@ -46,8 +46,9 @@ jobs:
       - run:
           command: |
             KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
-            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
+            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
             echo "search default.svc.cluster.local svc.cluster.local cluster.local" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
+            echo "options ndots:5" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
             sudo resolvconf -u
       - run:
           command: |
