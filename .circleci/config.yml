@@ -52,9 +52,8 @@ jobs:
             sudo resolvconf -u
       - run:
           command: |
-            KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
-            echo $KUBEDNS
-            nslookup circleci-example.default $KUBEDNS
+            nslookup circleci-example.default
+            curl circleci-example.default
       - restore_cache:
           keys:
             - miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
