@@ -36,7 +36,7 @@ jobs:
       - run:
           command: |
             sudo kubectl run circleci-example --image=nginx
-            sudo kubectl expose deployment circleci-example --type=ClusterIP --name=circleci-example
+            sudo kubectl expose deployment circleci-example --port 80 --type=ClusterIP --name=circleci-example
       - run:
           command: |
             sudo kubectl get deployment
