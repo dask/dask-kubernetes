@@ -21,6 +21,7 @@ from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
+from kubernetes_asyncio.client.rest import ApiException
 from tornado import gen
 
 from .objects import (
@@ -71,11 +72,16 @@ class Pod(ProcessInterface):
         await super().close(**kwargs)
 
     async def logs(self):
-        return Log(
-            await self.core_api.read_namespaced_pod_log(
+        try:
+            log = await self.core_api.read_namespaced_pod_log(
                 self._pod.metadata.name, self.namespace
             )
-        )
+        except ApiException as e:
+            if "waiting to start" in str(e):
+                log = ""
+            else:
+                raise e
+        return Log(log)
 
     async def describe_pod(self):
         self._pod = await self.core_api.read_namespaced_pod(
