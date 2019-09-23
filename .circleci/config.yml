@@ -48,7 +48,8 @@ jobs:
             echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
             echo "search default.svc.cluster.local svc.cluster.local cluster.local" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
             sudo resolvconf -u
-            cat /etc/resolv.conf
+            cat /etc/resolvconf/resolv.conf.d/base
+            # cat /etc/resolv.conf
       - run:
           command: |
             curl circleci-example.default
