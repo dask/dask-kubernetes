@@ -53,7 +53,9 @@ jobs:
             sudo resolvconf -u
       - run:
           command: |
-            nslookup circleci-example.default
+            until nslookup circleci-example.default; do
+              sleep 1
+            done
             curl circleci-example.default
       - restore_cache:
           keys:
