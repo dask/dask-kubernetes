@@ -45,7 +45,8 @@ jobs:
             MINIKUBEIP=`sudo -E minikube ip`
             KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
             sudo route add -net 10.96.0.0 netmask 255.255.255.0 gw $MINIKUBEIP
-            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
+            sudo kubectl get svc --namespace=kube-system
+            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolv.conf > /dev/null
             sudo resolvconf -u
             curl circleci-example.default
       - restore_cache:
