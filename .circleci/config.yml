@@ -47,15 +47,17 @@ jobs:
           command: |
             MINIKUBEIP=`sudo -E minikube ip`
             KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
-            sudo route add -net 10.96.0.0 netmask 255.255.255.0 gw $MINIKUBEIP
-            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
-            echo "search default.svc.cluster.local svc.cluster.local cluster.local" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
+            sudo ip route add 10.96.0.0/24 dev docker0
+            sudo ip route show table all
+            # sudo route add -net 10.96.0.0 netmask 255.255.255.0 gw $MINIKUBEIP
+            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
+            echo "search default.svc.cluster.local svc.cluster.local cluster.local" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
             sudo resolvconf -u
-            cat /etc/resolvconf/resolv.conf.d/base
-            # cat /etc/resolv.conf
       - run:
           command: |
-            curl circleci-example.default
+            KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
+            echo $KUBEDNS
+            nslookup circleci-example.default $KUBEDNS
       - restore_cache:
           keys:
             - miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
