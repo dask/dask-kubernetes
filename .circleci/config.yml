@@ -26,6 +26,9 @@ jobs:
             sudo -E minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20 --extra-config=apiserver.service-cluster-ip-range=10.96.0.0/24
       - run:
           command: |
+            sudo -E minikube addons enable kube-dns
+      - run:
+          command: |
             sudo -E minikube update-context
       - run:
           command: |
