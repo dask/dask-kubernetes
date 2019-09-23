@@ -23,7 +23,7 @@ jobs:
             curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v0.25.2/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
       - run:
           command: |
-            sudo -E minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20
+            sudo -E minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20 --extra-config=apiserver.service-cluster-ip-range=10.96.0.0/24
       - run:
           command: |
             sudo -E minikube update-context
@@ -36,34 +36,43 @@ jobs:
       - run:
           command: |
             sudo kubectl run circleci-example --image=nginx
+            sudo kubectl expose deployment circleci-example --type=ClusterIP --name=circleci-example
       - run:
           command: |
             sudo kubectl get deployment
+      - run:
+          command: |
+            MINIKUBEIP=`sudo -E minikube ip`
+            KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
+            sudo route -n add 10.96.0.0/24 $MINIKUBEIP
+            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
+            sudo resolvconf -u
+            curl circleci-example.default
       - restore_cache:
           keys:
             - miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
       - run:
           name: install miniconda
           command: |
-              if [ ! -d "/home/circleci/miniconda" ]; then
-                wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-                bash miniconda.sh -b -p $HOME/miniconda
-                export PATH="$HOME/miniconda/bin:$PATH"
-                conda config --set always_yes yes --set changeps1 no
-              fi
-              sudo chown -R $USER.$USER $HOME
+            if [ ! -d "/home/circleci/miniconda" ]; then
+              wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+              bash miniconda.sh -b -p $HOME/miniconda
+              export PATH="$HOME/miniconda/bin:$PATH"
+              conda config --set always_yes yes --set changeps1 no
+            fi
+            sudo chown -R $USER.$USER $HOME
       - run:
           name: configure conda
           command: |
-              export PATH="$HOME/miniconda/bin:$PATH"
-              if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
-                conda update -q conda
-                conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
-                source activate ${ENV_NAME}
-                pip install --no-deps --quiet -e .
-              fi
-              conda env list
-              conda list ${ENV_NAME}
+            export PATH="$HOME/miniconda/bin:$PATH"
+            if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
+              conda update -q conda
+              conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
+              source activate ${ENV_NAME}
+              pip install --no-deps --quiet -e .
+            fi
+            conda env list
+            conda list ${ENV_NAME}
       - save_cache:
           key: miniconda-v1-{{ checksum "ci/environment-3.7.yml" }}
           paths:
@@ -71,8 +80,8 @@ jobs:
       - run:
           name: build docker
           command: |
-              # eval $(minikube docker-env)
-              docker build -t daskdev/dask:dev docker/
+            # eval $(minikube docker-env)
+            docker build -t daskdev/dask:dev docker/
       - run:
           command: |
             # eval $(minikube docker-env)
