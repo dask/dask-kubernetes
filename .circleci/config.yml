@@ -43,6 +43,7 @@ jobs:
       - run:
           command: |
             sudo kubectl get deployment
+            sudo kubectl get service
       - run:
           command: |
             KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
