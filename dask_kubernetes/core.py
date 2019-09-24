@@ -200,7 +200,7 @@ class Scheduler(Pod):
         await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
         )
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
         return await self.core_api.read_namespaced_service(
             self.cluster_name, self.namespace
         )
