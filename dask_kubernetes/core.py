@@ -197,9 +197,11 @@ class Scheduler(Pod):
             self.service_template.spec.type = dask.config.get(
                 "kubernetes.scheduler-service-type"
             )
-
-        return await self.core_api.create_namespaced_service(
+        await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
+        )
+        return await self.core_api.read_namespaced_service(
+            self.cluster_name, self.namespace
         )
 
         # TODO Clean up services
