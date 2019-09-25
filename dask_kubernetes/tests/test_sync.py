@@ -80,10 +80,6 @@ def test_fixtures(client, cluster):
     assert client.submit(lambda x: x + 1, 10).result(timeout=10) == 11
 
 
-def test_versions(client):
-    client.get_versions(check=True)
-
-
 def test_basic(cluster, client):
     cluster.scale(2)
     future = client.submit(lambda x: x + 1, 10)
@@ -111,7 +107,7 @@ def test_ipython_display(cluster):
 
     start = time()
     while "<td>1</td>" not in str(box):  # one worker in a table
-        assert time() < start + 20
+        assert time() < start + 30
         sleep(0.5)
 
 
