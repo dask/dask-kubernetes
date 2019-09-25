@@ -107,7 +107,7 @@ def test_ipython_display(cluster):
 
     start = time()
     while "<td>1 / 1</td>" not in str(box):  # one worker in a table
-        print(str(box))
+        cluster._ipython_display_()
         assert time() < start + 30
         sleep(0.5)
 
