@@ -190,7 +190,7 @@ async def test_ipython_display(cluster):
     assert cluster._cached_widget is box
 
     start = time()
-    while "<td>1</td>" not in str(box):  # one worker in a table
+    while "<td>1 / 1</td>" not in str(box):  # one worker in a table
         assert time() < start + 20
         await gen.sleep(0.5)
 
