@@ -340,7 +340,7 @@ def test_scale_up_down(cluster, client):
     # assert set(cluster.scheduler_info["workers"]) == {b}
 
 
-def test_automatic_startup(image_name, loop, ns):
+def test_automatic_startup(image_name, ns):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"foo": "bar"}},
@@ -364,7 +364,7 @@ def test_automatic_startup(image_name, loop, ns):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         with dask.config.set({"kubernetes.worker-template-path": fn}):
-            with KubeCluster(loop=loop, namespace=ns) as cluster:
+            with KubeCluster(namespace=ns) as cluster:
                 assert cluster.pod_template.metadata.labels["foo"] == "bar"
 
 
