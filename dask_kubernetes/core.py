@@ -422,12 +422,7 @@ class KubeCluster(SpecCluster):
         self.pod_template.metadata.generate_name = self._generate_name
 
         finalize(
-            self,
-            self.sync,
-            _cleanup_pods,
-            self.core_api,
-            self._namespace,
-            self.pod_template.metadata.labels,
+            self, _cleanup_pods, self._namespace, self.pod_template.metadata.labels
         )
 
         common_options = {
@@ -558,14 +553,15 @@ class KubeCluster(SpecCluster):
         return logs
 
 
-async def _cleanup_pods(core_api, namespace, labels):
+def _cleanup_pods(namespace, labels):
     """ Remove all pods with these labels in this namespace """
-    pods = await core_api.list_namespaced_pod(
-        namespace, label_selector=format_labels(labels)
-    )
+    import kubernetes
+
+    core_api = kubernetes.client.CoreV1Api()
+    pods = core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
-            await core_api.delete_namespaced_pod(pod.metadata.name, namespace)
+            core_api.delete_namespaced_pod(pod.metadata.name, namespace)
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
