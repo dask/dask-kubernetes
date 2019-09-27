@@ -216,8 +216,6 @@ class Scheduler(Pod):
             self.cluster_name, self.namespace
         )
 
-        # TODO Clean up services
-
 
 class KubeCluster(SpecCluster):
     """ Launch a Dask cluster on Kubernetes
