@@ -235,6 +235,8 @@ class KubeCluster(Cluster):
             )
         self.pod_template.metadata.generate_name = name
 
+        self.worker_type_pod_templates = {}
+
         finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
 
         if n_workers:
@@ -243,6 +245,47 @@ class KubeCluster(Cluster):
             except Exception:
                 self.cluster.close()
                 raise
+
+    def config_pod_template(self, pod_template):
+        name = dask.config.get("kubernetes.name")
+        namespace = dask.config.get("kubernetes.namespace")
+        n_workers = dask.config.get("kubernetes.count.start")
+        host = dask.config.get("kubernetes.host")
+        port = dask.config.get("kubernetes.port")
+        env = dask.config.get("kubernetes.env")
+
+        pod_template = clean_pod_template(pod_template)
+
+        if namespace is None:
+            namespace = _namespace_default()
+
+        name = name.format(
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+        )
+        name = escape(name)
+
+        # Default labels that can't be overwritten
+        pod_template.metadata.labels["dask.org/cluster-name"] = name
+        pod_template.metadata.labels["user"] = escape(getpass.getuser())
+        pod_template.metadata.labels["app"] = "dask"
+        pod_template.metadata.labels["component"] = "dask-worker"
+        pod_template.metadata.namespace = namespace
+
+        pod_template.spec.containers[0].env.append(
+            kubernetes.client.V1EnvVar(
+                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
+            )
+        )
+        if env:
+            pod_template.spec.containers[0].env.extend(
+                [
+                    kubernetes.client.V1EnvVar(name=k, value=str(v))
+                    for k, v in env.items()
+                ]
+            )
+        pod_template.metadata.generate_name = name
+        return pod_template
+
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -273,6 +316,17 @@ class KubeCluster(Cluster):
         return cls(make_pod_from_dict(pod_spec), **kwargs)
 
     @classmethod
+    def yaml_to_dict(cls, yaml_path):
+        if not yaml:
+            raise ImportError(
+                "PyYaml is required to use yaml functionality, please install it!"
+            )
+        with open(yaml_path) as f:
+            d = yaml.safe_load(f)
+            d = dask.config.expand_environment_variables(d)
+        return d
+
+    @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
         """ Create cluster with worker pod spec defined by a YAML file
 
@@ -301,14 +355,14 @@ class KubeCluster(Cluster):
         --------
         KubeCluster.from_dict
         """
-        if not yaml:
-            raise ImportError(
-                "PyYaml is required to use yaml functionality, please install it!"
-            )
-        with open(yaml_path) as f:
-            d = yaml.safe_load(f)
-            d = dask.config.expand_environment_variables(d)
-            return cls.from_dict(d, **kwargs)
+        d = cls.yaml_to_dict(yaml_path)
+        return cls.from_dict(d, **kwargs)
+
+    def add_worker_type(self, worker_type, yaml_path):
+        d = KubeCluster.yaml_to_dict(yaml_path)
+        pod_template = make_pod_from_dict(d)
+        pod_template = self.config_pod_template(pod_template)
+        self.worker_type_pod_templates[worker_type] = pod_template
 
     @property
     def namespace(self):
@@ -382,13 +436,15 @@ class KubeCluster(Cluster):
     def adapt(self, Adaptive=Adaptive, **kwargs):
         return super().adapt(Adaptive=Adaptive, **kwargs)
 
-    def scale(self, n):
+    def scale(self, n, worker_type=None):
         """ Scale cluster to n workers
 
         Parameters
         ----------
         n: int
             Target number of workers
+        worker_type: str
+            Type of worker; used to select
 
         Example
         -------
@@ -401,7 +457,7 @@ class KubeCluster(Cluster):
         """
         pods = self._cleanup_terminated_pods(self.pods())
         if n >= len(pods):
-            self.scale_up(n, pods=pods)
+            self.scale_up(n, pods=pods, worker_type=worker_type)
             return
         else:
             n_to_delete = len(pods) - n
@@ -458,7 +514,7 @@ class KubeCluster(Cluster):
         self._delete_pods(terminated_pods)
         return [p for p in pods if p.status.phase not in terminated_phases]
 
-    def scale_up(self, n, pods=None, **kwargs):
+    def scale_up(self, n, pods=None, worker_type=None, **kwargs):
         """
         Make sure we have n dask-workers available for this cluster
 
@@ -480,7 +536,8 @@ class KubeCluster(Cluster):
                 for _ in range(to_create):
                     new_pods.append(
                         self.core_api.create_namespaced_pod(
-                            self.namespace, self.pod_template
+                            self.namespace,
+                            self.worker_type_pod_templates[worker_type] if worker_type else self.pod_template
                         )
                     )
                     to_create -= 1
