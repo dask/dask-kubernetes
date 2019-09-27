@@ -4,18 +4,19 @@ kubernetes:
   count:
     start: 0
     max: null
-  host: '0.0.0.0'
+  host: "0.0.0.0"
   port: 0
   env: {}
+  scheduler-timeout: "5 minutes" # Length of inactivity to wait before closing the cluster
 
-  scheduler-service-type: 'ClusterIP'
+  scheduler-service-type: "ClusterIP"
 
   scheduler-service-template:
     apiVersion: v1
     kind: Service
     spec:
       selector:
-        dask.org/cluster-name: ''  # Cluster name will be added automatically
+        dask.org/cluster-name: "" # Cluster name will be added automatically
         dask.org/component: scheduler
       ports:
         - name: comm
@@ -29,7 +30,8 @@ kubernetes:
 
   worker-template-path: null
 
-  worker-template: {}
+  worker-template:
+    {}
     # kind: Pod
     # metadata:
     #   labels:

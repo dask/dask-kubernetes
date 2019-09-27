@@ -137,14 +137,17 @@ class Scheduler(Pod):
         TODO Document Scheduler kwargs
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, scheduler_timeout: str, **kwargs):
         super().__init__(**kwargs)
         self.service = None
+        self._scheduler_timeout = scheduler_timeout
 
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
         self.pod_template.spec.containers[0].args = [
-            "dask-scheduler"
-        ]  # TODO Add scheduler timeout
+            "dask-scheduler",
+            "--idle-timeout",
+            self._scheduler_timeout,
+        ]
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
@@ -344,12 +347,14 @@ class KubeCluster(SpecCluster):
         port=None,
         env=None,
         auth=ClusterAuth.DEFAULT,
+        scheduler_timeout=None,
         **kwargs
     ):
         self.pod_template = pod_template
         self._generate_name = name
         self._namespace = namespace
         self._n_workers = n_workers
+        self._scheduler_timeout = scheduler_timeout
         self.host = host
         self.port = port
         self.env = env
@@ -360,6 +365,9 @@ class KubeCluster(SpecCluster):
     async def _start(self):
         self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
         self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
+        self._scheduler_timeout = self._scheduler_timeout or dask.config.get(
+            "kubernetes.scheduler-timeout"
+        )
         self._n_workers = (
             self._n_workers
             if self._n_workers is not None
@@ -438,7 +446,10 @@ class KubeCluster(SpecCluster):
             "loop": self.loop,
         }
 
-        self.scheduler_spec = {"cls": Scheduler, "options": {**common_options}}
+        self.scheduler_spec = {
+            "cls": Scheduler,
+            "options": {"scheduler_timeout": self._scheduler_timeout, **common_options},
+        }
         self.new_spec = {"cls": Worker, "options": {**common_options}}
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
 
