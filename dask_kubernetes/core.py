@@ -48,6 +48,7 @@ class Pod(ProcessInterface):
         self._pod = None
         self.core_api = core_api
         self.pod_template = copy.deepcopy(pod_template)
+        self.base_labels = self.pod_template.metadata.labels
         self.namespace = namespace
         self.name = None
         self.loop = loop
@@ -197,9 +198,8 @@ class Scheduler(Pod):
             make_service_from_dict(service_template_dict)
         )
         self.service_template.metadata.name = self.cluster_name
-        self.service_template.metadata.labels[
-            "dask.org/cluster-name"
-        ] = self.cluster_name
+        self.service_template.metadata.labels = copy.deepcopy(self.base_labels)
+
         self.service_template.spec.selector["dask.org/cluster-name"] = self.cluster_name
         if self.service_template.spec.type is None:
             self.service_template.spec.type = dask.config.get(
@@ -430,7 +430,7 @@ class KubeCluster(SpecCluster):
         self.pod_template.metadata.generate_name = self._generate_name
 
         finalize(
-            self, _cleanup_pods, self._namespace, self.pod_template.metadata.labels
+            self, _cleanup_resources, self._namespace, self.pod_template.metadata.labels
         )
 
         common_options = {
@@ -561,11 +561,12 @@ class KubeCluster(SpecCluster):
         return logs
 
 
-def _cleanup_pods(namespace, labels):
+def _cleanup_resources(namespace, labels):
     """ Remove all pods with these labels in this namespace """
     import kubernetes
 
     core_api = kubernetes.client.CoreV1Api()
+
     pods = core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
@@ -573,6 +574,18 @@ def _cleanup_pods(namespace, labels):
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
+            if e.status != 404:
+                raise
+
+    services = core_api.list_namespaced_service(
+        namespace, label_selector=format_labels(labels)
+    )
+    for service in services.items:
+        try:
+            core_api.delete_namespaced_service(service.metadata.name, namespace)
+            logger.info("Deleted service: %s", service.metadata.name)
+        except kubernetes.client.rest.ApiException as e:
+            # ignore error if service is already removed
             if e.status != 404:
                 raise
 
