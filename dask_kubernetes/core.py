@@ -246,7 +246,7 @@ class KubeCluster(Cluster):
                 self.cluster.close()
                 raise
 
-    def config_pod_template(self, pod_template):
+    def config_pod_template(self, pod_template, worker_type=None):
         name = dask.config.get("kubernetes.name")
         namespace = dask.config.get("kubernetes.namespace")
         n_workers = dask.config.get("kubernetes.count.start")
@@ -262,10 +262,18 @@ class KubeCluster(Cluster):
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
+        if worker_type:
+            if len(name.split("-")) >= 3:
+                split_name = name.split("-", 2)
+                name = "{}-{}-{}-{}".format(split_name[0], split_name[1], worker_type, split_name[2])
+            else:
+                name = "{}-{}".format(name, worker_type)
         name = escape(name)
 
         # Default labels that can't be overwritten
         pod_template.metadata.labels["dask.org/cluster-name"] = name
+        if worker_type:
+            pod_template.metadata.labels["dask.org/worker-type"] = worker_type
         pod_template.metadata.labels["user"] = escape(getpass.getuser())
         pod_template.metadata.labels["app"] = "dask"
         pod_template.metadata.labels["component"] = "dask-worker"
@@ -285,7 +293,6 @@ class KubeCluster(Cluster):
             )
         pod_template.metadata.generate_name = name
         return pod_template
-
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -361,7 +368,7 @@ class KubeCluster(Cluster):
     def add_worker_type(self, worker_type, yaml_path):
         d = KubeCluster.yaml_to_dict(yaml_path)
         pod_template = make_pod_from_dict(d)
-        pod_template = self.config_pod_template(pod_template)
+        pod_template = self.config_pod_template(pod_template, worker_type=worker_type)
         self.worker_type_pod_templates[worker_type] = pod_template
 
     @property
@@ -390,8 +397,13 @@ class KubeCluster(Cluster):
     def scheduler_address(self):
         return self.scheduler.address
 
-    def pods(self):
+    def pods(self, worker_type=None):
         """ A list of kubernetes pods corresponding to current workers
+
+        Parameters
+        ----------
+        worker_type: str
+            The type of worker. The default None value will return all worker pods regardless of type.
 
         See Also
         --------
@@ -399,7 +411,11 @@ class KubeCluster(Cluster):
         """
         return self.core_api.list_namespaced_pod(
             self.namespace,
-            label_selector=format_labels(self.pod_template.metadata.labels),
+            label_selector=format_labels(
+                self.worker_type_pod_templates[worker_type].metadata.labels
+                if worker_type
+                else self.pod_template.metadata.labels
+            ),
         ).items
 
     @property
@@ -455,7 +471,7 @@ class KubeCluster(Cluster):
         KubeCluster.scale_up
         KubeCluster.scale_down
         """
-        pods = self._cleanup_terminated_pods(self.pods())
+        pods = self._cleanup_terminated_pods(self.pods(worker_type=worker_type))
         if n >= len(pods):
             self.scale_up(n, pods=pods, worker_type=worker_type)
             return
@@ -467,17 +483,19 @@ class KubeCluster(Cluster):
             running_workers = list(self.scheduler.workers.keys())
             running_ips = set(urlparse(worker).hostname for worker in running_workers)
             pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
+            logger.info('pending_pods = {}'.format(pending_pods))
             if pending_pods:
                 pending_to_delete = pending_pods[:n_to_delete]
-                logger.debug("Deleting pending pods: %s", pending_to_delete)
+                logger.info("Deleting pending pods: %s", pending_to_delete)
                 self._delete_pods(pending_to_delete)
                 n_to_delete = n_to_delete - len(pending_to_delete)
                 if n_to_delete <= 0:
                     return
 
-            to_close = select_workers_to_close(self.scheduler, n_to_delete)
-            logger.debug("Closing workers: %s", to_close)
-            if len(to_close) < len(self.scheduler.workers):
+            to_close = self.select_workers_to_close(n_to_delete, worker_type=worker_type)
+            logger.info("Closing workers: %s", to_close)
+            if len(to_close) < len(self.filter_workers_by_type(self.cluster.scheduler.workers.values(), worker_type)):
+                logger.info('calling coroutine on to_close = {}'.format(to_close))
                 # Close workers cleanly to migrate any temporary results to
                 # remaining workers.
                 @gen.coroutine
@@ -485,7 +503,7 @@ class KubeCluster(Cluster):
                     yield self.scheduler.retire_workers(
                         workers=to_close, remove=True, close_workers=True
                     )
-                    yield offload(self.scale_down, to_close)
+                    yield offload(self.scale_down, to_close, worker_type=worker_type)
 
                 self.scheduler.loop.add_callback(f, to_close)
                 return
@@ -495,6 +513,7 @@ class KubeCluster(Cluster):
 
     def _delete_pods(self, to_delete):
         for pod in to_delete:
+            logger.info('to_delete = {}'.format(pod))
             try:
                 self.core_api.delete_namespaced_pod(pod.metadata.name, self.namespace)
                 pod_info = pod.metadata.name
@@ -528,7 +547,7 @@ class KubeCluster(Cluster):
                 "Tried to scale beyond maximum number of workers %d > %d", n, maximum
             )
             n = maximum
-        pods = pods or self._cleanup_terminated_pods(self.pods())
+        pods = pods or self._cleanup_terminated_pods(self.pods(worker_type=worker_type))
         to_create = n - len(pods)
         new_pods = []
         for i in range(3):
@@ -537,7 +556,9 @@ class KubeCluster(Cluster):
                     new_pods.append(
                         self.core_api.create_namespaced_pod(
                             self.namespace,
-                            self.worker_type_pod_templates[worker_type] if worker_type else self.pod_template
+                            self.worker_type_pod_templates[worker_type]
+                            if worker_type
+                            else self.pod_template,
                         )
                     )
                     to_create -= 1
@@ -553,7 +574,7 @@ class KubeCluster(Cluster):
         else:
             raise last_exception
 
-    def scale_down(self, workers, pods=None):
+    def scale_down(self, workers, pods=None, worker_type=None):
         """ Remove the pods for the requested list of workers
 
         When scale_down is called by the _adapt async loop, the workers are
@@ -571,16 +592,43 @@ class KubeCluster(Cluster):
         workers: List[str] List of addresses of workers to close
         """
         # Get the existing worker pods
-        pods = pods or self._cleanup_terminated_pods(self.pods())
+        pods = pods or self._cleanup_terminated_pods(self.pods(worker_type=worker_type))
 
         # Work out the list of pods that we are going to delete
         # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
         # Convert this to a set of IPs
         ips = set(urlparse(worker).hostname for worker in workers)
         to_delete = [p for p in pods if p.status.pod_ip in ips]
+        logger.info('ips = {} to_delete = {}'.format(ips, to_delete))
         if not to_delete:
             return
         self._delete_pods(to_delete)
+
+    def select_workers_to_close(self, n_to_close, worker_type=None):
+        """ Select n workers to close from scheduler """
+        workers = self.filter_workers_by_type(self.cluster.scheduler.workers.values(), worker_type)
+        pods = self.pods(worker_type=worker_type)
+        pod_ips = [p.status.pod_ip for p in pods]
+        logger.info("pod_ips = {}".format(pod_ips))
+        assert n_to_close <= len(workers)
+        key = lambda ws: ws.metrics["memory"]
+        to_close = set(sorted(self.filter_workers_by_type(self.cluster.scheduler.idle, worker_type),
+                              key=key)[:n_to_close])
+
+        if len(to_close) < n_to_close:
+            rest = sorted(workers, key=key, reverse=True)
+            while len(to_close) < n_to_close:
+                if worker_type and any([pod_ip in rest[-1:] for pod_ip in pod_ips]):
+                    to_close.add(rest.pop())
+                else:
+                    to_close.add(rest.pop())
+        logger.info("to_close = {}".format(to_close))
+        return [ws.address for ws in to_close]
+
+    def filter_workers_by_type(self, workers, worker_type):
+        pods = self.pods(worker_type=worker_type)
+        pod_ips = [p.status.pod_ip for p in pods]
+        return [w for w in workers if any([pod_ip in w.name for pod_ip in pod_ips])]
 
     def __enter__(self):
         return self
@@ -643,21 +691,6 @@ def _namespace_default():
         with open(ns_path) as f:
             return f.read().strip()
     return "default"
-
-
-def select_workers_to_close(scheduler, n_to_close):
-    """ Select n workers to close from scheduler """
-    workers = list(scheduler.workers.values())
-    assert n_to_close <= len(workers)
-    key = lambda ws: ws.metrics["memory"]
-    to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
-
-    if len(to_close) < n_to_close:
-        rest = sorted(workers, key=key, reverse=True)
-        while len(to_close) < n_to_close:
-            to_close.add(rest.pop())
-
-    return [ws.address for ws in to_close]
 
 
 valid_characters = string.ascii_letters + string.digits + "_-."
