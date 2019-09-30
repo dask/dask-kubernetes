@@ -265,7 +265,9 @@ class KubeCluster(Cluster):
         if worker_type:
             if len(name.split("-")) >= 3:
                 split_name = name.split("-", 2)
-                name = "{}-{}-{}-{}".format(split_name[0], split_name[1], worker_type, split_name[2])
+                name = "{}-{}-{}-{}".format(
+                    split_name[0], split_name[1], worker_type, split_name[2]
+                )
             else:
                 name = "{}-{}".format(name, worker_type)
         name = escape(name)
@@ -419,7 +421,8 @@ class KubeCluster(Cluster):
         ).items
 
     @property
-    def workers(self):
+    def workers(self, worker_type=None):
+        # TODO: this needs to return *all* workers -- the Widget uses this to get the count of total workers
         return self.pods()
 
     def logs(self, pod=None):
@@ -483,7 +486,7 @@ class KubeCluster(Cluster):
             running_workers = list(self.scheduler.workers.keys())
             running_ips = set(urlparse(worker).hostname for worker in running_workers)
             pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
-            logger.info('pending_pods = {}'.format(pending_pods))
+            logger.info("pending_pods = {}".format(pending_pods))
             if pending_pods:
                 pending_to_delete = pending_pods[:n_to_delete]
                 logger.info("Deleting pending pods: %s", pending_to_delete)
@@ -492,10 +495,16 @@ class KubeCluster(Cluster):
                 if n_to_delete <= 0:
                     return
 
-            to_close = self.select_workers_to_close(n_to_delete, worker_type=worker_type)
+            to_close = self.select_workers_to_close(
+                n_to_delete, worker_type=worker_type
+            )
             logger.info("Closing workers: %s", to_close)
-            if len(to_close) < len(self.filter_workers_by_type(self.cluster.scheduler.workers.values(), worker_type)):
-                logger.info('calling coroutine on to_close = {}'.format(to_close))
+            if len(to_close) < len(
+                self.filter_workers_by_type(
+                    self.cluster.scheduler.workers.values(), worker_type
+                )
+            ):
+                logger.info("calling coroutine on to_close = {}".format(to_close))
                 # Close workers cleanly to migrate any temporary results to
                 # remaining workers.
                 @gen.coroutine
@@ -513,7 +522,7 @@ class KubeCluster(Cluster):
 
     def _delete_pods(self, to_delete):
         for pod in to_delete:
-            logger.info('to_delete = {}'.format(pod))
+            logger.info("to_delete = {}".format(pod))
             try:
                 self.core_api.delete_namespaced_pod(pod.metadata.name, self.namespace)
                 pod_info = pod.metadata.name
@@ -599,21 +608,27 @@ class KubeCluster(Cluster):
         # Convert this to a set of IPs
         ips = set(urlparse(worker).hostname for worker in workers)
         to_delete = [p for p in pods if p.status.pod_ip in ips]
-        logger.info('ips = {} to_delete = {}'.format(ips, to_delete))
+        logger.info("ips = {} to_delete = {}".format(ips, to_delete))
         if not to_delete:
             return
         self._delete_pods(to_delete)
 
     def select_workers_to_close(self, n_to_close, worker_type=None):
         """ Select n workers to close from scheduler """
-        workers = self.filter_workers_by_type(self.cluster.scheduler.workers.values(), worker_type)
+        workers = self.filter_workers_by_type(
+            self.cluster.scheduler.workers.values(), worker_type
+        )
         pods = self.pods(worker_type=worker_type)
         pod_ips = [p.status.pod_ip for p in pods]
         logger.info("pod_ips = {}".format(pod_ips))
         assert n_to_close <= len(workers)
         key = lambda ws: ws.metrics["memory"]
-        to_close = set(sorted(self.filter_workers_by_type(self.cluster.scheduler.idle, worker_type),
-                              key=key)[:n_to_close])
+        to_close = set(
+            sorted(
+                self.filter_workers_by_type(self.cluster.scheduler.idle, worker_type),
+                key=key,
+            )[:n_to_close]
+        )
 
         if len(to_close) < n_to_close:
             rest = sorted(workers, key=key, reverse=True)
