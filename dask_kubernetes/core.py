@@ -211,10 +211,6 @@ class Scheduler(Pod):
         await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
         )
-        # TODO Resolve service race condidion
-        # There is some race condition happening here where the service isn't actually ready by the time
-        # this function exits.
-        await asyncio.sleep(5)
         return await self.core_api.read_namespaced_service(
             self.cluster_name, self.namespace
         )
