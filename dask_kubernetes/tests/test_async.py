@@ -77,6 +77,14 @@ async def cluster(pod_spec, ns):
 
 
 @pytest.fixture
+async def remote_cluster(pod_spec, ns):
+    async with KubeCluster(
+        pod_spec, namespace=ns, local_scheduler=False, **cluster_kwargs
+    ) as cluster:
+        yield cluster
+
+
+@pytest.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
@@ -116,7 +124,8 @@ async def test_basic(cluster, client):
 
 
 @pytest.mark.asyncio
-async def test_logs(cluster):
+async def test_logs(remote_cluster):
+    cluster = remote_cluster
     cluster.scale(2)
     await cluster
 
