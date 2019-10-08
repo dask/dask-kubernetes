@@ -20,6 +20,7 @@ import dask
 from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
+from distributed.scheduler import Scheduler as LocalScheduler
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 from tornado import gen
@@ -266,6 +267,14 @@ class KubeCluster(SpecCluster):
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
+    scheduler_timeout: str (optional)
+        The scheduler task will exit after this amount of time
+        if there are no clients connected.
+        Defaults to ``5 minutes``.
+    local_scheduler: bool (optional)
+        Run the scheduler locally. If false sheduler is run in a
+        pod.
+        Defaults to ``True``.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -344,6 +353,7 @@ class KubeCluster(SpecCluster):
         env=None,
         auth=ClusterAuth.DEFAULT,
         scheduler_timeout=None,
+        local_scheduler=None,
         **kwargs
     ):
         self.pod_template = pod_template
@@ -351,6 +361,7 @@ class KubeCluster(SpecCluster):
         self._namespace = namespace
         self._n_workers = n_workers
         self._scheduler_timeout = scheduler_timeout
+        self._local_scheduler = local_scheduler
         self.host = host
         self.port = port
         self.env = env
@@ -363,6 +374,9 @@ class KubeCluster(SpecCluster):
         self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
         self._scheduler_timeout = self._scheduler_timeout or dask.config.get(
             "kubernetes.scheduler-timeout"
+        )
+        self._local_scheduler = self._local_scheduler or dask.config.get(
+            "kubernetes.local-scheduler"
         )
         self._n_workers = (
             self._n_workers
@@ -446,6 +460,10 @@ class KubeCluster(SpecCluster):
             "cls": Scheduler,
             "options": {"scheduler_timeout": self._scheduler_timeout, **common_options},
         }
+
+        if self._local_scheduler:
+            self.scheduler_spec["cls"] = LocalScheduler
+
         self.new_spec = {"cls": Worker, "options": {**common_options}}
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
 
