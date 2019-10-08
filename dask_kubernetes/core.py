@@ -457,7 +457,7 @@ class KubeCluster(SpecCluster):
         }
 
         if self._local_scheduler:
-            self.scheduler_spec = {"cls": LocalScheduler, "options": {**common_options}}
+            self.scheduler_spec = {"cls": LocalScheduler, "options": {}}
         else:
             self.scheduler_spec = {
                 "cls": Scheduler,
