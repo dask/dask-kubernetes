@@ -375,8 +375,10 @@ class KubeCluster(SpecCluster):
         self._scheduler_timeout = self._scheduler_timeout or dask.config.get(
             "kubernetes.scheduler-timeout"
         )
-        self._local_scheduler = self._local_scheduler or dask.config.get(
-            "kubernetes.local-scheduler"
+        self._local_scheduler = (
+            self._local_scheduler
+            if self._local_scheduler is not None
+            else dask.config.get("kubernetes.local-scheduler")
         )
         self._n_workers = (
             self._n_workers
