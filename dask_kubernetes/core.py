@@ -456,13 +456,16 @@ class KubeCluster(SpecCluster):
             "loop": self.loop,
         }
 
-        self.scheduler_spec = {
-            "cls": Scheduler,
-            "options": {"scheduler_timeout": self._scheduler_timeout, **common_options},
-        }
-
         if self._local_scheduler:
-            self.scheduler_spec["cls"] = LocalScheduler
+            self.scheduler_spec = {"cls": LocalScheduler, "options": {**common_options}}
+        else:
+            self.scheduler_spec = {
+                "cls": Scheduler,
+                "options": {
+                    "scheduler_timeout": self._scheduler_timeout,
+                    **common_options,
+                },
+            }
 
         self.new_spec = {"cls": Worker, "options": {**common_options}}
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
