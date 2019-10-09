@@ -267,10 +267,9 @@ class KubeCluster(SpecCluster):
         The scheduler task will exit after this amount of time
         if there are no clients connected.
         Defaults to ``5 minutes``.
-    local_scheduler: bool (optional)
-        Run the scheduler locally. If false sheduler is run in a
-        pod.
-        Defaults to ``True``.
+    deploy_mode: str (optional)
+        Run the scheduler as "local" or "remote".
+        Defaults to ``"local"``.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -349,7 +348,7 @@ class KubeCluster(SpecCluster):
         env=None,
         auth=ClusterAuth.DEFAULT,
         scheduler_timeout=None,
-        local_scheduler=None,
+        deploy_mode=None,
         interface=None,
         protocol=None,
         dashboard_address=None,
@@ -361,7 +360,7 @@ class KubeCluster(SpecCluster):
         self._namespace = namespace
         self._n_workers = n_workers
         self._scheduler_timeout = scheduler_timeout
-        self._local_scheduler = local_scheduler
+        self._deploy_mode = deploy_mode
         self._protocol = protocol
         self._interface = interface
         self._dashboard_address = dashboard_address
@@ -379,11 +378,10 @@ class KubeCluster(SpecCluster):
         self._scheduler_timeout = self._scheduler_timeout or dask.config.get(
             "kubernetes.scheduler-timeout"
         )
-        self._local_scheduler = (
-            self._local_scheduler
-            if self._local_scheduler is not None
-            else dask.config.get("kubernetes.local-scheduler")
+        self._deploy_mode = self._deploy_mode or dask.config.get(
+            "kubernetes.deploy-mode"
         )
+
         self._n_workers = (
             self._n_workers
             if self._n_workers is not None
@@ -468,7 +466,7 @@ class KubeCluster(SpecCluster):
             "loop": self.loop,
         }
 
-        if self._local_scheduler:
+        if self._deploy_mode == "local":
             self.scheduler_spec = {
                 "cls": dask.distributed.Scheduler,
                 "options": {
@@ -479,7 +477,7 @@ class KubeCluster(SpecCluster):
                     "security": self.security,
                 },
             }
-        else:
+        elif self._deploy_mode == "remote":
             self.scheduler_spec = {
                 "cls": Scheduler,
                 "options": {
@@ -487,6 +485,8 @@ class KubeCluster(SpecCluster):
                     **common_options,
                 },
             }
+        else:
+            raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
 
         self.new_spec = {"cls": Worker, "options": {**common_options}}
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}

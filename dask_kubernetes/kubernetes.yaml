@@ -8,7 +8,7 @@ kubernetes:
   port: 0
   env: {}
   scheduler-timeout: "5 minutes" # Length of inactivity to wait before closing the cluster
-  local-scheduler: true
+  deploy-mode: "local"
   interface: null
   protocol: "tcp://"
   dashboard_address: ":8787"

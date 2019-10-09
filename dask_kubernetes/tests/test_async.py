@@ -79,7 +79,7 @@ async def cluster(pod_spec, ns):
 @pytest.fixture
 async def remote_cluster(pod_spec, ns):
     async with KubeCluster(
-        pod_spec, namespace=ns, local_scheduler=False, **cluster_kwargs
+        pod_spec, namespace=ns, deploy_mode="remote", **cluster_kwargs
     ) as cluster:
         yield cluster
 
