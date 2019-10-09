@@ -18,6 +18,7 @@ except ImportError:
 
 import dask
 import dask.distributed
+import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
@@ -365,6 +366,12 @@ class KubeCluster(SpecCluster):
         self._interface = interface
         self._dashboard_address = dashboard_address
         self.security = security
+        if self.security and not isinstance(
+            self.security, distributed.security.Security
+        ):
+            raise RuntimeError(
+                "Security object is not a valid distributed.security.Security object"
+            )
         self.host = host
         self.port = port
         self.env = env
@@ -396,7 +403,6 @@ class KubeCluster(SpecCluster):
         self._dashboard_address = self._dashboard_address or dask.config.get(
             "kubernetes.dashboard_address"
         )
-        self.security = self.security or dask.config.get("kubernetes.security")
         self.env = (
             self.env if self.env is not None else dask.config.get("kubernetes.env")
         )

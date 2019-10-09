@@ -12,7 +12,6 @@ kubernetes:
   interface: null
   protocol: "tcp://"
   dashboard_address: ":8787"
-  security: null
 
   scheduler-service-type: "ClusterIP"
 
