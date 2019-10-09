@@ -36,6 +36,8 @@ from .auth import ClusterAuth
 
 logger = logging.getLogger(__name__)
 
+SCHEDULER_PORT = 8786
+
 
 class Pod(ProcessInterface):
     """ A superclass for Kubernetes Pods
@@ -157,7 +159,9 @@ class Scheduler(Pod):
 
         self.service = await self._create_service()
         self.address = "tcp://{name}.{namespace}:{port}".format(
-            name=self.service.metadata.name, namespace=self.namespace, port=8786
+            name=self.service.metadata.name,
+            namespace=self.namespace,
+            port=SCHEDULER_PORT,
         )
         if self.service.spec.type == "LoadBalancer":
             # Wait for load balancer to be assigned
@@ -175,11 +179,11 @@ class Scheduler(Pod):
             [loadbalancer_ingress] = self.service.status.load_balancer.ingress
             loadbalancer_host = loadbalancer_ingress.hostname or loadbalancer_ingress.ip
             self.external_address = "tcp://{host}:{port}".format(
-                host=loadbalancer_host, port=8786
+                host=loadbalancer_host, port=SCHEDULER_PORT
             )
-        # TODO Set external address when using nodeport service type
+        # FIXME Set external address when using nodeport service type
 
-        # TODO Create an optional Ingress just in case folks want to configure one
+        # FIXME Create an optional Ingress just in case folks want to configure one
 
     async def close(self, **kwargs):
         if self.service:
