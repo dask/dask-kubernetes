@@ -17,10 +17,10 @@ except ImportError:
     yaml = False
 
 import dask
+import dask.distributed
 from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
-from distributed.scheduler import Scheduler as LocalScheduler
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 from tornado import gen
@@ -100,17 +100,11 @@ class Pod(ProcessInterface):
 
 
 class Worker(Pod):
-    """ A Remote Dask Worker controled by SSH
+    """ A Remote Dask Worker controled by Kubernetes
     Parameters
     ----------
     scheduler: str
         The address of the scheduler
-    address: str
-        The hostname where we should run this worker
-    connect_kwargs: dict
-        kwargs to be passed to asyncssh connections
-    kwargs:
-        TODO Document Worker kwargs
     """
 
     def __init__(self, scheduler: str, **kwargs):
@@ -127,15 +121,13 @@ class Worker(Pod):
 
 
 class Scheduler(Pod):
-    """ A Remote Dask Scheduler controled by SSH
+    """ A Remote Dask Scheduler controled by Kubernetes
     Parameters
     ----------
-    address: str
-        The hostname where we should run this worker
-    connect_kwargs: dict
-        kwargs to be passed to asyncssh connections
-    kwargs:
-        TODO Document Scheduler kwargs
+    scheduler_timeout: str
+        The scheduler task will exit after this amount of time
+        if there are no clients connected.
+        Defaults to ``5 minutes``.
     """
 
     def __init__(self, scheduler_timeout: str, **kwargs):
@@ -459,7 +451,10 @@ class KubeCluster(SpecCluster):
         }
 
         if self._local_scheduler:
-            self.scheduler_spec = {"cls": LocalScheduler, "options": {}}
+            self.scheduler_spec = {
+                "cls": dask.distributed.scheduler.Scheduler,
+                "options": {},
+            }
         else:
             self.scheduler_spec = {
                 "cls": Scheduler,
