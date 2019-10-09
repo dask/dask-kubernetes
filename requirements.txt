@@ -1,4 +1,4 @@
-dask>=2.3.0
-distributed>=2.3.0
+dask>=2.5.2
+distributed>=2.5.2
 kubernetes>=9
 kubernetes-asyncio>=9
