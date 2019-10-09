@@ -346,6 +346,10 @@ class KubeCluster(SpecCluster):
         auth=ClusterAuth.DEFAULT,
         scheduler_timeout=None,
         local_scheduler=None,
+        interface=None,
+        protocol=None,
+        dashboard_address=None,
+        security=None,
         **kwargs
     ):
         self.pod_template = pod_template
@@ -354,6 +358,10 @@ class KubeCluster(SpecCluster):
         self._n_workers = n_workers
         self._scheduler_timeout = scheduler_timeout
         self._local_scheduler = local_scheduler
+        self._protocol = protocol
+        self._interface = interface
+        self._dashboard_address = dashboard_address
+        self._security = security
         self.host = host
         self.port = port
         self.env = env
@@ -381,6 +389,12 @@ class KubeCluster(SpecCluster):
         self.port = (
             self.port if self.port is not None else dask.config.get("kubernetes.port")
         )
+        self._protocol = self._protocol or dask.config.get("kubernetes.protocol")
+        self._interface = self._interface or dask.config.get("kubernetes.interface")
+        self._dashboard_address = self._dashboard_address or dask.config.get(
+            "kubernetes.dashboard_address"
+        )
+        self._security = self._security or dask.config.get("kubernetes.security")
         self.env = (
             self.env if self.env is not None else dask.config.get("kubernetes.env")
         )
@@ -452,8 +466,14 @@ class KubeCluster(SpecCluster):
 
         if self._local_scheduler:
             self.scheduler_spec = {
-                "cls": dask.distributed.scheduler.Scheduler,
-                "options": {},
+                "cls": dask.distributed.Scheduler,
+                "options": {
+                    "protocol": self._protocol,
+                    "interface": self._interface,
+                    "host": self.host,
+                    "dashboard_address": self._dashboard_address,
+                    "security": self._security,
+                },
             }
         else:
             self.scheduler_spec = {
