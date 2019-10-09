@@ -365,7 +365,7 @@ class KubeCluster(SpecCluster):
         self._protocol = protocol
         self._interface = interface
         self._dashboard_address = dashboard_address
-        self._security = security
+        self.security = security
         self.host = host
         self.port = port
         self.env = env
@@ -398,7 +398,7 @@ class KubeCluster(SpecCluster):
         self._dashboard_address = self._dashboard_address or dask.config.get(
             "kubernetes.dashboard_address"
         )
-        self._security = self._security or dask.config.get("kubernetes.security")
+        self.security = self.security or dask.config.get("kubernetes.security")
         self.env = (
             self.env if self.env is not None else dask.config.get("kubernetes.env")
         )
@@ -476,7 +476,7 @@ class KubeCluster(SpecCluster):
                     "interface": self._interface,
                     "host": self.host,
                     "dashboard_address": self._dashboard_address,
-                    "security": self._security,
+                    "security": self.security,
                 },
             }
         else:
