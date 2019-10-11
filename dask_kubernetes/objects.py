@@ -3,7 +3,7 @@ Convenience functions for creating pod templates.
 """
 from collections import namedtuple
 import copy
-from kubernetes import client
+from kubernetes_asyncio import client
 import json
 
 try:
@@ -174,6 +174,14 @@ def make_pod_from_dict(dict_):
     )
 
 
+def make_service_from_dict(dict_):
+    # FIXME: We can't use the 'deserialize' function since
+    # that expects a response object!
+    return SERIALIZATION_API_CLIENT.deserialize(
+        _FakeResponse(data=json.dumps(dict_)), client.V1Service
+    )
+
+
 def clean_pod_template(pod_template, match_node_purpose="prefer"):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
@@ -280,3 +288,18 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         pod_template.spec.affinity = affinity
 
     return pod_template
+
+
+def clean_service_template(service_template):
+    """ Normalize service template and check for type errors """
+
+    service_template = copy.deepcopy(service_template)
+
+    # Make sure metadata / labels objects exist, so they can be modified
+    # later without a lot of `is None` checks
+    if service_template.metadata is None:
+        service_template.metadata = client.V1ObjectMeta()
+    if service_template.metadata.labels is None:
+        service_template.metadata.labels = {}
+
+    return service_template
