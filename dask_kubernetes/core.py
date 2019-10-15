@@ -254,7 +254,7 @@ class KubeCluster(SpecCluster):
         Defaults to current namespace if available or "default"
     n_workers: int
         Number of workers on initial launch.
-        Use ``scale_up`` to increase this number in the future
+        Use ``scale`` to change this number in the future
     env: Dict[str, str]
         Dictionary of environment variables to pass to worker pod
     host: str
