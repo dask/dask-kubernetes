@@ -127,6 +127,56 @@ Some notable ones are described below:
     instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
     the template.**
 
+Role-Based Access Control (RBAC)
+--------------------------------
+
+In order to spawn worker (or separate scheduler) Dask pods, the service
+account creating those pods will require a set of RBAC permissions.
+Create a service account you will use for Dask, and then attach the
+following Role to that ServiceAccount via a RoleBinding:
+
+.. code-block:: yaml
+
+    kind: Role
+    apiVersion: rbac.authorization.k8s.io/v1beta1
+    metadata:
+      name: daskKubernetes
+    rules:
+    - apiGroups:
+      - ""  # indicates the core API group
+      resources:
+      - "pods"
+      verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "create"
+      - "delete"
+    - apiGroups:
+      - ""  # indicates the core API group
+      resources:
+      - "pods/log"
+      verbs:
+      - "get"
+      - "list"
+
+If you intend to use the newer Dask functionality in which the scheduler
+is created in its own pod and accessed via a service, you will also
+need:
+
+.. code-block:: yaml
+
+    - apiGroups:
+      - "" # indicates the core API group
+      resources:
+      - "services"
+      verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "create"
+      - "delete"
+
 
 Docker Images
 -------------
