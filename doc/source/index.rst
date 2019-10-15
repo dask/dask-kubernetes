@@ -28,7 +28,7 @@ Quickstart
    from dask_kubernetes import KubeCluster
 
    cluster = KubeCluster.from_yaml('worker-spec.yml')
-   cluster.scale_up(10)  # specify number of nodes explicitly
+   cluster.scale(10)  # specify number of workers explicitly
 
    cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
 
@@ -61,14 +61,14 @@ Quickstart
 .. code-block:: python
 
         # Example usage
-        import distributed
+        from dask.distributed import Client
         import dask.array as da
 
-        # Connect dask to the cluster
-        client = distributed.Client(cluster)
+        # Connect Dask to the cluster
+        client = Client(cluster)
 
-        # Create an array and calculate the mean
-        array = da.ones((1000, 1000, 1000), chunks=(100, 100, 10))
+        # Create a large array and calculate the mean
+        array = da.ones((1000, 1000, 1000))
         print(array.mean().compute())  # Should print 1.0
 
 
