@@ -4,8 +4,6 @@ channels:
   - conda-forge
 dependencies:
   - python=3.7
-  - conda
-  - setuptools
   - nomkl
   - pip
   # testing / CI
