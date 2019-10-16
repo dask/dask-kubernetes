@@ -72,7 +72,8 @@ jobs:
           command: |
             export PATH="$HOME/miniconda/bin:$PATH"
             if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
-              conda install -y conda==4.7.11
+              conda install pip  # create a record for conda, to avoid removing setuptools. See #192 for more.
+              conda update -q conda
               conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
               source activate ${ENV_NAME}
               pip install --no-deps --quiet -e .
