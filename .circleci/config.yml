@@ -72,7 +72,7 @@ jobs:
           command: |
             export PATH="$HOME/miniconda/bin:$PATH"
             if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
-              conda update --force -q conda
+              conda update -q conda==4.7.11
               conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
               source activate ${ENV_NAME}
               pip install --no-deps --quiet -e .
