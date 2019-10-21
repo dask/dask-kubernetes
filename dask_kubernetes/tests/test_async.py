@@ -328,9 +328,12 @@ async def test_pod_from_dict(image_name, ns):
         },
     }
 
-    async with KubeCluster.from_dict(spec, namespace=ns, **cluster_kwargs) as cluster:
+    async with KubeCluster.from_dict(
+        spec, namespace=ns, port=32000, **cluster_kwargs
+    ) as cluster:
         cluster.scale(2)
         await cluster
+        assert "32000" in cluster.scheduler_address
         async with Client(cluster, asynchronous=True) as client:
             future = client.submit(lambda x: x + 1, 10)
             result = await future
