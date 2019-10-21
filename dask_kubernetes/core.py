@@ -479,6 +479,7 @@ class KubeCluster(SpecCluster):
                     "protocol": self._protocol,
                     "interface": self._interface,
                     "host": self.host,
+                    "port": self.port,
                     "dashboard_address": self._dashboard_address,
                     "security": self.security,
                 },
