@@ -3,7 +3,8 @@ Defines different methods to configure a connection to a Kubernetes cluster.
 """
 import logging
 
-import kubernetes_asyncio as kubernetes
+import kubernetes
+import kubernetes_asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,7 @@ class ClusterAuth(object):
             auth = [auth]
         elif isinstance(auth, list):
             if not auth:
-                raise kubernetes.config.ConfigException(
+                raise kubernetes_asyncio.config.ConfigException(
                     "No authorization methods were provided"
                 )
         else:
@@ -68,7 +69,7 @@ class ClusterAuth(object):
         for auth_instance in auth:
             try:
                 await auth_instance.load()
-            except kubernetes.config.ConfigException as exc:
+            except kubernetes_asyncio.config.ConfigException as exc:
                 logger.debug(
                     "Failed to load configuration with %s method: %s",
                     auth_instance.__class__,
@@ -92,6 +93,7 @@ class InCluster(ClusterAuth):
 
     async def load(self):
         kubernetes.config.load_incluster_config()
+        kubernetes_asyncio.config.load_incluster_config()
 
 
 class KubeConfig(ClusterAuth):
@@ -117,7 +119,10 @@ class KubeConfig(ClusterAuth):
         self.persist_config = persist_config
 
     async def load(self):
-        await kubernetes.config.load_kube_config(
+        kubernetes.config.load_kube_config(
+            self.config_file, self.context, None, self.persist_config
+        )
+        await kubernetes_asyncio.config.load_kube_config(
             self.config_file, self.context, None, self.persist_config
         )
 
@@ -162,7 +167,8 @@ class KubeAuth(ClusterAuth):
         self.config = config
 
     async def load(self):
-        await kubernetes.client.Configuration.set_default(self.config)
+        kubernetes.client.Configuration.set_default(self.config)
+        await kubernetes_asyncio.client.Configuration.set_default(self.config)
 
 
 ClusterAuth.DEFAULT = [InCluster(), KubeConfig()]
