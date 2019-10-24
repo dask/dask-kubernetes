@@ -69,7 +69,10 @@ class ClusterAuth(object):
         for auth_instance in auth:
             try:
                 await auth_instance.load()
-            except (kubernetes_asyncio.config.ConfigException, kubernetes.config.ConfigException) as exc:
+            except (
+                kubernetes_asyncio.config.ConfigException,
+                kubernetes.config.ConfigException,
+            ) as exc:
                 logger.debug(
                     "Failed to load configuration with %s method: %s",
                     auth_instance.__class__,
