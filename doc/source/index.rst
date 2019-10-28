@@ -50,6 +50,8 @@ Quickstart
           env:
             - name: EXTRA_PIP_PACKAGES
               value: fastparquet git+https://github.com/dask/distributed
+            - name: EXTRA_APT_PACKAGES
+              value: gcc
           resources:
             limits:
               cpu: "2"
