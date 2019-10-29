@@ -45,13 +45,11 @@ Quickstart
         containers:
         - image: daskdev/dask:latest
           imagePullPolicy: IfNotPresent
-          args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 6GB, --death-timeout, '60']
+          args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
           name: dask
           env:
             - name: EXTRA_PIP_PACKAGES
-              value: fastparquet git+https://github.com/dask/distributed
-            - name: EXTRA_APT_PACKAGES
-              value: gcc
+              value: git+https://github.com/dask/distributed
           resources:
             limits:
               cpu: "2"
@@ -188,6 +186,10 @@ are available on https://hub.docker.com/r/daskdev .
 More information about these images is available at the
 `Dask documentation <https://docs.dask.org/en/latest/setup/docker.html>`_.
 
+Note that these images can be further customized with extra packages using
+``EXTRA_PIP_PACKAGES``, ``EXTRA_APT_PACKAGES``, and ``EXTRA_CONDA_PACKAGES``
+as described in the
+`Extensibility section <https://docs.dask.org/en/latest/setup/docker.html#extensibility>`_.
 
 Deployment Details
 ------------------
