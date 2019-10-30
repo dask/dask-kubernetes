@@ -45,7 +45,7 @@ Quickstart
         containers:
         - image: daskdev/dask:latest
           imagePullPolicy: IfNotPresent
-          args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
+          args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
           name: dask
           env:
             - name: EXTRA_PIP_PACKAGES
