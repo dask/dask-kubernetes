@@ -139,11 +139,13 @@ class Scheduler(Pod):
         self._idle_timeout = idle_timeout
 
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
-        self.pod_template.spec.containers[0].args = [
-            "dask-scheduler",
-            "--idle-timeout",
-            self._idle_timeout,
-        ]
+        cli_args = ["dask-scheduler"]
+        if self._idle_timeout is not None:
+            cli_args += [
+                "--idle-timeout",
+                self.__idle_timeout
+            ]
+        self.pod_template.spec.containers[0].args = cli_args
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
