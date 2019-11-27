@@ -127,23 +127,22 @@ class Scheduler(Pod):
     """ A Remote Dask Scheduler controled by Kubernetes
     Parameters
     ----------
-    scheduler_timeout: str
+    idle_timeout: str, optional
         The scheduler task will exit after this amount of time
-        if there are no clients connected.
-        Defaults to ``5 minutes``.
+        if there are no requests from the client. Default is to 
+        never timeout.
     """
 
-    def __init__(self, scheduler_timeout: str, **kwargs):
+    def __init__(self, idle_timeout: str, **kwargs):
         super().__init__(**kwargs)
         self.service = None
-        self._scheduler_timeout = scheduler_timeout
+        self._idle_timeout = idle_timeout
 
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
-        self.pod_template.spec.containers[0].args = [
-            "dask-scheduler",
-            "--idle-timeout",
-            self._scheduler_timeout,
-        ]
+        cli_args = ["dask-scheduler"]
+        if self._idle_timeout is not None:
+            cli_args += ["--idle-timeout", self.__idle_timeout]
+        self.pod_template.spec.containers[0].args = cli_args
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
@@ -264,10 +263,10 @@ class KubeCluster(SpecCluster):
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
-    scheduler_timeout: str (optional)
+    idle_timeout: str (optional)
         The scheduler task will exit after this amount of time
-        if there are no clients connected.
-        Defaults to ``5 minutes``.
+        if there are no requests from the client. Default is to 
+        never timeout.
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"local"``.
@@ -348,7 +347,7 @@ class KubeCluster(SpecCluster):
         port=None,
         env=None,
         auth=ClusterAuth.DEFAULT,
-        scheduler_timeout=None,
+        idle_timeout=None,
         deploy_mode=None,
         interface=None,
         protocol=None,
@@ -360,7 +359,7 @@ class KubeCluster(SpecCluster):
         self._generate_name = name
         self._namespace = namespace
         self._n_workers = n_workers
-        self._scheduler_timeout = scheduler_timeout
+        self._idle_timeout = idle_timeout
         self._deploy_mode = deploy_mode
         self._protocol = protocol
         self._interface = interface
@@ -382,8 +381,8 @@ class KubeCluster(SpecCluster):
     async def _start(self):
         self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
         self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
-        self._scheduler_timeout = self._scheduler_timeout or dask.config.get(
-            "kubernetes.scheduler-timeout"
+        self._idle_timeout = self._idle_timeout or dask.config.get(
+            "kubernetes.idle-timeout"
         )
         self._deploy_mode = self._deploy_mode or dask.config.get(
             "kubernetes.deploy-mode"
@@ -487,10 +486,7 @@ class KubeCluster(SpecCluster):
         elif self._deploy_mode == "remote":
             self.scheduler_spec = {
                 "cls": Scheduler,
-                "options": {
-                    "scheduler_timeout": self._scheduler_timeout,
-                    **common_options,
-                },
+                "options": {"idle_timeout": self._idle_timeout, **common_options},
             }
         else:
             raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
