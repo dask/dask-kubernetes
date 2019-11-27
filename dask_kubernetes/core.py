@@ -141,10 +141,7 @@ class Scheduler(Pod):
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
         cli_args = ["dask-scheduler"]
         if self._idle_timeout is not None:
-            cli_args += [
-                "--idle-timeout",
-                self.__idle_timeout
-            ]
+            cli_args += ["--idle-timeout", self.__idle_timeout]
         self.pod_template.spec.containers[0].args = cli_args
 
     async def start(self, **kwargs):
@@ -489,10 +486,7 @@ class KubeCluster(SpecCluster):
         elif self._deploy_mode == "remote":
             self.scheduler_spec = {
                 "cls": Scheduler,
-                "options": {
-                    "idle_timeout": self._idle_timeout,
-                    **common_options,
-                },
+                "options": {"idle_timeout": self._idle_timeout, **common_options,},
             }
         else:
             raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
