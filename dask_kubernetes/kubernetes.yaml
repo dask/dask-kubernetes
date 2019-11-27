@@ -7,7 +7,6 @@ kubernetes:
   host: "0.0.0.0"
   port: 0
   env: {}
-  idle-timeout: null # Length of inactivity to wait before closing the cluster
   deploy-mode: "local"
   interface: null
   protocol: "tcp://"

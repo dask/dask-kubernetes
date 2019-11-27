@@ -383,7 +383,7 @@ class KubeCluster(SpecCluster):
         self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
         self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
         self._idle_timeout = self._idle_timeout or dask.config.get(
-            "kubernetes.idle-timeout"
+            "distributed.scheduler.idle-timeout"
         )
         self._deploy_mode = self._deploy_mode or dask.config.get(
             "kubernetes.deploy-mode"
