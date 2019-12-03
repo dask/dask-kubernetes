@@ -129,19 +129,25 @@ class Scheduler(Pod):
     ----------
     idle_timeout: str, optional
         The scheduler task will exit after this amount of time
-        if there are no requests from the client. Default is to 
+        if there are no requests from the client. Default is to
         never timeout.
+    service_wait_timeout_s: int (optional)
+        Timeout, in seconds, to wait for the remote scheduler service to be ready.
+        Defaults to 30 seconds.
+        Set to 0 to disable the timeout (not recommended).
     """
 
-    def __init__(self, idle_timeout: str, **kwargs):
+    def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
         super().__init__(**kwargs)
         self.service = None
         self._idle_timeout = idle_timeout
+        self._service_wait_timeout_s = service_wait_timeout_s
 
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
         cli_args = ["dask-scheduler"]
         if self._idle_timeout is not None:
-            cli_args += ["--idle-timeout", self.__idle_timeout]
+            cli_args += ["--idle-timeout", self._idle_timeout]
+
         self.pod_template.spec.containers[0].args = cli_args
 
     async def start(self, **kwargs):
@@ -167,7 +173,10 @@ class Scheduler(Pod):
             # Wait for load balancer to be assigned
             start = time.time()
             while self.service.status.load_balancer.ingress is None:
-                if time.time() > start + 30:
+                if (
+                    self._service_wait_timeout_s > 0
+                    and time.time() > start + self._service_wait_timeout_s
+                ):
                     raise TimeoutError(
                         "Timed out waiting for Load Balancer to be provisioned."
                     )
@@ -265,8 +274,12 @@ class KubeCluster(SpecCluster):
         ``[InCluster(), KubeConfig()]``.
     idle_timeout: str (optional)
         The scheduler task will exit after this amount of time
-        if there are no requests from the client. Default is to 
+        if there are no requests from the client. Default is to
         never timeout.
+    scheduler_service_wait_timeout: int (optional)
+        Timeout, in seconds, to wait for the remote scheduler service to be ready.
+        Defaults to 30 seconds.
+        Set to 0 to disable the timeout (not recommended).
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"local"``.
@@ -353,6 +366,7 @@ class KubeCluster(SpecCluster):
         protocol=None,
         dashboard_address=None,
         security=None,
+        scheduler_service_wait_timeout=None,
         **kwargs
     ):
         self.pod_template = pod_template
@@ -364,6 +378,7 @@ class KubeCluster(SpecCluster):
         self._protocol = protocol
         self._interface = interface
         self._dashboard_address = dashboard_address
+        self._scheduler_service_wait_timeout = scheduler_service_wait_timeout
         self.security = security
         if self.security and not isinstance(
             self.security, distributed.security.Security
@@ -383,6 +398,10 @@ class KubeCluster(SpecCluster):
         self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
         self._idle_timeout = self._idle_timeout or dask.config.get(
             "kubernetes.idle-timeout"
+        )
+        self._scheduler_service_wait_timeout = (
+            self._scheduler_service_wait_timeout
+            or dask.config.get("kubernetes.scheduler-service-wait-timeout")
         )
         self._deploy_mode = self._deploy_mode or dask.config.get(
             "kubernetes.deploy-mode"
@@ -486,7 +505,11 @@ class KubeCluster(SpecCluster):
         elif self._deploy_mode == "remote":
             self.scheduler_spec = {
                 "cls": Scheduler,
-                "options": {"idle_timeout": self._idle_timeout, **common_options},
+                "options": {
+                    "idle_timeout": self._idle_timeout,
+                    "service_wait_timeout_s": self._scheduler_service_wait_timeout,
+                    **common_options,
+                },
             }
         else:
             raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
