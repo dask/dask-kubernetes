@@ -129,13 +129,14 @@ class Scheduler(Pod):
     ----------
     idle_timeout: str, optional
         The scheduler task will exit after this amount of time
-        if there are no requests from the client. Default is to 
+        if there are no requests from the client. Default is to
         never timeout.
     """
 
     def __init__(self, idle_timeout: str, **kwargs):
         super().__init__(**kwargs)
         self.service = None
+        self._service_wait_timeout_s = None
         self._idle_timeout = idle_timeout
 
         self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
@@ -167,7 +168,7 @@ class Scheduler(Pod):
             # Wait for load balancer to be assigned
             start = time.time()
             while self.service.status.load_balancer.ingress is None:
-                if time.time() > start + 30:
+                if time.time() > start + self._service_wait_timeout_s:
                     raise TimeoutError(
                         "Timed out waiting for Load Balancer to be provisioned."
                     )
@@ -205,6 +206,9 @@ class Scheduler(Pod):
             self.service_template.spec.type = dask.config.get(
                 "kubernetes.scheduler-service-type"
             )
+        self._service_wait_timeout_s = (
+            dask.config.get("kubernetes.scheduler-service-wait-timeout", 30) or 30
+        )
         await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
         )
@@ -265,7 +269,7 @@ class KubeCluster(SpecCluster):
         ``[InCluster(), KubeConfig()]``.
     idle_timeout: str (optional)
         The scheduler task will exit after this amount of time
-        if there are no requests from the client. Default is to 
+        if there are no requests from the client. Default is to
         never timeout.
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".

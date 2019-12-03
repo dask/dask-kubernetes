@@ -14,6 +14,8 @@ kubernetes:
   dashboard_address: ":8787"
 
   scheduler-service-type: "ClusterIP"
+  # Timeout to wait for the scheduler service to be up (in seconds)
+  scheduler-service-wait-timeout: 30
 
   scheduler-service-template:
     apiVersion: v1
