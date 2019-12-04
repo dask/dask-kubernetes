@@ -182,7 +182,7 @@ def make_service_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template, match_node_purpose="prefer"):
+def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
         msg = (
@@ -217,7 +217,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         client.V1Toleration(
             key="k8s.dask.org/dedicated",
             operator="Equal",
-            value="worker",
+            value=pod_type,
             effect="NoSchedule",
         ),
         # GKE currently does not permit creating taints on a node pool
@@ -225,7 +225,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         client.V1Toleration(
             key="k8s.dask.org_dedicated",
             operator="Equal",
-            value="worker",
+            value=pod_type,
             effect="NoSchedule",
         ),
     ]
@@ -249,7 +249,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         node_selector_term = client.V1NodeSelectorTerm(
             match_expressions=[
                 client.V1NodeSelectorRequirement(
-                    key="k8s.dask.org/node-purpose", operator="In", values=["worker"]
+                    key="k8s.dask.org/node-purpose", operator="In", values=[pod_type]
                 )
             ]
         )

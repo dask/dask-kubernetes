@@ -37,6 +37,28 @@ kubernetes:
 
   worker-template-path: null
 
+  scheduler-template:
+    {}
+    # kind: Pod
+    # metadata:
+    #   labels:
+    #     foo: bar
+    #     baz: quux
+    # spec:
+    #   restartPolicy: Never
+    #   containers:
+    #   - name: dask
+    #     image: daskdev/dask:latest
+    #     args:
+    #       - dask-scheduler
+    #     resources:
+    #       limits:
+    #         cpu: "1.75"
+    #         memory: 6G
+    #       requests:
+  #         cpu: "1.75"
+  #         memory: 6G
+
   worker-template:
     {}
     # kind: Pod
@@ -65,3 +87,4 @@ kubernetes:
     #       requests:
     #         cpu: "1.75"
     #         memory: 6G
+
