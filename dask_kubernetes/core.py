@@ -64,14 +64,19 @@ class Pod(ProcessInterface):
         return self.pod_template.metadata.labels["dask.org/cluster-name"]
 
     async def start(self, **kwargs):
-        for _ in range(10):  # Retry 10 times
+        retry_count = 0  # Retry 10 times
+        while True:
             try:
                 self._pod = await self.core_api.create_namespaced_pod(
                     self.namespace, self.pod_template
                 )
                 return await super().start(**kwargs)
-            except ApiException:
-                await asyncio.sleep(1)
+            except ApiException as e:
+                if retry_count < 10:
+                    await asyncio.sleep(1)
+                    retry_count += 1
+                else:
+                    raise e
 
     async def close(self, **kwargs):
         if self._pod:
