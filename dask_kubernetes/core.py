@@ -112,9 +112,11 @@ class Worker(Pod):
     ----------
     scheduler: str
         The address of the scheduler
+    name (optional):
+        The name passed to the dask-worker CLI at creation time.
     """
 
-    def __init__(self, scheduler: str, **kwargs):
+    def __init__(self, scheduler: str, name=None, **kwargs):
         super().__init__(**kwargs)
 
         self.scheduler = scheduler
@@ -125,6 +127,9 @@ class Worker(Pod):
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
             )
         )
+        if name is not None:
+            worker_name_args = ["--name", str(name)]
+            self.pod_template.spec.containers[0].args += worker_name_args
 
 
 class Scheduler(Pod):
