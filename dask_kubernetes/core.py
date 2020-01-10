@@ -78,10 +78,20 @@ class Pod(ProcessInterface):
                     raise e
 
     async def close(self, **kwargs):
+        name, namespace = self._pod.metadata.name, self.namespace
         if self._pod:
-            await self.core_api.delete_namespaced_pod(
-                self._pod.metadata.name, self.namespace
-            )
+            try:
+                await self.core_api.delete_namespaced_pod(name, namespace)
+            except ApiException as e:
+                if e.reason == "Not Found":
+                    logger.debug(
+                        "Pod %s in namespace %s has been deleated already.",
+                        name,
+                        namespace,
+                    )
+                else:
+                    raise
+
         await super().close(**kwargs)
 
     async def logs(self):
