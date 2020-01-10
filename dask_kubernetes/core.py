@@ -24,8 +24,6 @@ from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
-from tornado import gen
-from tornado.gen import TimeoutError
 
 from .objects import (
     make_pod_from_dict,
@@ -181,7 +179,7 @@ class Scheduler(Pod):
                     self._service_wait_timeout_s > 0
                     and time.time() > start + self._service_wait_timeout_s
                 ):
-                    raise TimeoutError(
+                    raise asyncio.TimeoutError(
                         "Timed out waiting for Load Balancer to be provisioned."
                     )
                 self.service = await self.core_api.read_namespaced_service(
