@@ -440,11 +440,18 @@ async def test_reject_evicted_workers(cluster):
         ),
     )
 
-    # Wait until pod is evicted
+    # Wait until worker removal has been picked up by scheduler
     start = time()
     while len(cluster.scheduler_info["workers"]) != 0:
-        await gen.sleep(0.1)
-        assert time() < start + 60
+        delta = time() - start 
+        assert delta < 60, f"Scheduler failed to remove worker in {delta:.0f}s"
+        await asyncio.sleep(0.1)
+
+    # Wait until worker removal has been handled by cluster
+    while len(cluster.workers) != 0:
+        delta = time() - start 
+        assert delta < 60, f"Cluster failed to remove worker in {delta:.0f}s"
+        await asyncio.sleep(0.1)
 
 
 @pytest.mark.asyncio
