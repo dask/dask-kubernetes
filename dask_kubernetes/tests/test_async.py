@@ -89,7 +89,6 @@ async def client(cluster):
         yield client
 
 
-@pytest.mark.skip  # Waiting on https://github.com/dask/distributed/pull/3064
 @pytest.mark.asyncio
 async def test_versions(client):
     await client.get_versions(check=True)
