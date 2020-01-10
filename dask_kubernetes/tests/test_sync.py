@@ -37,22 +37,20 @@ except kubernetes.config.ConfigException:
 asyncio.get_event_loop().run_until_complete(ClusterAuth.load_first())
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def api():
     return kubernetes.client.CoreV1Api()
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ns(api):
     name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(
         metadata=kubernetes.client.V1ObjectMeta(name=name)
     )
     api.create_namespace(ns)
-    try:
-        yield name
-    finally:
-        api.delete_namespace(name)
+    yield name
+    api.delete_namespace(name)
 
 
 @pytest.fixture

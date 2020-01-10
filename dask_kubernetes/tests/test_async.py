@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import getpass
 import os
@@ -40,31 +41,29 @@ def pod_spec(image_name):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
+def event_loop(request):
+    """Override function-scoped fixture in pytest-asyncio."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="module")
 async def api():
     await ClusterAuth.load_first()
     return kubernetes.client.CoreV1Api()
 
 
-@pytest.fixture
-async def cleanup_namespaces(api):
-    """ We only use this for the side effects """
-    for ns in (await api.list_namespace()).items:
-        if "test-dask-kubernets" in ns.metadata.name:
-            await api.delete_namespace(ns.metadata.name)
-
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def ns(api):
     name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(
         metadata=kubernetes.client.V1ObjectMeta(name=name)
     )
     await api.create_namespace(ns)
-    try:
-        yield name
-    finally:
-        await api.delete_namespace(name)
+    yield name
+    await api.delete_namespace(name)
 
 
 cluster_kwargs = {"asynchronous": True}
