@@ -5,7 +5,15 @@ K8S_TEST_CONTEXT ?= kind-kind  # also tested with minikube
 K8S_TEST_NAMESPACE ?= dask-kubernetes-test  # must have a serviceaccount, e.g. defined via `make k8s-set-up` 
 COMMAND ?= test
 
+# Path to install binaries to
 BIN_PATH ?= ~/.local/bin/
+
+# Versions to install by default
+OS ?= linux
+ARCHITECTURE ?= amd64
+KUBECTL_VERSION ?= v1.17.0
+KIND_VERSION ?= v0.6.1
+MINIKUBE_VERSION ?= v0.25.2
 
 # Pure python commands
 .PHONY: install format lint test
@@ -22,7 +30,7 @@ lint:
 	black --check dask_kubernetes setup.py
 
 test:
-	py.test dask_kubernetes/tests/test_async.py -vvv --namespace=${K8S_TEST_NAMESPACE}
+	py.test dask_kubernetes -vvv --namespace=${K8S_TEST_NAMESPACE}
 
 # Docker commands
 .PHONY: build docker-make
@@ -64,12 +72,12 @@ k8s-clean:
 .PHONY: kubectl-bootstrap kind-bootstrap minikube-bootstrap
 
 kubectl-bootstrap:
-	curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.8.4/bin/linux/amd64/kubectl && \
+	curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/${OS}/${ARCHITECTURE}/kubectl && \
 	chmod +x kubectl && \
 	mv kubectl ${BIN_PATH}
 
 kind-bootstrap:  # https://github.com/kubernetes-sigs/kind
-	curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.6.1/kind-linux-amd64 && \
+	curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCHITECTURE} && \
 	chmod +x ./kind && \
 	mv kind ${BIN_PATH}
 	
@@ -78,7 +86,7 @@ kind-start:
 	kind export kubeconfig
 
 minikube-bootstrap:
-	curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v0.25.2/minikube-linux-amd64 && \
+	curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-${OS}-${ARCHITECTURE} && \
 	chmod +x minikube && \
 	mv minikube ${BIN_PATH}
 
