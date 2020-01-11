@@ -38,7 +38,8 @@ asyncio.get_event_loop().run_until_complete(ClusterAuth.load_first())
 
 
 @pytest.fixture(scope="module")
-def api():
+def api(auth):
+    ClusterAuth.load_first(auth=auth)
     return kubernetes.client.CoreV1Api()
 
 

@@ -50,8 +50,8 @@ def event_loop(request):
 
 
 @pytest.fixture(scope="module")
-async def api():
-    await ClusterAuth.load_first()
+async def api(auth):
+    await ClusterAuth.load_first(auth=auth)
     return kubernetes.client.CoreV1Api()
 
 
