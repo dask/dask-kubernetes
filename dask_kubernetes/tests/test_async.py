@@ -1,3 +1,5 @@
+import asyncio
+
 import base64
 import getpass
 import os
@@ -8,7 +10,6 @@ import yaml
 
 import kubernetes_asyncio as kubernetes
 import pytest
-from tornado import gen
 
 import dask
 from dask.distributed import Client, wait
@@ -40,31 +41,29 @@ def pod_spec(image_name):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
+def event_loop(request):
+    """Override function-scoped fixture in pytest-asyncio."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="module")
 async def api():
     await ClusterAuth.load_first()
     return kubernetes.client.CoreV1Api()
 
 
-@pytest.fixture
-async def cleanup_namespaces(api):
-    """ We only use this for the side effects """
-    for ns in (await api.list_namespace()).items:
-        if "test-dask-kubernets" in ns.metadata.name:
-            await api.delete_namespace(ns.metadata.name)
-
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def ns(api):
     name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
     ns = kubernetes.client.V1Namespace(
         metadata=kubernetes.client.V1ObjectMeta(name=name)
     )
     await api.create_namespace(ns)
-    try:
-        yield name
-    finally:
-        await api.delete_namespace(name)
+    yield name
+    await api.delete_namespace(name)
 
 
 cluster_kwargs = {"asynchronous": True}
@@ -90,7 +89,6 @@ async def client(cluster):
         yield client
 
 
-@pytest.mark.skip  # Waiting on https://github.com/dask/distributed/pull/3064
 @pytest.mark.asyncio
 async def test_versions(client):
     await client.get_versions(check=True)
@@ -114,7 +112,7 @@ async def test_basic(cluster, client):
     assert result == 11
 
     while len(cluster.scheduler_info["workers"]) < 2:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
 
     # Ensure that inter-worker communication works well
     futures = client.map(lambda x: x + 1, range(10))
@@ -131,7 +129,7 @@ async def test_logs(remote_cluster):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) < 2:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
     logs = await cluster.logs()
@@ -170,7 +168,7 @@ async def test_namespace(pod_spec, ns):
 
             cluster2.scale(1)
             while len(await cluster2.pods()) != 1:
-                await gen.sleep(0.1)
+                await asyncio.sleep(0.1)
 
 
 @pytest.mark.asyncio
@@ -183,7 +181,7 @@ async def test_adapt(cluster):
 
     start = time()
     while cluster.scheduler_info["workers"]:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
 
@@ -202,7 +200,7 @@ async def test_ipython_display(cluster):
     start = time()
     while "<td>1</td>" not in str(box):  # one worker in a table
         assert time() < start + 20
-        await gen.sleep(0.5)
+        await asyncio.sleep(0.5)
 
 
 @pytest.mark.asyncio
@@ -214,7 +212,7 @@ async def test_env(pod_spec, ns):
         await cluster
         async with Client(cluster, asynchronous=True) as client:
             while not cluster.scheduler_info["workers"]:
-                await gen.sleep(0.1)
+                await asyncio.sleep(0.1)
             env = await client.run(lambda: dict(os.environ))
             assert all(v["ABC"] == "DEF" for v in env.values())
 
@@ -257,7 +255,7 @@ async def test_pod_from_yaml(image_name, ns):
 
                 start = time()
                 while len(cluster.scheduler_info["workers"]) < 2:
-                    await gen.sleep(0.1)
+                    await asyncio.sleep(0.1)
                     assert time() < start + 20, "timeout"
 
                 # Ensure that inter-worker communication works well
@@ -340,7 +338,7 @@ async def test_pod_from_dict(image_name, ns):
             assert result == 11
 
             while len(cluster.scheduler_info["workers"]) < 2:
-                await gen.sleep(0.1)
+                await asyncio.sleep(0.1)
 
             # Ensure that inter-worker communication works well
             futures = client.map(lambda x: x + 1, range(10))
@@ -427,7 +425,7 @@ async def test_reject_evicted_workers(cluster):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) != 1:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 60
 
     # Evict worker
@@ -441,11 +439,18 @@ async def test_reject_evicted_workers(cluster):
         ),
     )
 
-    # Wait until pod is evicted
+    # Wait until worker removal has been picked up by scheduler
     start = time()
     while len(cluster.scheduler_info["workers"]) != 0:
-        await gen.sleep(0.1)
-        assert time() < start + 60
+        delta = time() - start
+        assert delta < 60, f"Scheduler failed to remove worker in {delta:.0f}s"
+        await asyncio.sleep(0.1)
+
+    # Wait until worker removal has been handled by cluster
+    while len(cluster.workers) != 0:
+        delta = time() - start
+        assert delta < 60, f"Cluster failed to remove worker in {delta:.0f}s"
+        await asyncio.sleep(0.1)
 
 
 @pytest.mark.asyncio
@@ -456,7 +461,7 @@ async def test_scale_up_down(cluster, client):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) != 2:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
     a, b = list(cluster.scheduler_info["workers"])
@@ -470,7 +475,7 @@ async def test_scale_up_down(cluster, client):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) != 1:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
     # assert set(cluster.scheduler_info["workers"]) == {b}
@@ -486,7 +491,7 @@ async def test_scale_up_down_fast(cluster, client):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) != 1:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
     worker = next(iter(cluster.scheduler_info["workers"].values()))
@@ -501,13 +506,13 @@ async def test_scale_up_down_fast(cluster, client):
     # with the temporary result.
     for i in range(10):
         await cluster._scale_up(4)
-        await gen.sleep(random.random() / 2)
+        await asyncio.sleep(random.random() / 2)
         cluster.scale(1)
-        await gen.sleep(random.random() / 2)
+        await asyncio.sleep(random.random() / 2)
 
     start = time()
     while len(cluster.scheduler_info["workers"]) != 1:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
 
     # The original task result is still stored on the original worker: this pod
@@ -533,7 +538,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) < 2:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         # Wait a bit because the kubernetes cluster can take time to provision
         # the requested pods as we requested a large number of pods.
         assert time() < start + 60
@@ -566,7 +571,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
                 "Expected %d running pods but got %r"
                 % (len(running_workers), pod_statuses)
             )
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         pod_statuses = [p.status.phase for p in await cluster.pods()]
 
     assert pod_statuses == ["Running"] * len(running_workers)
@@ -577,7 +582,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
     start = time()
     while len(cluster.scheduler_info["workers"]) > 0:
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         assert time() < start + 60
 
 
@@ -647,9 +652,9 @@ async def test_maximum(cluster):
 
             start = time()
             while len(cluster.scheduler_info["workers"]) <= 0:
-                await gen.sleep(0.1)
+                await asyncio.sleep(0.1)
                 assert time() < start + 60
-            await gen.sleep(0.5)
+            await asyncio.sleep(0.5)
             assert len(cluster.scheduler_info["workers"]) == 1
 
         result = logger.getvalue()
@@ -786,4 +791,4 @@ async def test_start_with_workers(pod_spec, ns):
     ) as cluster:
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler_info["workers"]) != 2:
-                await gen.sleep(0.1)
+                await asyncio.sleep(0.1)

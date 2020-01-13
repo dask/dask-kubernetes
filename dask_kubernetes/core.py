@@ -24,8 +24,6 @@ from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
-from tornado import gen
-from tornado.gen import TimeoutError
 
 from .objects import (
     make_pod_from_dict,
@@ -80,10 +78,20 @@ class Pod(ProcessInterface):
                     raise e
 
     async def close(self, **kwargs):
+        name, namespace = self._pod.metadata.name, self.namespace
         if self._pod:
-            await self.core_api.delete_namespaced_pod(
-                self._pod.metadata.name, self.namespace
-            )
+            try:
+                await self.core_api.delete_namespaced_pod(name, namespace)
+            except ApiException as e:
+                if e.reason == "Not Found":
+                    logger.debug(
+                        "Pod %s in namespace %s has been deleated already.",
+                        name,
+                        namespace,
+                    )
+                else:
+                    raise
+
         await super().close(**kwargs)
 
     async def logs(self):
@@ -114,9 +122,11 @@ class Worker(Pod):
     ----------
     scheduler: str
         The address of the scheduler
+    name (optional):
+        The name passed to the dask-worker CLI at creation time.
     """
 
-    def __init__(self, scheduler: str, **kwargs):
+    def __init__(self, scheduler: str, name=None, **kwargs):
         super().__init__(**kwargs)
 
         self.scheduler = scheduler
@@ -127,6 +137,9 @@ class Worker(Pod):
                 name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
             )
         )
+        if name is not None:
+            worker_name_args = ["--name", str(name)]
+            self.pod_template.spec.containers[0].args += worker_name_args
 
 
 class Scheduler(Pod):
@@ -181,7 +194,7 @@ class Scheduler(Pod):
                     self._service_wait_timeout_s > 0
                     and time.time() > start + self._service_wait_timeout_s
                 ):
-                    raise TimeoutError(
+                    raise asyncio.TimeoutError(
                         "Timed out waiting for Load Balancer to be provisioned."
                     )
                 self.service = await self.core_api.read_namespaced_service(
