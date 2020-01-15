@@ -1,9 +1,13 @@
 IMAGE_NAME ?= dask-kubernetes
 IMAGE_TAG ?= test
 
-K8S_TEST_CONTEXT ?= kind-kind  # also tested with minikube
-K8S_TEST_NAMESPACE ?= dask-kubernetes-test  # must have a serviceaccount, e.g. defined via `make k8s-set-up` 
+# kind-kind OR minikibe
+K8S_TEST_CONTEXT ?= kind-kind
+# must have a serviceaccount, e.g. defined via `make k8s-set-up`
+K8S_TEST_NAMESPACE ?= dask-kubernetes-test
 COMMAND ?= test
+WORKER_IMAGE ?= daskdev/dask:dev
+EXTRA_TEST_ARGS ?=
 
 # Path to install binaries to
 BIN_PATH ?= ~/.local/bin/
@@ -30,7 +34,7 @@ lint:
 	black --check dask_kubernetes setup.py
 
 test:
-	py.test dask_kubernetes -vvv --namespace=${K8S_TEST_NAMESPACE}
+	py.test dask_kubernetes -vvv --namespace=${K8S_TEST_NAMESPACE} ${EXTRA_TEST_ARGS}
 
 # Docker commands
 .PHONY: build docker-make
@@ -62,6 +66,8 @@ k8s-make:  # having to set USER is actually a bug
 		--image=${IMAGE_NAME}:${IMAGE_TAG} \
 		--image-pull-policy=Never \
 		--env="USER=tester" \
+		--env="K8S_TEST_NAMESPACE=${K8S_TEST_NAMESPACE}" \
+		--env="EXTRA_TEST_ARGS=--in-cluster" \
 		--rm=true \
 		${COMMAND}
 
