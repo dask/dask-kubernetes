@@ -28,32 +28,6 @@ FAKE_KEY = os.path.join(TEST_DIR, "fake-key-file")
 FAKE_CA = os.path.join(TEST_DIR, "fake-ca-file")
 
 
-try:
-    kubernetes.config.load_incluster_config()
-except kubernetes.config.ConfigException:
-    kubernetes.config.load_kube_config()
-
-
-asyncio.get_event_loop().run_until_complete(ClusterAuth.load_first())
-
-
-@pytest.fixture(scope="module")
-def api(auth):
-    ClusterAuth.load_first(auth=auth)
-    return kubernetes.client.CoreV1Api()
-
-
-@pytest.fixture(scope="module")
-def ns(api):
-    name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
-    ns = kubernetes.client.V1Namespace(
-        metadata=kubernetes.client.V1ObjectMeta(name=name)
-    )
-    api.create_namespace(ns)
-    yield name
-    api.delete_namespace(name)
-
-
 @pytest.fixture
 def pod_spec(image_name):
     yield make_pod_spec(

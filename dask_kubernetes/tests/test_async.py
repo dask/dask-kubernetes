@@ -49,36 +49,21 @@ def event_loop(request):
     loop.close()
 
 
-@pytest.fixture(scope="module")
-async def api(auth):
-    await ClusterAuth.load_first(auth=auth)
-    return kubernetes.client.CoreV1Api()
-
-
-@pytest.fixture(scope="module")
-async def ns(api):
-    name = "test-dask-kubernetes" + str(uuid.uuid4())[:10]
-    ns = kubernetes.client.V1Namespace(
-        metadata=kubernetes.client.V1ObjectMeta(name=name)
-    )
-    await api.create_namespace(ns)
-    yield name
-    await api.delete_namespace(name)
-
-
 cluster_kwargs = {"asynchronous": True}
 
 
 @pytest.fixture
-async def cluster(pod_spec, ns):
-    async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
+async def cluster(pod_spec, ns, auth):
+    async with KubeCluster(
+        pod_spec, namespace=ns, auth=auth, **cluster_kwargs
+    ) as cluster:
         yield cluster
 
 
 @pytest.fixture
-async def remote_cluster(pod_spec, ns):
+async def remote_cluster(pod_spec, ns, auth):
     async with KubeCluster(
-        pod_spec, namespace=ns, deploy_mode="remote", **cluster_kwargs
+        pod_spec, namespace=ns, deploy_mode="remote", auth=auth, **cluster_kwargs
     ) as cluster:
         yield cluster
 
@@ -95,13 +80,12 @@ async def test_versions(client):
 
 
 @pytest.mark.asyncio
-async def test_cluster_create(pod_spec, ns):
-    async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
-        cluster.scale(1)
-        await cluster
-        async with Client(cluster, asynchronous=True) as client:
-            result = await client.submit(lambda x: x + 1, 10)
-            assert result == 11
+async def test_cluster_create(cluster):
+    cluster.scale(1)
+    await cluster
+    async with Client(cluster, asynchronous=True) as client:
+        result = await client.submit(lambda x: x + 1, 10)
+        assert result == 11
 
 
 @pytest.mark.asyncio
@@ -159,8 +143,10 @@ async def test_diagnostics_link_env_variable(pod_spec, ns):
 
 @pytest.mark.skip(reason="Cannot run two closers locally as loadbalancer ports collide")
 @pytest.mark.asyncio
-async def test_namespace(pod_spec, ns):
-    async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
+async def test_namespace(pod_spec, ns, auth):
+    async with KubeCluster(
+        pod_spec, namespace=ns, auth=auth, **cluster_kwargs
+    ) as cluster:
         assert "dask" in cluster.name
         assert getpass.getuser() in cluster.name
         async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster2:
@@ -204,9 +190,9 @@ async def test_ipython_display(cluster):
 
 
 @pytest.mark.asyncio
-async def test_env(pod_spec, ns):
+async def test_env(pod_spec, ns, auth):
     async with KubeCluster(
-        pod_spec, env={"ABC": "DEF"}, namespace=ns, **cluster_kwargs
+        pod_spec, env={"ABC": "DEF"}, namespace=ns, auth=auth, **cluster_kwargs
     ) as cluster:
         cluster.scale(1)
         await cluster
@@ -218,7 +204,7 @@ async def test_env(pod_spec, ns):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_yaml(image_name, ns):
+async def test_pod_from_yaml(image_name, ns, auth):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
@@ -243,7 +229,7 @@ async def test_pod_from_yaml(image_name, ns):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         async with KubeCluster.from_yaml(
-            f.name, namespace=ns, **cluster_kwargs
+            f.name, namespace=ns, auth=auth, **cluster_kwargs
         ) as cluster:
             assert cluster.namespace == ns
             cluster.scale(2)
@@ -266,7 +252,7 @@ async def test_pod_from_yaml(image_name, ns):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_yaml_expand_env_vars(image_name, ns):
+async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
     try:
         os.environ["FOO_IMAGE"] = image_name
 
@@ -294,7 +280,7 @@ async def test_pod_from_yaml_expand_env_vars(image_name, ns):
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
             async with KubeCluster.from_yaml(
-                f.name, namespace=ns, **cluster_kwargs
+                f.name, namespace=ns, auth=auth, **cluster_kwargs
             ) as cluster:
                 assert cluster.pod_template.spec.containers[0].image == image_name
     finally:
@@ -302,7 +288,7 @@ async def test_pod_from_yaml_expand_env_vars(image_name, ns):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_dict(image_name, ns):
+async def test_pod_from_dict(image_name, ns, auth):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -327,7 +313,7 @@ async def test_pod_from_dict(image_name, ns):
     }
 
     async with KubeCluster.from_dict(
-        spec, namespace=ns, port=32000, **cluster_kwargs
+        spec, namespace=ns, port=32000, auth=auth, **cluster_kwargs
     ) as cluster:
         cluster.scale(2)
         await cluster
@@ -348,7 +334,7 @@ async def test_pod_from_dict(image_name, ns):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_minimal_dict(image_name, ns):
+async def test_pod_from_minimal_dict(image_name, ns, auth):
     spec = {
         "spec": {
             "containers": [
@@ -370,7 +356,9 @@ async def test_pod_from_minimal_dict(image_name, ns):
         }
     }
 
-    async with KubeCluster.from_dict(spec, namespace=ns, **cluster_kwargs) as cluster:
+    async with KubeCluster.from_dict(
+        spec, namespace=ns, auth=auth, **cluster_kwargs
+    ) as cluster:
         cluster.adapt()
         async with Client(cluster, asynchronous=True) as client:
             future = client.submit(lambda x: x + 1, 10)
@@ -379,11 +367,11 @@ async def test_pod_from_minimal_dict(image_name, ns):
 
 
 @pytest.mark.asyncio
-async def test_pod_template_from_conf(image_name):
+async def test_pod_template_from_conf(image_name, auth):
     spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
 
     with dask.config.set({"kubernetes.worker-template": spec}):
-        async with KubeCluster(**cluster_kwargs) as cluster:
+        async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
             assert cluster.pod_template.spec.containers[0].name == "some-name"
 
 
@@ -401,10 +389,10 @@ async def test_bad_args():
 
 
 @pytest.mark.asyncio
-async def test_constructor_parameters(pod_spec, ns):
+async def test_constructor_parameters(pod_spec, ns, auth):
     env = {"FOO": "BAR", "A": 1}
     async with KubeCluster(
-        pod_spec, name="myname", namespace=ns, env=env, **cluster_kwargs
+        pod_spec, name="myname", namespace=ns, env=env, auth=auth, **cluster_kwargs
     ) as cluster:
         pod = cluster.pod_template
         assert pod.metadata.namespace == ns
@@ -587,7 +575,7 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
 
 
 @pytest.mark.asyncio
-async def test_automatic_startup(image_name, ns):
+async def test_automatic_startup(image_name, ns, auth):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"foo": "bar"}},
@@ -611,7 +599,9 @@ async def test_automatic_startup(image_name, ns):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         with dask.config.set({"kubernetes.worker-template-path": fn}):
-            async with KubeCluster(namespace=ns, **cluster_kwargs) as cluster:
+            async with KubeCluster(
+                namespace=ns, auth=auth, **cluster_kwargs
+            ) as cluster:
                 assert cluster.pod_template.metadata.labels["foo"] == "bar"
 
 
@@ -626,19 +616,21 @@ async def test_repr(cluster):
 
 
 @pytest.mark.asyncio
-async def test_escape_username(pod_spec, ns, monkeypatch):
+async def test_escape_username(pod_spec, ns, auth, monkeypatch):
     monkeypatch.setenv("LOGNAME", "foo!")
 
-    async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
+    async with KubeCluster(
+        pod_spec, namespace=ns, auth=auth, **cluster_kwargs
+    ) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
         assert "foo" in cluster.pod_template.metadata.labels["user"]
 
 
 @pytest.mark.asyncio
-async def test_escape_name(pod_spec, ns):
+async def test_escape_name(pod_spec, auth, ns):
     async with KubeCluster(
-        pod_spec, namespace=ns, name="foo@bar", **cluster_kwargs
+        pod_spec, namespace=ns, name="foo@bar", auth=auth, **cluster_kwargs
     ) as cluster:
         assert "@" not in str(cluster.pod_template)
 
@@ -785,9 +777,9 @@ async def test_auth_explicit():
 
 
 @pytest.mark.asyncio
-async def test_start_with_workers(pod_spec, ns):
+async def test_start_with_workers(pod_spec, ns, auth):
     async with KubeCluster(
-        pod_spec, n_workers=2, namespace=ns, **cluster_kwargs
+        pod_spec, n_workers=2, namespace=ns, auth=auth, **cluster_kwargs
     ) as cluster:
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler_info["workers"]) != 2:
