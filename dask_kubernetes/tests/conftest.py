@@ -10,7 +10,7 @@ from dask_kubernetes.auth import ClusterAuth, KubeConfig, InCluster
 def pytest_addoption(parser):
     parser.addoption(
         "--worker-image",
-        default="daskdev/dask:dev",
+        default="daskdev/dask:latest",
         help="Worker image to use for testing",
     )
     parser.addoption("--context", default=None, help="kubectl context to use")

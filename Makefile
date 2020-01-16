@@ -1,4 +1,5 @@
-IMAGE_NAME ?= dask-kubernetes
+TESTER_IMAGE_NAME ?= dask-kubernetes
+WORKER_IMAGE_NAME ?= dask-kubernetes-worker
 IMAGE_TAG ?= test
 
 # kind-kind OR minikibe
@@ -6,7 +7,7 @@ K8S_TEST_CONTEXT ?= kind-kind
 # must have a serviceaccount, e.g. defined via `make k8s-set-up`
 K8S_TEST_NAMESPACE ?= dask-kubernetes-test
 COMMAND ?= test
-WORKER_IMAGE ?= daskdev/dask:dev
+WORKER_IMAGE ?= ${WORKER_IMAGE_NAME}:${IMAGE_TAG}
 EXTRA_TEST_ARGS ?=
 
 # Path to install binaries to
@@ -34,23 +35,26 @@ lint:
 	black --check dask_kubernetes setup.py
 
 test:
-	py.test dask_kubernetes -vvv --namespace=${K8S_TEST_NAMESPACE} ${EXTRA_TEST_ARGS}
+	py.test dask_kubernetes -vvv \
+		--namespace=${K8S_TEST_NAMESPACE} --worker-image=${WORKER_IMAGE} ${EXTRA_TEST_ARGS}
 
 # Docker commands
 .PHONY: build docker-make
 
 build:
-	docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+	docker build -t ${TESTER_IMAGE_NAME}:${IMAGE_TAG} -f ci/tester.Dockerfile .
+	docker build -t ${WORKER_IMAGE_NAME}:${IMAGE_TAG} -f ci/worker.Dockerfile .
 
 docker-make:
-	docker run -it ${IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
+	docker run -it ${TESTER_IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
 
 # Make test image available in-cluster.
 # This is the only step that is not cluster-agnostic.
 .PHONY: push-kind
 
 push-kind:
-	kind load docker-image ${IMAGE_NAME}:${IMAGE_TAG}
+	kind load docker-image ${WORKER_IMAGE_NAME}:${IMAGE_TAG}
+	kind load docker-image ${TESTER_IMAGE_NAME}:${IMAGE_TAG}
 
 # Kubernetes commands
 .PHONY: k8s-deploy k8s-test k8s-clean
@@ -63,7 +67,7 @@ k8s-make:  # having to set USER is actually a bug
 		run -i --tty --restart=Never \
 		dask-kubernetes-test \
 		--serviceaccount=test-runner \
-		--image=${IMAGE_NAME}:${IMAGE_TAG} \
+		--image=${TESTER_IMAGE_NAME}:${IMAGE_TAG} \
 		--image-pull-policy=Never \
 		--env="USER=tester" \
 		--env="K8S_TEST_NAMESPACE=${K8S_TEST_NAMESPACE}" \

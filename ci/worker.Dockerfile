@@ -9,6 +9,3 @@ WORKDIR /usr/local/src/dask_kubernetes
 COPY . .
 
 RUN make install
-
-ENTRYPOINT ["make"]
-CMD ["test"]
