@@ -44,7 +44,10 @@ build:
 	docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f ci/Dockerfile .
 
 docker-make:
-	docker run -it --entrypoint make ${IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
+	docker run \
+		-v $(shell pwd)/dask_kubernetes:/usr/local/src/dask_kubernetes/dask_kubernetes \
+		-v $(shell pwd)/Makefile:/usr/local/src/dask_kubernetes/Makefile \
+		-it --entrypoint make ${IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
 
 # Make test image available in-cluster.
 # This is the only step that is not cluster-agnostic.
