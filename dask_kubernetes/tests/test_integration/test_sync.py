@@ -244,20 +244,6 @@ def test_repr(cluster):
         assert "workers=0" in text
 
 
-def test_escape_username(pod_spec, ns, monkeypatch):
-    monkeypatch.setenv("LOGNAME", "foo!")
-
-    with KubeCluster(pod_spec, namespace=ns) as cluster:
-        assert "foo" in cluster.name
-        assert "!" not in cluster.name
-        assert "foo" in cluster.rendered_worker_pod_template.metadata.labels["user"]
-
-
-def test_escape_name(pod_spec, ns):
-    with KubeCluster(pod_spec, namespace=ns, name="foo@bar") as cluster:
-        assert "@" not in str(cluster.rendered_worker_pod_template)
-
-
 def test_maximum(cluster):
     with dask.config.set({"kubernetes.count.max": 1}):
         with captured_logger("dask_kubernetes") as logger:

@@ -490,26 +490,6 @@ async def test_repr(cluster):
 
 
 @pytest.mark.asyncio
-async def test_escape_username(pod_spec, ns, auth, monkeypatch):
-    monkeypatch.setenv("LOGNAME", "foo!")
-
-    async with KubeCluster(
-        pod_spec, namespace=ns, auth=auth, **cluster_kwargs
-    ) as cluster:
-        assert "foo" in cluster.name
-        assert "!" not in cluster.name
-        assert "foo" in cluster.rendered_worker_pod_template.metadata.labels["user"]
-
-
-@pytest.mark.asyncio
-async def test_escape_name(pod_spec, auth, ns):
-    async with KubeCluster(
-        pod_spec, namespace=ns, name="foo@bar", auth=auth, **cluster_kwargs
-    ) as cluster:
-        assert "@" not in str(cluster.rendered_worker_pod_template)
-
-
-@pytest.mark.asyncio
 async def test_maximum(cluster):
     with dask.config.set({"kubernetes.count.max": 1}):
         with captured_logger("dask_kubernetes") as logger:

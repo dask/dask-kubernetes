@@ -57,6 +57,23 @@ def test_bad_args():
     assert "use KubeCluster.from_dict" in str(info.value)
 
 
+def test_escape_username(cluster, monkeypatch):
+    monkeypatch.setenv("LOGNAME", "foo!")
+
+    cluster = KubeCluster(pod_spec, **cluster_kwargs)
+
+    assert "foo" in cluster.name
+    assert "!" not in cluster.name
+    assert "foo" in cluster.rendered_worker_pod_template.metadata.labels["user"]
+
+
+@pytest.mark.asyncio
+async def test_escape_name():
+    cluster = KubeCluster(pod_spec, name="foo@bar", **cluster_kwargs)
+
+    assert "@" not in str(cluster.rendered_worker_pod_template)
+
+
 def test_extra_pod_config(cluster):
     """
     Test that our pod config merging process works fine
