@@ -6,6 +6,10 @@ K8S_TEST_CONTEXT ?= kind-kind
 # must have a serviceaccount, e.g. defined via `make k8s-set-up`
 K8S_TEST_NAMESPACE ?= dask-kubernetes-test
 COMMAND ?= test
+
+# Test settings
+TEST_KEYWORD ?= ""
+TEST_MARKER ?= ""
 WORKER_IMAGE ?= ${IMAGE_NAME}:${IMAGE_TAG}
 EXTRA_TEST_ARGS ?=
 
@@ -20,7 +24,10 @@ KIND_VERSION ?= v0.6.1
 MINIKUBE_VERSION ?= v0.25.2
 
 # Pure python commands
-.PHONY: install format lint test
+.PHONY: clean install format lint test
+
+clean:
+	find . | grep -E '(__pycache__|\.pyc|\.pyo$$)' | xargs rm -rf
 
 install:
 	pip install -e .
@@ -34,7 +41,7 @@ lint:
 	black --check dask_kubernetes setup.py
 
 test:
-	py.test dask_kubernetes -vvv \
+	py.test dask_kubernetes -vvv -k ${TEST_KEYWORD} -m ${TEST_MARKER} \
 		--namespace=${K8S_TEST_NAMESPACE} --worker-image=${WORKER_IMAGE} ${EXTRA_TEST_ARGS}
 
 # Docker commands
