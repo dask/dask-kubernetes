@@ -1,9 +1,5 @@
-import asyncio
-import base64
-import getpass
 import os
 from time import sleep, time
-import uuid
 import yaml
 
 import dask
@@ -11,15 +7,10 @@ import pytest
 from dask_kubernetes import (
     KubeCluster,
     make_pod_spec,
-    ClusterAuth,
-    KubeConfig,
-    KubeAuth,
 )
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
-import kubernetes
-from random import random
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -208,17 +199,6 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
             future = client.submit(lambda x: x + 1, 10)
             result = future.result()
             assert result == 11
-
-
-def test_pod_template_from_conf(image_name):
-    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
-
-    with dask.config.set({"kubernetes.worker-template": spec}):
-        with KubeCluster() as cluster:
-            assert (
-                cluster.rendered_worker_pod_template.spec.containers[0].name
-                == "some-name"
-            )
 
 
 def test_bad_args():

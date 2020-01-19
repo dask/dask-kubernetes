@@ -319,18 +319,6 @@ async def test_pod_from_minimal_dict(image_name, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_template_from_conf(image_name, auth):
-    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
-
-    with dask.config.set({"kubernetes.worker-template": spec}):
-        async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
-            assert (
-                cluster.rendered_worker_pod_template.spec.containers[0].name
-                == "some-name"
-            )
-
-
-@pytest.mark.asyncio
 async def test_bad_args():
     with pytest.raises(TypeError) as info:
         await KubeCluster("myfile.yaml", **cluster_kwargs)

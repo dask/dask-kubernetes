@@ -237,6 +237,16 @@ def test_pod_from_yaml_expand_env_vars(monkeypatch, tmp_path):
     assert cluster.rendered_worker_pod_template.spec.containers[0].image == image_name
 
 
+def test_pod_template_from_conf(cluster):
+    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
+
+    cluster.pod_template = None
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        assert (
+            cluster.rendered_worker_pod_template.spec.containers[0].name == "some-name"
+        )
+
+
 def test_pod_from_config_template_path(tmp_path):
     test_yaml = {
         "kind": "Pod",
