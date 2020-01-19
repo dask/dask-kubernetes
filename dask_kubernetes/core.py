@@ -3,12 +3,9 @@ import copy
 import getpass
 import logging
 import os
-import socket
 import string
 import time
-from urllib.parse import urlparse
 import uuid
-import weakref
 from weakref import finalize
 
 try:
@@ -20,7 +17,6 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
@@ -392,15 +388,15 @@ class KubeCluster(SpecCluster):
     ):
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
-        self._generate_name = name
-        self._namespace = namespace
-        self._n_workers = n_workers
-        self._idle_timeout = idle_timeout
-        self._deploy_mode = deploy_mode
-        self._protocol = protocol
-        self._interface = interface
-        self._dashboard_address = dashboard_address
-        self._scheduler_service_wait_timeout = scheduler_service_wait_timeout
+        self.__generate_name = name
+        self.__namespace = namespace
+        self.n_workers = n_workers
+        self.idle_timeout = idle_timeout
+        self.deploy_mode = deploy_mode
+        self.protocol = protocol
+        self.interface = interface
+        self.dashboard_address = dashboard_address
+        self.scheduler_service_wait_timeout = scheduler_service_wait_timeout
         self.security = security
         if self.security and not isinstance(
             self.security, distributed.security.Security
@@ -415,7 +411,81 @@ class KubeCluster(SpecCluster):
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
 
-    def _get_pod_template(self, pod_template, pod_type):
+    @property
+    def _generate_name(self):
+        _generate_name = self.__generate_name or dask.config.get("kubernetes.name")
+        _generate_name = _generate_name.format(
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+        )
+        return escape(_generate_name)
+
+    @property
+    def _namespace(self):
+        return (
+            self.__namespace
+            or dask.config.get("kubernetes.namespace")
+            or _namespace_default()
+        )
+
+    @property
+    def name(self):
+        return self._generate_name
+
+    @property
+    def namespace(self):
+        return self._namespace
+
+    @property
+    def _n_workers(self):
+        return (
+            self.n_workers
+            if self.n_workers is not None
+            else dask.config.get("kubernetes.count.start")
+        )
+
+    @property
+    def _idle_timeout(self):
+        return self.idle_timeout or dask.config.get("kubernetes.idle-timeout")
+
+    @property
+    def _deploy_mode(self):
+        return self.deploy_mode or dask.config.get("kubernetes.deploy-mode")
+
+    @property
+    def _protocol(self):
+        return self.protocol or dask.config.get("kubernetes.protocol")
+
+    @property
+    def _interface(self):
+        return self.interface or dask.config.get("kubernetes.interface")
+
+    @property
+    def _dashboard_address(self):
+        return self.dashboard_address or dask.config.get("kubernetes.dashboard_address")
+
+    @property
+    def _scheduler_service_wait_timeout(self):
+        return self.scheduler_service_wait_timeout or dask.config.get(
+            "kubernetes.scheduler-service-wait-timeout"
+        )
+
+    @property
+    def _host(self):
+        return self.host or dask.config.get("kubernetes.host")
+
+    @property
+    def _port(self):
+        return (
+            self.port if self.port is not None else dask.config.get("kubernetes.port")
+        )
+
+    @property
+    def _env(self):
+        return self.env if self.env is not None else dask.config.get("kubernetes.env")
+
+    @staticmethod
+    def _get_pod_template(pod_template, pod_type):
+        pod_template = copy.deepcopy(pod_template)
         if not pod_template and dask.config.get(
             "kubernetes.{}-template".format(pod_type), None
         ):
@@ -436,6 +506,39 @@ class KubeCluster(SpecCluster):
             pod_template = make_pod_from_dict(d)
         return pod_template
 
+    @property
+    def rendered_worker_pod_template(self):
+        pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
+        if not pod_template:
+            msg = (
+                "Worker pod specification not provided. See KubeCluster "
+                "docstring for ways to specify workers"
+            )
+            raise ValueError(msg)
+        pod_template = clean_pod_template(pod_template, pod_type="worker")
+        pod_template = self._fill_pod_templates(pod_template, pod_type="worker")
+        return pod_template
+
+    @property
+    def rendered_scheduler_pod_template(self):
+        scheduler_pod_template = self._get_pod_template(
+            self.scheduler_pod_template, pod_type="scheduler"
+        )
+
+        if not scheduler_pod_template:  # fall back to worker template
+            scheduler_pod_template = self._get_pod_template(
+                self.pod_template, pod_type="worker"
+            )
+            scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
+
+        scheduler_pod_template = clean_pod_template(
+            scheduler_pod_template, pod_type="scheduler"
+        )
+        scheduler_pod_template = self._fill_pod_templates(
+            scheduler_pod_template, pod_type="scheduler"
+        )
+        return scheduler_pod_template
+
     def _fill_pod_templates(self, pod_template, pod_type):
         pod_template = copy.deepcopy(pod_template)
 
@@ -446,11 +549,11 @@ class KubeCluster(SpecCluster):
         pod_template.metadata.labels["app"] = "dask"
         pod_template.metadata.namespace = self._namespace
 
-        if self.env:
+        if self._env:
             pod_template.spec.containers[0].env.extend(
                 [
                     kubernetes.client.V1EnvVar(name=k, value=str(v))
-                    for k, v in self.env.items()
+                    for k, v in self._env.items()
                 ]
             )
         pod_template.metadata.generate_name = self._generate_name
@@ -458,80 +561,15 @@ class KubeCluster(SpecCluster):
         return pod_template
 
     async def _start(self):
-        self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
-        self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
-        self._idle_timeout = self._idle_timeout or dask.config.get(
-            "kubernetes.idle-timeout"
-        )
-        self._scheduler_service_wait_timeout = (
-            self._scheduler_service_wait_timeout
-            or dask.config.get("kubernetes.scheduler-service-wait-timeout")
-        )
-        self._deploy_mode = self._deploy_mode or dask.config.get(
-            "kubernetes.deploy-mode"
-        )
-
-        self._n_workers = (
-            self._n_workers
-            if self._n_workers is not None
-            else dask.config.get("kubernetes.count.start")
-        )
-        self.host = self.host or dask.config.get("kubernetes.host")
-        self.port = (
-            self.port if self.port is not None else dask.config.get("kubernetes.port")
-        )
-        self._protocol = self._protocol or dask.config.get("kubernetes.protocol")
-        self._interface = self._interface or dask.config.get("kubernetes.interface")
-        self._dashboard_address = self._dashboard_address or dask.config.get(
-            "kubernetes.dashboard_address"
-        )
-        self.env = (
-            self.env if self.env is not None else dask.config.get("kubernetes.env")
-        )
-
-        self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
-        self.scheduler_pod_template = self._get_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
-        )
-        if not self.pod_template:
-            msg = (
-                "Worker pod specification not provided. See KubeCluster "
-                "docstring for ways to specify workers"
-            )
-            raise ValueError(msg)
-
-        base_pod_template = self.pod_template
-        self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
-
-        if not self.scheduler_pod_template:
-            self.scheduler_pod_template = base_pod_template
-            self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
-
-        self.scheduler_pod_template = clean_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
-        )
-
         await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
 
-        if self._namespace is None:
-            self._namespace = _namespace_default()
-
-        self._generate_name = self._generate_name.format(
-            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
-        )
-        self._generate_name = escape(self._generate_name)
-
-        self.pod_template = self._fill_pod_templates(
-            self.pod_template, pod_type="worker"
-        )
-        self.scheduler_pod_template = self._fill_pod_templates(
-            self.scheduler_pod_template, pod_type="scheduler"
-        )
-
         finalize(
-            self, _cleanup_resources, self._namespace, self.pod_template.metadata.labels
+            self,
+            _cleanup_resources,
+            self._namespace,
+            self.rendered_worker_pod_template.metadata.labels,
         )
 
         common_options = {
@@ -546,8 +584,8 @@ class KubeCluster(SpecCluster):
                 "options": {
                     "protocol": self._protocol,
                     "interface": self._interface,
-                    "host": self.host,
-                    "port": self.port,
+                    "host": self._host,
+                    "port": self._port,
                     "dashboard_address": self._dashboard_address,
                     "security": self.security,
                 },
@@ -558,7 +596,7 @@ class KubeCluster(SpecCluster):
                 "options": {
                     "idle_timeout": self._idle_timeout,
                     "service_wait_timeout_s": self._scheduler_service_wait_timeout,
-                    "pod_template": self.scheduler_pod_template,
+                    "pod_template": self.rendered_scheduler_pod_template,
                     **common_options,
                 },
             }
@@ -567,7 +605,10 @@ class KubeCluster(SpecCluster):
 
         self.new_spec = {
             "cls": Worker,
-            "options": {"pod_template": self.pod_template, **common_options},
+            "options": {
+                "pod_template": self.rendered_worker_pod_template,
+                **common_options,
+            },
         }
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
 
@@ -638,14 +679,6 @@ class KubeCluster(SpecCluster):
             d = yaml.safe_load(f)
             d = dask.config.expand_environment_variables(d)
             return cls.from_dict(d, **kwargs)
-
-    @property
-    def namespace(self):
-        return self.pod_template.metadata.namespace
-
-    @property
-    def name(self):
-        return self.pod_template.metadata.generate_name
 
     def scale(self, n):
         # A shim to maintain backward compatibility

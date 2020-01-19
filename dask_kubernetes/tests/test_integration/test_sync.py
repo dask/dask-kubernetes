@@ -167,7 +167,10 @@ def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
             with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
-                assert cluster.pod_template.spec.containers[0].image == image_name
+                assert (
+                    cluster.rendered_worker_pod_template.spec.containers[0].image
+                    == image_name
+                )
     finally:
         del os.environ["FOO_IMAGE"]
 
@@ -248,7 +251,10 @@ def test_pod_template_from_conf(image_name):
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         with KubeCluster() as cluster:
-            assert cluster.pod_template.spec.containers[0].name == "some-name"
+            assert (
+                cluster.rendered_worker_pod_template.spec.containers[0].name
+                == "some-name"
+            )
 
 
 def test_bad_args():
@@ -268,7 +274,7 @@ def test_constructor_parameters(pod_spec, loop, ns):
     with KubeCluster(
         pod_spec, name="myname", namespace=ns, loop=loop, env=env
     ) as cluster:
-        pod = cluster.pod_template
+        pod = cluster.rendered_worker_pod_template
         assert pod.metadata.namespace == ns
 
         var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
@@ -338,7 +344,9 @@ def test_automatic_startup(image_name, ns):
             yaml.dump(test_yaml, f)
         with dask.config.set({"kubernetes.worker-template-path": fn}):
             with KubeCluster(namespace=ns) as cluster:
-                assert cluster.pod_template.metadata.labels["foo"] == "bar"
+                assert (
+                    cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"
+                )
 
 
 def test_repr(cluster):
@@ -357,12 +365,12 @@ def test_escape_username(pod_spec, ns, monkeypatch):
     with KubeCluster(pod_spec, namespace=ns) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
-        assert "foo" in cluster.pod_template.metadata.labels["user"]
+        assert "foo" in cluster.rendered_worker_pod_template.metadata.labels["user"]
 
 
 def test_escape_name(pod_spec, ns):
     with KubeCluster(pod_spec, namespace=ns, name="foo@bar") as cluster:
-        assert "@" not in str(cluster.pod_template)
+        assert "@" not in str(cluster.rendered_worker_pod_template)
 
 
 def test_maximum(cluster):

@@ -282,7 +282,10 @@ async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
             async with KubeCluster.from_yaml(
                 f.name, namespace=ns, auth=auth, **cluster_kwargs
             ) as cluster:
-                assert cluster.pod_template.spec.containers[0].image == image_name
+                assert (
+                    cluster.rendered_worker_pod_template.spec.containers[0].image
+                    == image_name
+                )
     finally:
         del os.environ["FOO_IMAGE"]
 
@@ -372,7 +375,10 @@ async def test_pod_template_from_conf(image_name, auth):
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
-            assert cluster.pod_template.spec.containers[0].name == "some-name"
+            assert (
+                cluster.rendered_worker_pod_template.spec.containers[0].name
+                == "some-name"
+            )
 
 
 @pytest.mark.asyncio
@@ -394,7 +400,7 @@ async def test_constructor_parameters(pod_spec, ns, auth):
     async with KubeCluster(
         pod_spec, name="myname", namespace=ns, env=env, auth=auth, **cluster_kwargs
     ) as cluster:
-        pod = cluster.pod_template
+        pod = cluster.rendered_worker_pod_template
         assert pod.metadata.namespace == ns
 
         var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
@@ -602,7 +608,9 @@ async def test_automatic_startup(image_name, ns, auth):
             async with KubeCluster(
                 namespace=ns, auth=auth, **cluster_kwargs
             ) as cluster:
-                assert cluster.pod_template.metadata.labels["foo"] == "bar"
+                assert (
+                    cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"
+                )
 
 
 @pytest.mark.asyncio
@@ -624,7 +632,7 @@ async def test_escape_username(pod_spec, ns, auth, monkeypatch):
     ) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
-        assert "foo" in cluster.pod_template.metadata.labels["user"]
+        assert "foo" in cluster.rendered_worker_pod_template.metadata.labels["user"]
 
 
 @pytest.mark.asyncio
@@ -632,7 +640,7 @@ async def test_escape_name(pod_spec, auth, ns):
     async with KubeCluster(
         pod_spec, namespace=ns, name="foo@bar", auth=auth, **cluster_kwargs
     ) as cluster:
-        assert "@" not in str(cluster.pod_template)
+        assert "@" not in str(cluster.rendered_worker_pod_template)
 
 
 @pytest.mark.asyncio

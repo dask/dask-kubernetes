@@ -236,7 +236,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
         pod_template.spec.tolerations.extend(tolerations)
 
     # add default node affinity to k8s.dask.org/node-purpose=worker
-    if match_node_purpose is not "ignore":
+    if match_node_purpose != "ignore":
         # for readability
         affinity = pod_template.spec.affinity
 
