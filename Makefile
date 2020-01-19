@@ -30,7 +30,7 @@ format:
 	black dask_kubernetes setup.py
 
 lint:
-	flake8 dask-kubernetes
+	flake8 dask_kubernetes
 	black --check dask_kubernetes setup.py
 
 test:
