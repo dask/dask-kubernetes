@@ -1,23 +1,60 @@
+"""Unit test core.KubeCluster."""
+import getpass
 import yaml
 
 import pytest
 
 import dask
+
 from dask_kubernetes import KubeCluster
-from dask_kubernetes.objects import (
-    make_pod_spec,
-    make_pod_from_dict,
-    clean_pod_template,
-)
+from dask_kubernetes.objects import clean_pod_template, make_pod_spec
+
+cluster_kwargs = dict(asynchronous=True)
 
 
 @pytest.fixture
 def cluster():
     """Provide a cluster without starting any loops."""
-    return KubeCluster(asynchronous=True)
+    return KubeCluster(**cluster_kwargs)
 
 
 image_name = "lolcat.gif"
+
+
+pod_spec = clean_pod_template(make_pod_spec(image=image_name))
+
+
+def test_init_args():
+    env = {"FOO": "BAR", "A": 1}
+    namespace = "namespace-1"
+    name = "myname"
+    cluster = KubeCluster(
+        pod_spec, name="myname", namespace=namespace, env=env, **cluster_kwargs
+    )
+    pod = cluster.rendered_worker_pod_template
+    assert pod.metadata.namespace == namespace
+
+    var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
+    assert var and var[0].value == "BAR"
+
+    var = [v for v in pod.spec.containers[0].env if v.name == "A"]
+    assert var and var[0].value == "1"
+
+    assert pod.metadata.generate_name == name
+
+
+def test_bad_args():
+    with pytest.raises(TypeError) as info:
+        cluster = KubeCluster("myfile.yaml", **cluster_kwargs)
+        cluster.rendered_worker_pod_template
+
+    assert "use KubeCluster.from_yaml" in str(info.value)
+
+    with pytest.raises((ValueError, TypeError)) as info:
+        KubeCluster({"kind": "Pod"}, **cluster_kwargs)
+        cluster.rendered_worker_pod_template
+
+    assert "use KubeCluster.from_dict" in str(info.value)
 
 
 def test_extra_pod_config(cluster):
@@ -116,94 +153,6 @@ def test_extra_container_config_merge(cluster):
     assert pod.spec.containers[0].args[-1] == "last-item"
 
 
-def test_make_pod_from_dict():
-    d = {
-        "kind": "Pod",
-        "metadata": {"labels": {"app": "dask", "dask.org/component": "dask-worker"}},
-        "spec": {
-            "containers": [
-                {
-                    "args": [
-                        "dask-worker",
-                        "$(DASK_SCHEDULER_ADDRESS)",
-                        "--nthreads",
-                        "1",
-                    ],
-                    "image": "image-name",
-                    "name": "dask-worker",
-                    "securityContext": {
-                        "capabilities": {"add": ["SYS_ADMIN"]},
-                        "privileged": True,
-                    },
-                }
-            ],
-            "restartPolicy": "Never",
-        },
-    }
-
-    pod = make_pod_from_dict(d)
-
-    assert pod.spec.restart_policy == "Never"
-    assert pod.spec.containers[0].security_context.privileged
-    assert pod.spec.containers[0].security_context.capabilities.add == ["SYS_ADMIN"]
-
-
-def test_default_toleration():
-    pod_spec = clean_pod_template(make_pod_spec(image=image_name))
-    tolerations = pod_spec.to_dict()["spec"]["tolerations"]
-    assert {
-        "key": "k8s.dask.org/dedicated",
-        "operator": "Equal",
-        "value": "worker",
-        "effect": "NoSchedule",
-        "toleration_seconds": None,
-    } in tolerations
-    assert {
-        "key": "k8s.dask.org_dedicated",
-        "operator": "Equal",
-        "value": "worker",
-        "effect": "NoSchedule",
-        "toleration_seconds": None,
-    } in tolerations
-
-
-def test_default_toleration_preserved():
-    pod_spec = clean_pod_template(
-        make_pod_spec(
-            image=image_name,
-            extra_pod_config={
-                "tolerations": [
-                    {
-                        "key": "example.org/toleration",
-                        "operator": "Exists",
-                        "effect": "NoSchedule",
-                    }
-                ]
-            },
-        )
-    )
-    tolerations = pod_spec.to_dict()["spec"]["tolerations"]
-    assert {
-        "key": "k8s.dask.org/dedicated",
-        "operator": "Equal",
-        "value": "worker",
-        "effect": "NoSchedule",
-        "toleration_seconds": None,
-    } in tolerations
-    assert {
-        "key": "k8s.dask.org_dedicated",
-        "operator": "Equal",
-        "value": "worker",
-        "effect": "NoSchedule",
-        "toleration_seconds": None,
-    } in tolerations
-    assert {
-        "key": "example.org/toleration",
-        "operator": "Exists",
-        "effect": "NoSchedule",
-    } in tolerations
-
-
 def test_pod_from_yaml_expand_env_vars(monkeypatch, tmp_path):
     image_name = "foo.jpg"
 
@@ -273,3 +222,9 @@ def test_pod_from_config_template_path(tmp_path):
     with dask.config.set({"kubernetes.worker-template-path": str(f)}):
         cluster = KubeCluster(asynchronous=True)
         assert cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"
+
+
+def test_name_from_env_variable():
+    with dask.config.set({"kubernetes.name": "foo-{USER}-{uuid}"}):
+        cluster = KubeCluster(pod_spec, **cluster_kwargs)
+        assert "foo-" + getpass.getuser() in cluster.name

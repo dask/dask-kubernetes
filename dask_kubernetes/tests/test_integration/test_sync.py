@@ -201,35 +201,6 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
             assert result == 11
 
 
-def test_bad_args():
-    with pytest.raises(TypeError) as info:
-        KubeCluster("myfile.yaml")
-
-    assert "KubeCluster.from_yaml" in str(info.value)
-
-    with pytest.raises((ValueError, TypeError)) as info:
-        KubeCluster({"kind": "Pod"})
-
-    assert "KubeCluster.from_dict" in str(info.value)
-
-
-def test_constructor_parameters(pod_spec, loop, ns):
-    env = {"FOO": "BAR", "A": 1}
-    with KubeCluster(
-        pod_spec, name="myname", namespace=ns, loop=loop, env=env
-    ) as cluster:
-        pod = cluster.rendered_worker_pod_template
-        assert pod.metadata.namespace == ns
-
-        var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
-        assert var and var[0].value == "BAR"
-
-        var = [v for v in pod.spec.containers[0].env if v.name == "A"]
-        assert var and var[0].value == "1"
-
-        assert pod.metadata.generate_name == "myname"
-
-
 def test_scale_up_down(cluster, client):
     np = pytest.importorskip("numpy")
     cluster.scale(2)

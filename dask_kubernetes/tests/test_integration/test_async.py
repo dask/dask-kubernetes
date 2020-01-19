@@ -111,13 +111,6 @@ async def test_logs(remote_cluster):
 
 
 @pytest.mark.asyncio
-async def test_dask_worker_name_env_variable(pod_spec, ns):
-    with dask.config.set({"kubernetes.name": "foo-{USER}-{uuid}"}):
-        async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
-            assert "foo-" + getpass.getuser() in cluster.name
-
-
-@pytest.mark.asyncio
 async def test_diagnostics_link_env_variable(pod_spec, ns):
     pytest.importorskip("bokeh")
     with dask.config.set({"distributed.dashboard.link": "foo-{USER}-{port}"}):
@@ -316,37 +309,6 @@ async def test_pod_from_minimal_dict(image_name, ns, auth):
             future = client.submit(lambda x: x + 1, 10)
             result = await future
             assert result == 11
-
-
-@pytest.mark.asyncio
-async def test_bad_args():
-    with pytest.raises(TypeError) as info:
-        await KubeCluster("myfile.yaml", **cluster_kwargs)
-
-    assert "KubeCluster.from_yaml" in str(info.value)
-
-    with pytest.raises((ValueError, TypeError)) as info:
-        await KubeCluster({"kind": "Pod"}, **cluster_kwargs)
-
-    assert "KubeCluster.from_dict" in str(info.value)
-
-
-@pytest.mark.asyncio
-async def test_constructor_parameters(pod_spec, ns, auth):
-    env = {"FOO": "BAR", "A": 1}
-    async with KubeCluster(
-        pod_spec, name="myname", namespace=ns, env=env, auth=auth, **cluster_kwargs
-    ) as cluster:
-        pod = cluster.rendered_worker_pod_template
-        assert pod.metadata.namespace == ns
-
-        var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
-        assert var and var[0].value == "BAR"
-
-        var = [v for v in pod.spec.containers[0].env if v.name == "A"]
-        assert var and var[0].value == "1"
-
-        assert pod.metadata.generate_name == "myname"
 
 
 @pytest.mark.asyncio
