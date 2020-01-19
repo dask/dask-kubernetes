@@ -21,7 +21,10 @@ jobs:
           command: make build
       - run:
           name: Lint containerized code
-          command: make docker-make COMMAND=lint
+          command: make ci-lint
+      - run:
+          name: Unit test containerized code
+          command: make ci-unit
       - run:
           name: Make docker image available in-cluster
           command: make push-kind    
@@ -29,5 +32,5 @@ jobs:
           name: Create K8S resources needed for testing in-cluster
           command: make k8s-deploy
       - run:
-          name: Test containerized code in-cluster
-          command: make k8s-make COMMAND=test
+          name: Run integration tests in-cluster
+          command: make ci-integration

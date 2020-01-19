@@ -8,8 +8,8 @@ K8S_TEST_NAMESPACE ?= dask-kubernetes-test
 COMMAND ?= test
 
 # Test settings
-TEST_KEYWORD ?= ""
-TEST_MARKER ?= ""
+TEST_KEYWORD ?= unit
+TEST_MARKER ?= ''
 WORKER_IMAGE ?= ${IMAGE_NAME}:${IMAGE_TAG}
 EXTRA_TEST_ARGS ?=
 
@@ -54,6 +54,8 @@ docker-make:
 	docker run \
 		-v $(shell pwd)/dask_kubernetes:/usr/local/src/dask_kubernetes/dask_kubernetes \
 		-v $(shell pwd)/Makefile:/usr/local/src/dask_kubernetes/Makefile \
+		--env="TEST_KEYWORD=${TEST_KEYWORD}" \
+		--env="TEST_MARKER=${TEST_MARKER}" \
 		-it --entrypoint make ${IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
 
 # Make test image available in-cluster.
@@ -76,9 +78,11 @@ k8s-make:  # having to set USER is actually a bug
 		--serviceaccount=test-runner \
 		--image=${IMAGE_NAME}:${IMAGE_TAG} \
 		--image-pull-policy=Never \
-		--env="USER=tester" \
+		--env="TEST_KEYWORD=${TEST_KEYWORD}" \
+		--env="TEST_MARKER=${TEST_MARKER}" \
 		--env="K8S_TEST_NAMESPACE=${K8S_TEST_NAMESPACE}" \
-		--env="EXTRA_TEST_ARGS=--in-cluster" \
+		--env="USER=tester" \
+		--env="EXTRA_TEST_ARGS=-x --in-cluster" \
 		--rm=true \
 		--command -- make ${COMMAND}
 
@@ -110,3 +114,15 @@ minikube-bootstrap:
 minikube-start:  # this needs to be run before `build` to use locally built image in minikube
 	minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20 && \
 	eval $(shell minikube docker-env)
+
+# CI commands
+.PHONY: ci-unit ci-integration
+
+ci-lint:
+	$(MAKE) docker-make COMMAND=lint
+
+ci-unit:
+	$(MAKE) docker-make COMMAND=test TEST_KEYWORD=unit
+
+ci-integration:
+	$(MAKE) k8s-make COMMAND=test TEST_KEYWORD=integration
