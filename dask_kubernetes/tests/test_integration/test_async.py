@@ -758,9 +758,6 @@ async def test_auth_kubeconfig_with_context():
     )
 
 
-@pytest.mark.xfail(
-    reason="Updating the default client configuration is broken in async kubernetes"
-)
 @pytest.mark.asyncio
 async def test_auth_explicit():
     await KubeAuth(

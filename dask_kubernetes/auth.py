@@ -171,7 +171,7 @@ class KubeAuth(ClusterAuth):
 
     async def load(self):
         kubernetes.client.Configuration.set_default(self.config)
-        await kubernetes_asyncio.client.Configuration.set_default(self.config)
+        kubernetes_asyncio.client.Configuration.set_default(self.config)
 
 
 ClusterAuth.DEFAULT = [InCluster(), KubeConfig()]
