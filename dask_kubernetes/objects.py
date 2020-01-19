@@ -184,22 +184,6 @@ def make_service_from_dict(dict_):
 
 def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
     """ Normalize pod template and check for type errors """
-    if isinstance(pod_template, str):
-        msg = (
-            "Expected a kubernetes.client.V1Pod object, got %s"
-            "If trying to pass a yaml filename then use "
-            "KubeCluster.from_yaml"
-        )
-        raise TypeError(msg % pod_template)
-
-    if isinstance(pod_template, dict):
-        msg = (
-            "Expected a kubernetes.client.V1Pod object, got %s"
-            "If trying to pass a dictionary specification then use "
-            "KubeCluster.from_dict"
-        )
-        raise TypeError(msg % str(pod_template))
-
     pod_template = copy.deepcopy(pod_template)
 
     # Make sure metadata / labels / env objects exist, so they can be modified

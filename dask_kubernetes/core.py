@@ -366,6 +366,8 @@ class KubeCluster(SpecCluster):
     KubeCluster.adapt
     """
 
+    __pod_template = None
+
     def __init__(
         self,
         pod_template=None,
@@ -384,7 +386,7 @@ class KubeCluster(SpecCluster):
         security=None,
         scheduler_service_wait_timeout=None,
         scheduler_pod_template=None,
-        **kwargs
+        **kwargs,
     ):
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
@@ -410,6 +412,29 @@ class KubeCluster(SpecCluster):
         self.auth = auth
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
+
+    @property
+    def pod_template(self):
+        return self.__pod_template
+
+    @pod_template.setter
+    def pod_template(self, pod_template):
+        if isinstance(pod_template, str):
+            msg = (
+                f"Expected a kubernetes.client.V1Pod object, got '{pod_template}'. "
+                f"If trying to pass a yaml filename then use "
+                f"{self.__class__.__name__}.from_yaml"
+            )
+            raise TypeError(msg)
+
+        if isinstance(pod_template, dict):
+            msg = (
+                f"Expected a kubernetes.client.V1Pod object, got {pod_template}. "
+                f"If trying to pass a dictionary specification then use "
+                f"{self.__class__.__name__}.from_dict"
+            )
+            raise TypeError(msg)
+        self.__pod_template = pod_template
 
     @property
     def _generate_name(self):
