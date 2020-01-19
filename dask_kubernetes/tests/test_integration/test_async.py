@@ -25,13 +25,6 @@ from distributed.utils import tmpfile
 from distributed.utils_test import captured_logger
 
 
-TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
-CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
-FAKE_CERT = os.path.join(TEST_DIR, "fake-cert-file")
-FAKE_KEY = os.path.join(TEST_DIR, "fake-key-file")
-FAKE_CA = os.path.join(TEST_DIR, "fake-ca-file")
-
-
 @pytest.fixture
 def pod_spec(image_name):
     yield clean_pod_template(
@@ -659,71 +652,6 @@ async def test_maximum(cluster):
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
-
-
-@pytest.mark.asyncio
-async def test_auth_missing(pod_spec, ns):
-    with pytest.raises(kubernetes.config.ConfigException) as info:
-        await KubeCluster(pod_spec, auth=[], namespace=ns, **cluster_kwargs)
-
-    assert "No authorization methods were provided" in str(info.value)
-
-
-@pytest.mark.asyncio
-async def test_auth_tries_all_methods(pod_spec, ns):
-    fails = {"count": 0}
-
-    class FailAuth(ClusterAuth):
-        def load(self):
-            fails["count"] += 1
-            raise kubernetes.config.ConfigException("Fail #{count}".format(**fails))
-
-    with pytest.raises(kubernetes.config.ConfigException) as info:
-        await KubeCluster(
-            pod_spec, auth=[FailAuth()] * 3, namespace=ns, **cluster_kwargs
-        )
-
-    assert "Fail #3" in str(info.value)
-    assert fails["count"] == 3
-
-
-@pytest.mark.asyncio
-async def test_auth_kubeconfig_with_filename():
-    await KubeConfig(config_file=CONFIG_DEMO).load()
-
-    # we've set the default configuration, so check that it is default
-    config = kubernetes.client.Configuration()
-    assert config.host == "https://1.2.3.4"
-    assert config.cert_file == FAKE_CERT
-    assert config.key_file == FAKE_KEY
-    assert config.ssl_ca_cert == FAKE_CA
-
-
-@pytest.mark.asyncio
-async def test_auth_kubeconfig_with_context():
-    await KubeConfig(config_file=CONFIG_DEMO, context="exp-scratch").load()
-
-    # we've set the default configuration, so check that it is default
-    config = kubernetes.client.Configuration()
-    assert config.host == "https://5.6.7.8"
-    assert config.api_key["authorization"] == "Basic {}".format(
-        base64.b64encode(b"exp:some-password").decode("ascii")
-    )
-
-
-@pytest.mark.asyncio
-async def test_auth_explicit():
-    await KubeAuth(
-        host="https://9.8.7.6", username="abc", password="some-password"
-    ).load()
-
-    config = kubernetes.client.Configuration()
-    assert config.host == "https://9.8.7.6"
-    assert config.username == "abc"
-    assert config.password == "some-password"
-    assert config.get_basic_auth_token() == "Basic {}".format(
-        base64.b64encode(b"abc:some-password").decode("ascii")
-    )
 
 
 @pytest.mark.asyncio
