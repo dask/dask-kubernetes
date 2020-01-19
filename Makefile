@@ -56,6 +56,7 @@ docker-make:
 		-v $(shell pwd)/Makefile:/usr/local/src/dask_kubernetes/Makefile \
 		--env="TEST_KEYWORD=${TEST_KEYWORD}" \
 		--env="TEST_MARKER=${TEST_MARKER}" \
+		--env="USER=tester" \
 		-it --entrypoint make ${IMAGE_NAME}:${IMAGE_TAG} ${COMMAND}
 
 # Make test image available in-cluster.
