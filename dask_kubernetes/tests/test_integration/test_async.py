@@ -1,11 +1,9 @@
 import asyncio
 
-import base64
 import getpass
 import os
 import random
 from time import time
-import uuid
 import yaml
 
 import kubernetes_asyncio as kubernetes
@@ -17,9 +15,6 @@ from dask_kubernetes import (
     KubeCluster,
     make_pod_spec,
     clean_pod_template,
-    ClusterAuth,
-    KubeConfig,
-    KubeAuth,
 )
 from distributed.utils import tmpfile
 from distributed.utils_test import captured_logger
@@ -468,9 +463,6 @@ async def test_scale_up_down(cluster, client):
     # assert set(cluster.scheduler_info["workers"]) == {b}
 
 
-@pytest.mark.xfail(
-    reason="The delay between scaling up, starting a worker, and then scale down causes issues"
-)
 @pytest.mark.asyncio
 async def test_scale_up_down_fast(cluster, client):
     cluster.scale(1)
@@ -486,13 +478,15 @@ async def test_scale_up_down_fast(cluster, client):
     # Put some data on this worker
     future = client.submit(lambda: b"\x00" * int(1e6))
     await wait(future)
-    assert worker in cluster.scheduler.tasks[future.key].who_has
+    havers_names = {ws.name for ws in cluster.scheduler.tasks[future.key].who_has}
+    assert worker["name"] in havers_names
 
     # Rescale the cluster many times without waiting: this should put some
     # pressure on kubernetes but this should never fail nor delete our worker
     # with the temporary result.
     for i in range(10):
-        await cluster._scale_up(4)
+        cluster.scale(4)
+        await cluster
         await asyncio.sleep(random.random() / 2)
         cluster.scale(1)
         await asyncio.sleep(random.random() / 2)
@@ -505,7 +499,8 @@ async def test_scale_up_down_fast(cluster, client):
     # The original task result is still stored on the original worker: this pod
     # has never been deleted when rescaling the cluster and the result can
     # still be fetched back.
-    assert worker in cluster.scheduler.tasks[future.key].who_has
+    havers_names = {ws.name for ws in cluster.scheduler.tasks[future.key].who_has}
+    assert worker["name"] in havers_names
     assert len(await future) == int(1e6)
 
 
