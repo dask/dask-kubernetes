@@ -1,5 +1,8 @@
+import yaml
+
 import pytest
 
+import dask
 from dask_kubernetes import KubeCluster
 from dask_kubernetes.objects import (
     make_pod_spec,
@@ -199,3 +202,64 @@ def test_default_toleration_preserved():
         "operator": "Exists",
         "effect": "NoSchedule",
     } in tolerations
+
+
+def test_pod_from_yaml_expand_env_vars(monkeypatch, tmp_path):
+    image_name = "foo.jpg"
+
+    monkeypatch.setenv("FOO_IMAGE", image_name)
+
+    test_yaml = {
+        "kind": "Pod",
+        "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
+        "spec": {
+            "containers": [
+                {
+                    "args": [
+                        "dask-worker",
+                        "$(DASK_SCHEDULER_ADDRESS)",
+                        "--nthreads",
+                        "1",
+                    ],
+                    "image": "${FOO_IMAGE}",
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "dask-worker",
+                }
+            ]
+        },
+    }
+
+    f = tmp_path / "template.yaml"
+    f.write_text(yaml.dump(test_yaml))
+
+    cluster = KubeCluster.from_yaml(str(f), asynchronous=True)
+
+    assert cluster.rendered_worker_pod_template.spec.containers[0].image == image_name
+
+
+def test_pod_from_config_template_path(tmp_path):
+    test_yaml = {
+        "kind": "Pod",
+        "metadata": {"labels": {"foo": "bar"}},
+        "spec": {
+            "containers": [
+                {
+                    "args": [
+                        "dask-worker",
+                        "$(DASK_SCHEDULER_ADDRESS)",
+                        "--nthreads",
+                        "1",
+                    ],
+                    "image": image_name,
+                    "name": "dask-worker",
+                }
+            ]
+        },
+    }
+
+    f = tmp_path / "template.yaml"
+    f.write_text(yaml.dump(test_yaml))
+
+    with dask.config.set({"kubernetes.worker-template-path": str(f)}):
+        cluster = KubeCluster(asynchronous=True)
+        assert cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"

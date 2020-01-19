@@ -240,45 +240,6 @@ async def test_pod_from_yaml(image_name, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
-    try:
-        os.environ["FOO_IMAGE"] = image_name
-
-        test_yaml = {
-            "kind": "Pod",
-            "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
-            "spec": {
-                "containers": [
-                    {
-                        "args": [
-                            "dask-worker",
-                            "$(DASK_SCHEDULER_ADDRESS)",
-                            "--nthreads",
-                            "1",
-                        ],
-                        "image": "${FOO_IMAGE}",
-                        "imagePullPolicy": "IfNotPresent",
-                        "name": "dask-worker",
-                    }
-                ]
-            },
-        }
-
-        with tmpfile(extension="yaml") as fn:
-            with open(fn, mode="w") as f:
-                yaml.dump(test_yaml, f)
-            async with KubeCluster.from_yaml(
-                f.name, namespace=ns, auth=auth, **cluster_kwargs
-            ) as cluster:
-                assert (
-                    cluster.rendered_worker_pod_template.spec.containers[0].image
-                    == image_name
-                )
-    finally:
-        del os.environ["FOO_IMAGE"]
-
-
-@pytest.mark.asyncio
 async def test_pod_from_dict(image_name, ns, auth):
     spec = {
         "metadata": {},
@@ -566,39 +527,6 @@ async def test_scale_down_pending(cluster, client, cleanup_namespaces):
     while len(cluster.scheduler_info["workers"]) > 0:
         await asyncio.sleep(0.1)
         assert time() < start + 60
-
-
-@pytest.mark.asyncio
-async def test_automatic_startup(image_name, ns, auth):
-    test_yaml = {
-        "kind": "Pod",
-        "metadata": {"labels": {"foo": "bar"}},
-        "spec": {
-            "containers": [
-                {
-                    "args": [
-                        "dask-worker",
-                        "$(DASK_SCHEDULER_ADDRESS)",
-                        "--nthreads",
-                        "1",
-                    ],
-                    "image": image_name,
-                    "name": "dask-worker",
-                }
-            ]
-        },
-    }
-
-    with tmpfile(extension="yaml") as fn:
-        with open(fn, mode="w") as f:
-            yaml.dump(test_yaml, f)
-        with dask.config.set({"kubernetes.worker-template-path": fn}):
-            async with KubeCluster(
-                namespace=ns, auth=auth, **cluster_kwargs
-            ) as cluster:
-                assert (
-                    cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"
-                )
 
 
 @pytest.mark.asyncio

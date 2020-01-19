@@ -139,42 +139,6 @@ def dont_test_pod_from_yaml(image_name, loop, ns):
                 assert all(client.has_what().values())
 
 
-def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
-    try:
-        os.environ["FOO_IMAGE"] = image_name
-
-        test_yaml = {
-            "kind": "Pod",
-            "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
-            "spec": {
-                "containers": [
-                    {
-                        "args": [
-                            "dask-worker",
-                            "$(DASK_SCHEDULER_ADDRESS)",
-                            "--nthreads",
-                            "1",
-                        ],
-                        "image": "${FOO_IMAGE}",
-                        "imagePullPolicy": "IfNotPresent",
-                        "name": "dask-worker",
-                    }
-                ]
-            },
-        }
-
-        with tmpfile(extension="yaml") as fn:
-            with open(fn, mode="w") as f:
-                yaml.dump(test_yaml, f)
-            with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
-                assert (
-                    cluster.rendered_worker_pod_template.spec.containers[0].image
-                    == image_name
-                )
-    finally:
-        del os.environ["FOO_IMAGE"]
-
-
 def test_pod_from_dict(image_name, loop, ns):
     spec = {
         "metadata": {},
@@ -317,36 +281,6 @@ def test_scale_up_down(cluster, client):
         assert time() < start + 20
 
     # assert set(cluster.scheduler_info["workers"]) == {b}
-
-
-def test_automatic_startup(image_name, ns):
-    test_yaml = {
-        "kind": "Pod",
-        "metadata": {"labels": {"foo": "bar"}},
-        "spec": {
-            "containers": [
-                {
-                    "args": [
-                        "dask-worker",
-                        "$(DASK_SCHEDULER_ADDRESS)",
-                        "--nthreads",
-                        "1",
-                    ],
-                    "image": image_name,
-                    "name": "dask-worker",
-                }
-            ]
-        },
-    }
-
-    with tmpfile(extension="yaml") as fn:
-        with open(fn, mode="w") as f:
-            yaml.dump(test_yaml, f)
-        with dask.config.set({"kubernetes.worker-template-path": fn}):
-            with KubeCluster(namespace=ns) as cluster:
-                assert (
-                    cluster.rendered_worker_pod_template.metadata.labels["foo"] == "bar"
-                )
 
 
 def test_repr(cluster):
