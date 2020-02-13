@@ -104,9 +104,23 @@ async def test_basic(cluster, client):
     assert (await total) == sum(map(lambda x: x + 1, range(10)))
     assert all((await client.has_what()).values())
 
+@pytest.mark.asyncio
+async def test_logs(cluster):
+    cluster.scale(2)
+    await cluster
+
+    start = time()
+    while len(cluster.scheduler_info["workers"]) < 2:
+        await asyncio.sleep(0.1)
+        assert time() < start + 20
+
+    logs = await cluster.logs()
+    assert len(logs) == 3
+    for _, log in logs.items():
+        assert "distributed.scheduler" in log or "distributed.worker" in log
 
 @pytest.mark.asyncio
-async def test_logs(remote_cluster):
+async def test_remote_logs(remote_cluster):
     cluster = remote_cluster
     cluster.scale(2)
     await cluster

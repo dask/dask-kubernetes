@@ -218,6 +218,9 @@ class Scheduler(Pod):
             )
         await super().close(**kwargs)
 
+    async def get_logs(self, *args, **kwargs):
+        return await self.logs(*args, **kwargs)
+
     async def _create_service(self):
         service_template_dict = dask.config.get("kubernetes.scheduler-service-template")
         self.service_template = clean_service_template(
@@ -676,7 +679,7 @@ class KubeCluster(SpecCluster):
         logs = Logs()
 
         if scheduler:
-            logs["Scheduler"] = await self.scheduler.logs()
+            logs["Scheduler"] = await self.scheduler.get_logs()
 
         if workers:
             worker_logs = await asyncio.gather(
