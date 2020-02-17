@@ -2,94 +2,32 @@ version: 2
 
 jobs:
   build:
-    machine: true
-    environment:
-      MINIKUBE_WANTUPDATENOTIFICATION: false
-      MINIKUBE_WANTREPORTERRORPROMPT: false
-      CHANGE_MINIKUBE_NONE_USER: true
-      PYTHON: "3.7"
-      ENV_NAME: "dask-kubernetes-test"
+    machine:
+      image: ubuntu-1604:201903-01
 
     steps:
       - checkout
       - run:
-          command: |
-            curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.8.4/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/
-      # Use minikube v0.25.2 as v0.26.0 requires systemd to manage the daemons which
-      # is not available in the Ubuntu 14.04 image used by Circle CI with the
-      # "machine: true" option.
+          name: Install kubectl
+          command: sudo make kubectl-bootstrap BIN_PATH=/usr/local/bin
       - run:
-          command: |
-            curl -Lo minikube https://github.com/kubernetes/minikube/releases/download/v0.25.2/minikube-linux-amd64 && chmod +x minikube && sudo mv minikube /usr/local/bin/
+          name: Install kind
+          command: sudo make kind-bootstrap BIN_PATH=/usr/local/bin
       - run:
-          command: |
-            sudo -E minikube start --vm-driver=none --extra-config=kubelet.MaxPods=20
+          name: Start local Kubernetes Cluster and create context in ~/.kube/config
+          command: make kind-start
       - run:
-          command: |
-            sudo -E minikube addons enable kube-dns
+          name: Build docker image for testing
+          command: make build
       - run:
-          command: |
-            sudo -E minikube update-context
+          name: Lint containerized code
+          command: make docker-make COMMAND=lint
       - run:
-          command: |
-            JSONPATH='{range .items[*]}{@.metadata.name}:{range @.status.conditions[*]}{@.type}={@.status};{end}{end}'; until sudo kubectl get nodes -o jsonpath="$JSONPATH" 2>&1 | grep -q "Ready=True"; do sleep 1; done
+          name: Make docker image available in-cluster
+          command: make push-kind    
       - run:
-          command: |
-            sudo kubectl cluster-info
+          name: Create K8S resources needed for testing in-cluster
+          command: make k8s-deploy
       - run:
-          command: |
-            sudo kubectl run circleci-example --image=nginx
-            sudo kubectl expose deployment circleci-example --port 80 --type=ClusterIP --name=circleci-example
-      - run:
-          command: |
-            sudo kubectl get deployment
-            sudo kubectl get service
-      - run:
-          command: |
-            KUBEDNS=`sudo kubectl get svc -o json kube-dns --namespace=kube-system | jq -r '.spec.clusterIP'`
-            echo "nameserver $KUBEDNS" | sudo tee -a /etc/resolvconf/resolv.conf.d/head > /dev/null
-            echo "search default.svc.cluster.local svc.cluster.local cluster.local" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
-            echo "options ndots:5" | sudo tee -a /etc/resolvconf/resolv.conf.d/base > /dev/null
-            sudo resolvconf -u
-      - run:
-          command: |
-            until nslookup circleci-example.default; do
-              sleep 1
-            done
-            curl circleci-example.default
-      - run:
-          name: install miniconda
-          command: |
-            if [ ! -d "/home/circleci/miniconda" ]; then
-              wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-              bash miniconda.sh -b -p $HOME/miniconda
-              export PATH="$HOME/miniconda/bin:$PATH"
-              conda config --set always_yes yes --set changeps1 no
-            fi
-            sudo chown -R $USER.$USER $HOME
-      - run:
-          name: configure conda
-          command: |
-            export PATH="$HOME/miniconda/bin:$PATH"
-            if [ ! -d "/home/circleci/miniconda/envs/dask-kubernetes-test" ]; then
-              conda install pip  # create a record for conda, to avoid removing setuptools. See #192 for more.
-              conda update -q conda
-              conda env create -f ci/environment-${PYTHON}.yml --name=${ENV_NAME}
-              source activate ${ENV_NAME}
-              pip install --no-deps --quiet -e .
-            fi
-            conda env list
-            conda list ${ENV_NAME}
-      - run:
-          name: build docker
-          command: |
-            # eval $(minikube docker-env)
-            docker build -t daskdev/dask:dev docker/
-      - run:
-          command: |
-            # eval $(minikube docker-env)
-            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/py.test dask_kubernetes -s --verbose --worker-image daskdev/dask:dev
-      - run:
-          command: |
-            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/flake8 dask-kubernetes
-            /home/circleci/miniconda/envs/dask-kubernetes-test/bin/black --check dask_kubernetes setup.py
+          name: Test containerized code in-cluster
+          command: make k8s-make COMMAND=test
