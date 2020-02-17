@@ -627,11 +627,13 @@ async def test_repr(cluster):
 
 @pytest.mark.asyncio
 async def test_escape_username(pod_spec, ns, monkeypatch):
-    monkeypatch.setenv("LOGNAME", "foo!")
+    monkeypatch.setenv("LOGNAME", "foo!._")
 
     async with KubeCluster(pod_spec, namespace=ns, **cluster_kwargs) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
+        assert "." not in cluster.name
+        assert "_" not in cluster.name
         assert "foo" in cluster.pod_template.metadata.labels["user"]
 
 
