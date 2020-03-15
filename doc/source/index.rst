@@ -78,8 +78,8 @@ Best Practices
 1.  Your worker pod image should have a similar environment to your local
     environment, including versions of Python, dask, cloudpickle, and any
     libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
-    See :obj:`KubeCluster` docstring below for guidance on how to check and
-    modify this.
+    See :py:class:`dask_kubernetes.KubeCluster` docstring for guidance on how 
+    to check and modify this.
 
 2.  Your Kubernetes resource limits and requests should match the
     ``--memory-limit`` and ``--nthreads`` parameters given to the
@@ -104,7 +104,7 @@ Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
-    :obj:`KubeCluster` is called with no arguments::
+    :py:class:`dask_kubernetes.KubeCluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
