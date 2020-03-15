@@ -21,7 +21,7 @@ You can install dask-kubernetes with ``pip``, ``conda``, or by installing from s
 Pip
 ---
 
-Pip can be used to install both dask-jobqueue and its dependencies.::
+Pip can be used to install both dask-kubernetes and its dependencies.::
 
    pip install dask-kubernetes --upgrade # Install everything from last released version
 
