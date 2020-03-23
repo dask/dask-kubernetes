@@ -752,16 +752,23 @@ def check_node_purpose(pod_template):
     assert affinity.preferred_during_scheduling_ignored_during_execution is None
 
 
-def test_match_node_purpose_keyword(image_name, loop):
+@pytest.mark.asyncio
+async def test_match_node_purpose_keyword(image_name, ns):
     with KubeCluster(
-        make_pod_spec(image_name), loop=loop, n_workers=0, match_node_purpose="require"
+        make_pod_spec(image_name),
+        n_workers=0,
+        namespace=ns,
+        match_node_purpose="require",
     ) as cluster:
         check_node_purpose(cluster.pod_template)
 
 
-def test_match_node_purpose_config(image_name, loop):
+@pytest.mark.asyncio
+async def test_match_node_purpose_config(image_name, ns):
     with dask.config.set(**{"kubernetes.match_node_purpose": "require"}):
-        with KubeCluster(make_pod_spec(image_name), loop=loop, n_workers=0) as cluster:
+        with KubeCluster(
+            make_pod_spec(image_name), namespace=ns, n_workers=0
+        ) as cluster:
             check_node_purpose(cluster.pod_template)
 
 
