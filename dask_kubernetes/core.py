@@ -1,3 +1,5 @@
+import asyncio
+import copy
 import getpass
 import logging
 import os
@@ -6,6 +8,7 @@ import string
 import time
 from urllib.parse import urlparse
 import uuid
+import weakref
 from weakref import finalize
 
 try:
@@ -14,19 +17,229 @@ except ImportError:
     yaml = False
 
 import dask
-from distributed.deploy import LocalCluster, Cluster
+import dask.distributed
+import distributed.security
+from distributed.deploy import SpecCluster, ProcessInterface
 from distributed.comm.utils import offload
-import kubernetes
-from tornado import gen
+from distributed.utils import Log, Logs
+import kubernetes_asyncio as kubernetes
+from kubernetes_asyncio.client.rest import ApiException
 
-from .objects import make_pod_from_dict, clean_pod_template
+from .objects import (
+    make_pod_from_dict,
+    make_service_from_dict,
+    clean_pod_template,
+    clean_service_template,
+)
 from .auth import ClusterAuth
-from .logs import Log, Logs
 
 logger = logging.getLogger(__name__)
 
+SCHEDULER_PORT = 8786
 
-class KubeCluster(Cluster):
+
+class Pod(ProcessInterface):
+    """ A superclass for Kubernetes Pods
+    See Also
+    --------
+    Worker
+    Scheduler
+    """
+
+    def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
+        self._pod = None
+        self.core_api = core_api
+        self.pod_template = copy.deepcopy(pod_template)
+        self.base_labels = self.pod_template.metadata.labels
+        self.namespace = namespace
+        self.name = None
+        self.loop = loop
+        self.kwargs = kwargs
+        super().__init__()
+
+    @property
+    def cluster_name(self):
+        return self.pod_template.metadata.labels["dask.org/cluster-name"]
+
+    async def start(self, **kwargs):
+        retry_count = 0  # Retry 10 times
+        while True:
+            try:
+                self._pod = await self.core_api.create_namespaced_pod(
+                    self.namespace, self.pod_template
+                )
+                return await super().start(**kwargs)
+            except ApiException as e:
+                if retry_count < 10:
+                    logger.debug("Error when creating pod, retrying... - %s", str(e))
+                    await asyncio.sleep(1)
+                    retry_count += 1
+                else:
+                    raise e
+
+    async def close(self, **kwargs):
+        name, namespace = self._pod.metadata.name, self.namespace
+        if self._pod:
+            try:
+                await self.core_api.delete_namespaced_pod(name, namespace)
+            except ApiException as e:
+                if e.reason == "Not Found":
+                    logger.debug(
+                        "Pod %s in namespace %s has been deleated already.",
+                        name,
+                        namespace,
+                    )
+                else:
+                    raise
+
+        await super().close(**kwargs)
+
+    async def logs(self):
+        try:
+            log = await self.core_api.read_namespaced_pod_log(
+                self._pod.metadata.name, self.namespace
+            )
+        except ApiException as e:
+            if "waiting to start" in str(e):
+                log = ""
+            else:
+                raise e
+        return Log(log)
+
+    async def describe_pod(self):
+        self._pod = await self.core_api.read_namespaced_pod(
+            self._pod.metadata.name, self.namespace
+        )
+        return self._pod
+
+    def __repr__(self):
+        return "<Pod %s: status=%s>" % (type(self).__name__, self.status)
+
+
+class Worker(Pod):
+    """ A Remote Dask Worker controled by Kubernetes
+    Parameters
+    ----------
+    scheduler: str
+        The address of the scheduler
+    name (optional):
+        The name passed to the dask-worker CLI at creation time.
+    """
+
+    def __init__(self, scheduler: str, name=None, **kwargs):
+        super().__init__(**kwargs)
+
+        self.scheduler = scheduler
+
+        self.pod_template.metadata.labels["dask.org/component"] = "worker"
+        self.pod_template.spec.containers[0].env.append(
+            kubernetes.client.V1EnvVar(
+                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler
+            )
+        )
+        if name is not None:
+            worker_name_args = ["--name", str(name)]
+            self.pod_template.spec.containers[0].args += worker_name_args
+
+
+class Scheduler(Pod):
+    """ A Remote Dask Scheduler controled by Kubernetes
+    Parameters
+    ----------
+    idle_timeout: str, optional
+        The scheduler task will exit after this amount of time
+        if there are no requests from the client. Default is to
+        never timeout.
+    service_wait_timeout_s: int (optional)
+        Timeout, in seconds, to wait for the remote scheduler service to be ready.
+        Defaults to 30 seconds.
+        Set to 0 to disable the timeout (not recommended).
+    """
+
+    def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
+        super().__init__(**kwargs)
+        self.service = None
+        self._idle_timeout = idle_timeout
+        self._service_wait_timeout_s = service_wait_timeout_s
+        if self._idle_timeout is not None:
+            self.pod_template.spec.containers[0].args += [
+                "--idle-timeout",
+                self._idle_timeout,
+            ]
+
+    async def start(self, **kwargs):
+        await super().start(**kwargs)
+
+        while (await self.describe_pod()).status.phase == "Pending":
+            await asyncio.sleep(0.1)
+
+        while self.address is None:
+            logs = await self.logs()
+            for line in logs.splitlines():
+                if "Scheduler at:" in line:
+                    self.address = line.split("Scheduler at:")[1].strip()
+            await asyncio.sleep(0.1)
+
+        self.service = await self._create_service()
+        self.address = "tcp://{name}.{namespace}:{port}".format(
+            name=self.service.metadata.name,
+            namespace=self.namespace,
+            port=SCHEDULER_PORT,
+        )
+        if self.service.spec.type == "LoadBalancer":
+            # Wait for load balancer to be assigned
+            start = time.time()
+            while self.service.status.load_balancer.ingress is None:
+                if (
+                    self._service_wait_timeout_s > 0
+                    and time.time() > start + self._service_wait_timeout_s
+                ):
+                    raise asyncio.TimeoutError(
+                        "Timed out waiting for Load Balancer to be provisioned."
+                    )
+                self.service = await self.core_api.read_namespaced_service(
+                    self.cluster_name, self.namespace
+                )
+                await asyncio.sleep(0.2)
+
+            [loadbalancer_ingress] = self.service.status.load_balancer.ingress
+            loadbalancer_host = loadbalancer_ingress.hostname or loadbalancer_ingress.ip
+            self.external_address = "tcp://{host}:{port}".format(
+                host=loadbalancer_host, port=SCHEDULER_PORT
+            )
+        # FIXME Set external address when using nodeport service type
+
+        # FIXME Create an optional Ingress just in case folks want to configure one
+
+    async def close(self, **kwargs):
+        if self.service:
+            await self.core_api.delete_namespaced_service(
+                self.cluster_name, self.namespace
+            )
+        await super().close(**kwargs)
+
+    async def _create_service(self):
+        service_template_dict = dask.config.get("kubernetes.scheduler-service-template")
+        self.service_template = clean_service_template(
+            make_service_from_dict(service_template_dict)
+        )
+        self.service_template.metadata.name = self.cluster_name
+        self.service_template.metadata.labels = copy.deepcopy(self.base_labels)
+
+        self.service_template.spec.selector["dask.org/cluster-name"] = self.cluster_name
+        if self.service_template.spec.type is None:
+            self.service_template.spec.type = dask.config.get(
+                "kubernetes.scheduler-service-type"
+            )
+        await self.core_api.create_namespaced_service(
+            self.namespace, self.service_template
+        )
+        return await self.core_api.read_namespaced_service(
+            self.cluster_name, self.namespace
+        )
+
+
+class KubeCluster(SpecCluster):
     """ Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
@@ -59,6 +272,9 @@ class KubeCluster(Cluster):
     ----------
     pod_template: kubernetes.client.V1Pod
         A Kubernetes specification for a Pod for a dask worker.
+    scheduler_pod_template: kubernetes.client.V1Pod (optional)
+        A Kubernetes specification for a Pod for a dask scheduler.
+        Defaults to the pod_template.
     name: str (optional)
         Name given to the pods.  Defaults to ``dask-$USER-random``
     namespace: str (optional)
@@ -66,7 +282,7 @@ class KubeCluster(Cluster):
         Defaults to current namespace if available or "default"
     n_workers: int
         Number of workers on initial launch.
-        Use ``scale_up`` to increase this number in the future
+        Use ``scale`` to change this number in the future
     env: Dict[str, str]
         Dictionary of environment variables to pass to worker pod
     host: str
@@ -76,6 +292,17 @@ class KubeCluster(Cluster):
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
+    idle_timeout: str (optional)
+        The scheduler task will exit after this amount of time
+        if there are no requests from the client. Default is to
+        never timeout.
+    scheduler_service_wait_timeout: int (optional)
+        Timeout, in seconds, to wait for the remote scheduler service to be ready.
+        Defaults to 30 seconds.
+        Set to 0 to disable the timeout (not recommended).
+    deploy_mode: str (optional)
+        Run the scheduler as "local" or "remote".
+        Defaults to ``"local"``.
     match_node_purpose: {"prefer", "require", "ignore"}, optional
         The node affinity for workers with the label ``k8s.dask.org/node-purpose="worker"``.
         By default, this is taken from the dask config ``kubernetes.match_node_purpose``,
@@ -86,7 +313,6 @@ class KubeCluster(Cluster):
         * "require" : Applies the ``requiredDuringSchedulingIgnoredDuringExecution``
           affinity type.
         * "ignore" : Don't add any (additional) affinities to the pod template.
-
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -164,103 +390,206 @@ class KubeCluster(Cluster):
         port=None,
         env=None,
         auth=ClusterAuth.DEFAULT,
+        idle_timeout=None,
+        deploy_mode=None,
+        interface=None,
+        protocol=None,
+        dashboard_address=None,
+        security=None,
+        scheduler_service_wait_timeout=None,
+        scheduler_pod_template=None,
         match_node_purpose=None,
         **kwargs
     ):
-        name = name or dask.config.get("kubernetes.name")
-        namespace = namespace or dask.config.get("kubernetes.namespace")
-        n_workers = (
-            n_workers
-            if n_workers is not None
-            else dask.config.get("kubernetes.count.start")
-        )
-        host = host or dask.config.get("kubernetes.host")
-        port = port if port is not None else dask.config.get("kubernetes.port")
-        env = env if env is not None else dask.config.get("kubernetes.env")
-        match_node_purpose = (
+        self.pod_template = pod_template
+        self.scheduler_pod_template = scheduler_pod_template
+        self._generate_name = name
+        self._namespace = namespace
+        self._n_workers = n_workers
+        self._idle_timeout = idle_timeout
+        self._deploy_mode = deploy_mode
+        self._protocol = protocol
+        self._interface = interface
+        self._dashboard_address = dashboard_address
+        self._scheduler_service_wait_timeout = scheduler_service_wait_timeout
+        self.security = security
+        if self.security and not isinstance(
+            self.security, distributed.security.Security
+        ):
+            raise RuntimeError(
+                "Security object is not a valid distributed.security.Security object"
+            )
+        self.host = host
+        self.port = port
+        self.env = env
+        self.auth = auth
+        self.kwargs = kwargs
+        self.match_node_purpose = (
             match_node_purpose
             if match_node_purpose is not None
             else dask.config.get("kubernetes.match_node_purpose", "prefer")
         )
+        super().__init__(**self.kwargs)
 
-        if not pod_template and dask.config.get("kubernetes.worker-template", None):
-            d = dask.config.get("kubernetes.worker-template")
+    def _get_pod_template(self, pod_template, pod_type):
+        if not pod_template and dask.config.get(
+            "kubernetes.{}-template".format(pod_type), None
+        ):
+            d = dask.config.get("kubernetes.{}-template".format(pod_type))
             d = dask.config.expand_environment_variables(d)
             pod_template = make_pod_from_dict(d)
 
         if not pod_template and dask.config.get(
-            "kubernetes.worker-template-path", None
+            "kubernetes.{}-template-path".format(pod_type), None
         ):
             import yaml
 
-            fn = dask.config.get("kubernetes.worker-template-path")
+            fn = dask.config.get("kubernetes.{}-template-path".format(pod_type))
             fn = fn.format(**os.environ)
             with open(fn) as f:
                 d = yaml.safe_load(f)
             d = dask.config.expand_environment_variables(d)
             pod_template = make_pod_from_dict(d)
+        return pod_template
 
-        if not pod_template:
+    def _fill_pod_templates(self, pod_template, pod_type):
+        pod_template = copy.deepcopy(pod_template)
+
+        # Default labels that can't be overwritten
+        pod_template.metadata.labels["dask.org/cluster-name"] = self._generate_name
+        pod_template.metadata.labels["dask.org/component"] = pod_type
+        pod_template.metadata.labels["user"] = escape(getpass.getuser())
+        pod_template.metadata.labels["app"] = "dask"
+        pod_template.metadata.namespace = self._namespace
+
+        if self.env:
+            pod_template.spec.containers[0].env.extend(
+                [
+                    kubernetes.client.V1EnvVar(name=k, value=str(v))
+                    for k, v in self.env.items()
+                ]
+            )
+        pod_template.metadata.generate_name = self._generate_name
+
+        return pod_template
+
+    async def _start(self):
+        self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
+        self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
+        self._idle_timeout = self._idle_timeout or dask.config.get(
+            "kubernetes.idle-timeout"
+        )
+        self._scheduler_service_wait_timeout = (
+            self._scheduler_service_wait_timeout
+            or dask.config.get("kubernetes.scheduler-service-wait-timeout")
+        )
+        self._deploy_mode = self._deploy_mode or dask.config.get(
+            "kubernetes.deploy-mode"
+        )
+
+        self._n_workers = (
+            self._n_workers
+            if self._n_workers is not None
+            else dask.config.get("kubernetes.count.start")
+        )
+        self.host = self.host or dask.config.get("kubernetes.host")
+        self.port = (
+            self.port if self.port is not None else dask.config.get("kubernetes.port")
+        )
+        self._protocol = self._protocol or dask.config.get("kubernetes.protocol")
+        self._interface = self._interface or dask.config.get("kubernetes.interface")
+        self._dashboard_address = self._dashboard_address or dask.config.get(
+            "kubernetes.dashboard_address"
+        )
+        self.env = (
+            self.env if self.env is not None else dask.config.get("kubernetes.env")
+        )
+
+        self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
+        self.scheduler_pod_template = self._get_pod_template(
+            self.scheduler_pod_template, pod_type="scheduler"
+        )
+        if not self.pod_template:
             msg = (
                 "Worker pod specification not provided. See KubeCluster "
                 "docstring for ways to specify workers"
             )
             raise ValueError(msg)
 
-        pod_template = clean_pod_template(
-            pod_template, match_node_purpose=match_node_purpose
+        base_pod_template = self.pod_template
+        self.pod_template = clean_pod_template(
+            self.pod_template, pod_type="worker", match_node_purpose=match_node_purpose
         )
-        ClusterAuth.load_first(auth)
+
+        if not self.scheduler_pod_template:
+            self.scheduler_pod_template = base_pod_template
+            self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
+
+        self.scheduler_pod_template = clean_pod_template(
+            self.scheduler_pod_template, pod_type="scheduler"
+        )
+
+        await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
 
-        if namespace is None:
-            namespace = _namespace_default()
+        if self._namespace is None:
+            self._namespace = _namespace_default()
 
-        name = name.format(
+        self._generate_name = self._generate_name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
-        name = escape(name)
-        self.pod_template = pod_template
+        self._generate_name = escape(self._generate_name)
 
-        # Default labels that can't be overwritten
-        self.pod_template.metadata.labels["dask.org/cluster-name"] = name
-        self.pod_template.metadata.labels["user"] = escape(getpass.getuser())
-        self.pod_template.metadata.labels["app"] = "dask"
-        self.pod_template.metadata.labels["component"] = "dask-worker"
-        self.pod_template.metadata.namespace = namespace
-
-        self.cluster = LocalCluster(
-            host=host or socket.gethostname(),
-            scheduler_port=port,
-            n_workers=0,
-            **kwargs
+        self.pod_template = self._fill_pod_templates(
+            self.pod_template, pod_type="worker"
+        )
+        self.scheduler_pod_template = self._fill_pod_templates(
+            self.scheduler_pod_template, pod_type="scheduler"
         )
 
-        # TODO: handle any exceptions here, ensure self.cluster is properly
-        # cleaned up.
-        self.pod_template.spec.containers[0].env.append(
-            kubernetes.client.V1EnvVar(
-                name="DASK_SCHEDULER_ADDRESS", value=self.scheduler_address
-            )
+        finalize(
+            self, _cleanup_resources, self._namespace, self.pod_template.metadata.labels
         )
-        if env:
-            self.pod_template.spec.containers[0].env.extend(
-                [
-                    kubernetes.client.V1EnvVar(name=k, value=str(v))
-                    for k, v in env.items()
-                ]
-            )
-        self.pod_template.metadata.generate_name = name
 
-        finalize(self, _cleanup_pods, self.namespace, self.pod_template.metadata.labels)
+        common_options = {
+            "core_api": self.core_api,
+            "namespace": self._namespace,
+            "loop": self.loop,
+        }
 
-        if n_workers:
-            try:
-                self.scale(n_workers)
-            except Exception:
-                self.cluster.close()
-                raise
+        if self._deploy_mode == "local":
+            self.scheduler_spec = {
+                "cls": dask.distributed.Scheduler,
+                "options": {
+                    "protocol": self._protocol,
+                    "interface": self._interface,
+                    "host": self.host,
+                    "port": self.port,
+                    "dashboard_address": self._dashboard_address,
+                    "security": self.security,
+                },
+            }
+        elif self._deploy_mode == "remote":
+            self.scheduler_spec = {
+                "cls": Scheduler,
+                "options": {
+                    "idle_timeout": self._idle_timeout,
+                    "service_wait_timeout_s": self._scheduler_service_wait_timeout,
+                    "pod_template": self.scheduler_pod_template,
+                    **common_options,
+                },
+            }
+        else:
+            raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
+
+        self.new_spec = {
+            "cls": Worker,
+            "options": {"pod_template": self.pod_template, **common_options},
+        }
+        self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
+
+        await super()._start()
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -336,229 +665,72 @@ class KubeCluster(Cluster):
     def name(self):
         return self.pod_template.metadata.generate_name
 
-    def __repr__(self):
-        return 'KubeCluster("%s", workers=%d)' % (
-            self.scheduler.address,
-            len(self.pods()),
-        )
-
-    @property
-    def scheduler(self):
-        return self.cluster.scheduler
-
-    @property
-    def scheduler_address(self):
-        return self.scheduler.address
-
-    def pods(self):
-        """ A list of kubernetes pods corresponding to current workers
-
-        See Also
-        --------
-        KubeCluster.logs
-        """
-        return self.core_api.list_namespaced_pod(
-            self.namespace,
-            label_selector=format_labels(self.pod_template.metadata.labels),
-        ).items
-
-    @property
-    def workers(self):
-        return self.pods()
-
-    def logs(self, pod=None):
-        """ Logs from a worker pod
-
-        You can get this pod object from the ``pods`` method.
-
-        If no pod is specified all pod logs will be returned. On large clusters
-        this could end up being rather large.
-
-        Parameters
-        ----------
-        pod: kubernetes.client.V1Pod
-            The pod from which we want to collect logs.
-
-        See Also
-        --------
-        KubeCluster.pods
-        Client.get_worker_logs
-        """
-        if pod is None:
-            return Logs({pod.status.pod_ip: self.logs(pod) for pod in self.pods()})
-
-        return Log(
-            self.core_api.read_namespaced_pod_log(
-                pod.metadata.name, pod.metadata.namespace
-            )
-        )
-
     def scale(self, n):
-        """ Scale cluster to n workers
-
-        Parameters
-        ----------
-        n: int
-            Target number of workers
-
-        Example
-        -------
-        >>> cluster.scale(10)  # scale cluster to ten workers
-
-        See Also
-        --------
-        KubeCluster.scale_up
-        KubeCluster.scale_down
-        """
-        pods = self._cleanup_terminated_pods(self.pods())
-        if n >= len(pods):
-            self.scale_up(n, pods=pods)
-            return
-        else:
-            n_to_delete = len(pods) - n
-            # Before trying to close running workers, check if we can cancel
-            # pending pods (in case the kubernetes cluster was too full to
-            # provision those pods in the first place).
-            running_workers = list(self.scheduler.workers.keys())
-            running_ips = set(urlparse(worker).hostname for worker in running_workers)
-            pending_pods = [p for p in pods if p.status.pod_ip not in running_ips]
-            if pending_pods:
-                pending_to_delete = pending_pods[:n_to_delete]
-                logger.debug("Deleting pending pods: %s", pending_to_delete)
-                self._delete_pods(pending_to_delete)
-                n_to_delete = n_to_delete - len(pending_to_delete)
-                if n_to_delete <= 0:
-                    return
-
-            to_close = select_workers_to_close(self.scheduler, n_to_delete)
-            logger.debug("Closing workers: %s", to_close)
-            if len(to_close) < len(self.scheduler.workers):
-                # Close workers cleanly to migrate any temporary results to
-                # remaining workers.
-                @gen.coroutine
-                def f(to_close):
-                    yield self.scheduler.retire_workers(
-                        workers=to_close, remove=True, close_workers=True
-                    )
-                    yield offload(self.scale_down, to_close)
-
-                self.scheduler.loop.add_callback(f, to_close)
-                return
-
-            # Terminate all pods without waiting for clean worker shutdown
-            self.scale_down(to_close)
-
-    def _delete_pods(self, to_delete):
-        for pod in to_delete:
-            try:
-                self.core_api.delete_namespaced_pod(pod.metadata.name, self.namespace)
-                pod_info = pod.metadata.name
-                if pod.status.reason:
-                    pod_info += " [{}]".format(pod.status.reason)
-                if pod.status.message:
-                    pod_info += " {}".format(pod.status.message)
-                logger.info("Deleted pod: %s", pod_info)
-            except kubernetes.client.rest.ApiException as e:
-                # If a pod has already been removed, just ignore the error
-                if e.status != 404:
-                    raise
-
-    def _cleanup_terminated_pods(self, pods):
-        terminated_phases = {"Succeeded", "Failed"}
-        terminated_pods = [p for p in pods if p.status.phase in terminated_phases]
-        self._delete_pods(terminated_pods)
-        return [p for p in pods if p.status.phase not in terminated_phases]
-
-    def scale_up(self, n, pods=None, **kwargs):
-        """
-        Make sure we have n dask-workers available for this cluster
-
-        Examples
-        --------
-        >>> cluster.scale_up(20)  # ask for twenty workers
-        """
+        # A shim to maintain backward compatibility
+        # https://github.com/dask/distributed/issues/3054
         maximum = dask.config.get("kubernetes.count.max")
         if maximum is not None and maximum < n:
             logger.info(
                 "Tried to scale beyond maximum number of workers %d > %d", n, maximum
             )
             n = maximum
-        pods = pods or self._cleanup_terminated_pods(self.pods())
-        to_create = n - len(pods)
-        new_pods = []
-        for i in range(3):
-            try:
-                for _ in range(to_create):
-                    new_pods.append(
-                        self.core_api.create_namespaced_pod(
-                            self.namespace, self.pod_template
-                        )
-                    )
-                    to_create -= 1
-                break
-            except kubernetes.client.rest.ApiException as e:
-                if e.status == 500 and "ServerTimeout" in e.body:
-                    logger.info("Server timeout, retry #%d", i + 1)
-                    time.sleep(1)
-                    last_exception = e
-                    continue
-                else:
-                    raise
-        else:
-            raise last_exception
+        return super().scale(n)
 
-    def scale_down(self, workers, pods=None):
-        """ Remove the pods for the requested list of workers
-
-        When scale_down is called by the _adapt async loop, the workers are
-        assumed to have been cleanly closed first and in-memory data has been
-        migrated to the remaining workers.
-
-        Note that when the worker process exits, Kubernetes leaves the pods in
-        a 'Succeeded' state that we collect here.
-
-        If some workers have not been closed, we just delete the pods with
-        matching ip addresses.
-
+    async def _logs(self, scheduler=True, workers=True):
+        """ Return logs for the scheduler and workers
         Parameters
         ----------
-        workers: List[str] List of addresses of workers to close
+        scheduler : boolean
+            Whether or not to collect logs for the scheduler
+        workers : boolean or Iterable[str], optional
+            A list of worker addresses to select.
+            Defaults to all workers if `True` or no workers if `False`
+        Returns
+        -------
+        logs: Dict[str]
+            A dictionary of logs, with one item for the scheduler and one for
+            each worker
         """
-        # Get the existing worker pods
-        pods = pods or self._cleanup_terminated_pods(self.pods())
+        logs = Logs()
 
-        # Work out the list of pods that we are going to delete
-        # Each worker to delete is given in the form "tcp://<worker ip>:<port>"
-        # Convert this to a set of IPs
-        ips = set(urlparse(worker).hostname for worker in workers)
-        to_delete = [p for p in pods if p.status.pod_ip in ips]
-        if not to_delete:
-            return
-        self._delete_pods(to_delete)
+        if scheduler:
+            logs["Scheduler"] = await self.scheduler.logs()
 
-    def __enter__(self):
-        return self
+        if workers:
+            worker_logs = await asyncio.gather(
+                *[w.logs() for w in self.workers.values()]
+            )
+            for key, log in zip(self.workers, worker_logs):
+                logs[key] = log
 
-    def close(self, **kwargs):
-        """ Close this cluster """
-        self.scale_down(self.cluster.scheduler.workers)
-        return self.cluster.close(**kwargs)
-
-    def __exit__(self, type, value, traceback):
-        _cleanup_pods(self.namespace, self.pod_template.metadata.labels)
-        self.cluster.__exit__(type, value, traceback)
+        return logs
 
 
-def _cleanup_pods(namespace, labels):
+def _cleanup_resources(namespace, labels):
     """ Remove all pods with these labels in this namespace """
-    api = kubernetes.client.CoreV1Api()
-    pods = api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
+    import kubernetes
+
+    core_api = kubernetes.client.CoreV1Api()
+
+    pods = core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
-            api.delete_namespaced_pod(pod.metadata.name, namespace)
+            core_api.delete_namespaced_pod(pod.metadata.name, namespace)
             logger.info("Deleted pod: %s", pod.metadata.name)
         except kubernetes.client.rest.ApiException as e:
             # ignore error if pod is already removed
+            if e.status != 404:
+                raise
+
+    services = core_api.list_namespaced_service(
+        namespace, label_selector=format_labels(labels)
+    )
+    for service in services.items:
+        try:
+            core_api.delete_namespaced_service(service.metadata.name, namespace)
+            logger.info("Deleted service: %s", service.metadata.name)
+        except kubernetes.client.rest.ApiException as e:
+            # ignore error if service is already removed
             if e.status != 404:
                 raise
 
@@ -587,23 +759,6 @@ def _namespace_default():
     return "default"
 
 
-def select_workers_to_close(scheduler, n_to_close):
-    """ Select n workers to close from scheduler """
-    workers = list(scheduler.workers.values())
-    assert n_to_close <= len(workers)
-    key = lambda ws: ws.metrics["memory"]
-    to_close = set(sorted(scheduler.idle, key=key)[:n_to_close])
-
-    if len(to_close) < n_to_close:
-        rest = sorted(workers, key=key, reverse=True)
-        while len(to_close) < n_to_close:
-            to_close.add(rest.pop())
-
-    return [ws.address for ws in to_close]
-
-
-valid_characters = string.ascii_letters + string.digits + "_-."
-
-
 def escape(s):
+    valid_characters = string.ascii_letters + string.digits + "-"
     return "".join(c for c in s if c in valid_characters)

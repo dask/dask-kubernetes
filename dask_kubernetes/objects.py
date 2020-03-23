@@ -3,7 +3,7 @@ Convenience functions for creating pod templates.
 """
 from collections import namedtuple
 import copy
-from kubernetes import client
+from kubernetes_asyncio import client
 import json
 
 try:
@@ -174,7 +174,15 @@ def make_pod_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template, match_node_purpose="prefer"):
+def make_service_from_dict(dict_):
+    # FIXME: We can't use the 'deserialize' function since
+    # that expects a response object!
+    return SERIALIZATION_API_CLIENT.deserialize(
+        _FakeResponse(data=json.dumps(dict_)), client.V1Service
+    )
+
+
+def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
         msg = (
@@ -209,7 +217,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         client.V1Toleration(
             key="k8s.dask.org/dedicated",
             operator="Equal",
-            value="worker",
+            value=pod_type,
             effect="NoSchedule",
         ),
         # GKE currently does not permit creating taints on a node pool
@@ -217,7 +225,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         client.V1Toleration(
             key="k8s.dask.org_dedicated",
             operator="Equal",
-            value="worker",
+            value=pod_type,
             effect="NoSchedule",
         ),
     ]
@@ -241,7 +249,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         node_selector_term = client.V1NodeSelectorTerm(
             match_expressions=[
                 client.V1NodeSelectorRequirement(
-                    key="k8s.dask.org/node-purpose", operator="In", values=["worker"]
+                    key="k8s.dask.org/node-purpose", operator="In", values=[pod_type]
                 )
             ]
         )
@@ -280,3 +288,18 @@ def clean_pod_template(pod_template, match_node_purpose="prefer"):
         pod_template.spec.affinity = affinity
 
     return pod_template
+
+
+def clean_service_template(service_template):
+    """ Normalize service template and check for type errors """
+
+    service_template = copy.deepcopy(service_template)
+
+    # Make sure metadata / labels objects exist, so they can be modified
+    # later without a lot of `is None` checks
+    if service_template.metadata is None:
+        service_template.metadata = client.V1ObjectMeta()
+    if service_template.metadata.labels is None:
+        service_template.metadata.labels = {}
+
+    return service_template

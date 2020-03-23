@@ -1,0 +1,23 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: dask-kubernetes-test
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-runner
+  namespace: dask-kubernetes-test
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: test-runner
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: test-runner
+  namespace: dask-kubernetes-test

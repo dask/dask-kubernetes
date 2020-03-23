@@ -4,13 +4,41 @@ kubernetes:
   count:
     start: 0
     max: null
-  host: '0.0.0.0'
+  host: "0.0.0.0"
   port: 0
   env: {}
+  idle-timeout: null
+  deploy-mode: "local"
+  interface: null
+  protocol: "tcp://"
+  dashboard_address: ":8787"
+
+  scheduler-service-type: "ClusterIP"
+  # Timeout to wait for the scheduler service to be up (in seconds)
+  # Set it to 0 to wait indefinitely (not recommended)
+  scheduler-service-wait-timeout: 30
+
+  scheduler-service-template:
+    apiVersion: v1
+    kind: Service
+    spec:
+      selector:
+        dask.org/cluster-name: "" # Cluster name will be added automatically
+        dask.org/component: scheduler
+      ports:
+        - name: comm
+          protocol: TCP
+          port: 8786
+          targetPort: 8786
+        - name: dashboard
+          protocol: TCP
+          port: 8787
+          targetPort: 8787
 
   worker-template-path: null
 
-  worker-template: {}
+  scheduler-template:
+    {}
     # kind: Pod
     # metadata:
     #   labels:
@@ -19,7 +47,30 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - image: daskdev/dask:latest
+    #   - name: dask
+    #     image: daskdev/dask:latest
+    #     args:
+    #       - dask-scheduler
+    #     resources:
+    #       limits:
+    #         cpu: "1.75"
+    #         memory: 6G
+    #       requests:
+  #         cpu: "1.75"
+  #         memory: 6G
+
+  worker-template:
+    {}
+    # kind: Pod
+    # metadata:
+    #   labels:
+    #     foo: bar
+    #     baz: quux
+    # spec:
+    #   restartPolicy: Never
+    #   containers:
+    #   - name: dask
+    #     image: daskdev/dask:latest
     #     args:
     #       - dask-worker
     #       - --nthreads
@@ -36,3 +87,4 @@ kubernetes:
     #       requests:
     #         cpu: "1.75"
     #         memory: 6G
+

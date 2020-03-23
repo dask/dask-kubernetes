@@ -11,7 +11,7 @@ See https://docs.dask.org/en/latest/setup/kubernetes.html for more.
 Currently, it is designed to be run from a pod on a Kubernetes cluster that
 has permissions to launch other pods. However, it can also work with a remote
 Kubernetes cluster (configured via a kubeconfig file), as long as it is possible
-to open network connections with all the workers nodes on the remote cluster.
+to interact with the Kubernetes API and access services on the cluster.
 
 Install
 -------
@@ -28,7 +28,7 @@ Quickstart
    from dask_kubernetes import KubeCluster
 
    cluster = KubeCluster.from_yaml('worker-spec.yml')
-   cluster.scale_up(10)  # specify number of nodes explicitly
+   cluster.scale(10)  # specify number of workers explicitly
 
    cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
 
@@ -45,11 +45,11 @@ Quickstart
         containers:
         - image: daskdev/dask:latest
           imagePullPolicy: IfNotPresent
-          args: [dask-worker, --nthreads, '2', --no-bokeh, --memory-limit, 6GB, --death-timeout, '60']
+          args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
           name: dask
           env:
             - name: EXTRA_PIP_PACKAGES
-              value: fastparquet git+https://github.com/dask/distributed
+              value: git+https://github.com/dask/distributed
           resources:
             limits:
               cpu: "2"
@@ -61,14 +61,14 @@ Quickstart
 .. code-block:: python
 
         # Example usage
-        import distributed
+        from dask.distributed import Client
         import dask.array as da
 
-        # Connect dask to the cluster
-        client = distributed.Client(cluster)
+        # Connect Dask to the cluster
+        client = Client(cluster)
 
-        # Create an array and calculate the mean
-        array = da.ones((1000, 1000, 1000), chunks=(100, 100, 10))
+        # Create a large array and calculate the mean
+        array = da.ones((1000, 1000, 1000))
         print(array.mean().compute())  # Should print 1.0
 
 
@@ -127,6 +127,56 @@ Some notable ones are described below:
     instead of ``dask-{user}-{uuid}``. **Ensure you keep the ``uuid`` somewhere in
     the template.**
 
+Role-Based Access Control (RBAC)
+--------------------------------
+
+In order to spawn worker (or separate scheduler) Dask pods, the service
+account creating those pods will require a set of RBAC permissions.
+Create a service account you will use for Dask, and then attach the
+following Role to that ServiceAccount via a RoleBinding:
+
+.. code-block:: yaml
+
+    kind: Role
+    apiVersion: rbac.authorization.k8s.io/v1beta1
+    metadata:
+      name: daskKubernetes
+    rules:
+    - apiGroups:
+      - ""  # indicates the core API group
+      resources:
+      - "pods"
+      verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "create"
+      - "delete"
+    - apiGroups:
+      - ""  # indicates the core API group
+      resources:
+      - "pods/log"
+      verbs:
+      - "get"
+      - "list"
+
+If you intend to use the newer Dask functionality in which the scheduler
+is created in its own pod and accessed via a service, you will also
+need:
+
+.. code-block:: yaml
+
+    - apiGroups:
+      - "" # indicates the core API group
+      resources:
+      - "services"
+      verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "create"
+      - "delete"
+
 
 Docker Images
 -------------
@@ -136,6 +186,10 @@ are available on https://hub.docker.com/r/daskdev .
 More information about these images is available at the
 `Dask documentation <https://docs.dask.org/en/latest/setup/docker.html>`_.
 
+Note that these images can be further customized with extra packages using
+``EXTRA_PIP_PACKAGES``, ``EXTRA_APT_PACKAGES``, and ``EXTRA_CONDA_PACKAGES``
+as described in the
+`Extensibility section <https://docs.dask.org/en/latest/setup/docker.html#extensibility>`_.
 
 Deployment Details
 ------------------
