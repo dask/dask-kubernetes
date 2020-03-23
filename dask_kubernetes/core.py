@@ -506,8 +506,6 @@ class KubeCluster(SpecCluster):
             else dask.config.get("kubernetes.match_node_purpose")
         )
 
-        self.mat
-
         self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
         self.scheduler_pod_template = self._get_pod_template(
             self.scheduler_pod_template, pod_type="scheduler"
