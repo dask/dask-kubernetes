@@ -424,11 +424,7 @@ class KubeCluster(SpecCluster):
         self.env = env
         self.auth = auth
         self.kwargs = kwargs
-        self.match_node_purpose = (
-            match_node_purpose
-            if match_node_purpose is not None
-            else dask.config.get("kubernetes.match_node_purpose", "prefer")
-        )
+        self.match_node_purpose = match_node_purpose
         super().__init__(**self.kwargs)
 
     def _get_pod_template(self, pod_template, pod_type):
@@ -504,6 +500,13 @@ class KubeCluster(SpecCluster):
         self.env = (
             self.env if self.env is not None else dask.config.get("kubernetes.env")
         )
+        self.match_node_purpose = (
+            match_node_purpose
+            if match_node_purpose is not None
+            else dask.config.get("kubernetes.match_node_purpose")
+        )
+
+        self.mat
 
         self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
         self.scheduler_pod_template = self._get_pod_template(
