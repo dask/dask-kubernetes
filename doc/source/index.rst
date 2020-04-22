@@ -13,12 +13,44 @@ has permissions to launch other pods. However, it can also work with a remote
 Kubernetes cluster (configured via a kubeconfig file), as long as it is possible
 to interact with the Kubernetes API and access services on the cluster.
 
-Install
--------
+Installing
+----------
 
-::
+You can install dask-kubernetes with ``pip``, ``conda``, or by installing from source.
 
-   pip install dask-kubernetes
+Pip
+---
+
+Pip can be used to install both dask-kubernetes and its dependencies.::
+
+   pip install dask-kubernetes --upgrade # Install everything from last released version
+
+Conda
+-----
+
+To install the latest version of dask-kubernetes from the
+`conda-forge <https://conda-forge.github.io/>`_ repository using
+`conda <https://www.anaconda.com/downloads>`_::
+
+    conda install dask-kubernetes -c conda-forge
+
+Install from Source
+-------------------
+
+To install dask-kubernetes from source, clone the repository from `github
+<https://github.com/dask/dask-kubernetes>`_::
+
+    git clone https://github.com/dask/dask-kubernetes.git
+    cd dask-kubernetes
+    python setup.py install
+
+or use ``pip`` locally if you want to install all dependencies as well::
+
+    pip install -e .
+
+You can also install directly from git master branch::
+
+    pip install git+https://github.com/dask/dask-kubernetes
 
 Quickstart
 ----------
@@ -78,8 +110,8 @@ Best Practices
 1.  Your worker pod image should have a similar environment to your local
     environment, including versions of Python, dask, cloudpickle, and any
     libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
-    See :obj:`KubeCluster` docstring below for guidance on how to check and
-    modify this.
+    See :py:class:`dask_kubernetes.KubeCluster` docstring for guidance on how 
+    to check and modify this.
 
 2.  Your Kubernetes resource limits and requests should match the
     ``--memory-limit`` and ``--nthreads`` parameters given to the
@@ -104,7 +136,7 @@ Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
-    :obj:`KubeCluster` is called with no arguments::
+    :py:class:`dask_kubernetes.KubeCluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
