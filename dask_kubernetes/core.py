@@ -531,7 +531,8 @@ class KubeCluster(SpecCluster):
         )
 
         finalize(
-            self, _cleanup_resources, self._namespace, self.pod_template.metadata.labels
+            self, _cleanup_resources, self._namespace,
+            self.pod_template.metadata.labels, self.core_api
         )
 
         common_options = {
@@ -688,13 +689,10 @@ class KubeCluster(SpecCluster):
         return logs
 
 
-def _cleanup_resources(namespace, labels):
+def _cleanup_resources(namespace, labels, core_api):
     """ Remove all pods with these labels in this namespace """
-    import kubernetes
 
-    core_api = kubernetes.client.CoreV1Api()
-
-    pods = core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
+    pods = yield core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
     for pod in pods.items:
         try:
             core_api.delete_namespaced_pod(pod.metadata.name, namespace)
@@ -704,7 +702,7 @@ def _cleanup_resources(namespace, labels):
             if e.status != 404:
                 raise
 
-    services = core_api.list_namespaced_service(
+    services = yield core_api.list_namespaced_service(
         namespace, label_selector=format_labels(labels)
     )
     for service in services.items:
