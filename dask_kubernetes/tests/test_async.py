@@ -787,6 +787,7 @@ async def test_start_with_workers(pod_spec, ns, auth):
             while len(cluster.scheduler_info["workers"]) != 2:
                 await asyncio.sleep(0.1)
 
+
 @pytest.mark.asyncio
 async def test_adapt_delete(cluster, ns):
     cluster.adapt(maximum=2, minimum=2)
@@ -798,8 +799,11 @@ async def test_adapt_delete(cluster, ns):
 
     core_api = cluster.core_api
     pods_list = await core_api.list_namespaced_pod(ns)
-    worker_pods = [x.metadata.name for x in pods_list.items
-                   if x.metadata.name.startswith(cluster.name)]
+    worker_pods = [
+        x.metadata.name
+        for x in pods_list.items
+        if x.metadata.name.startswith(cluster.name)
+    ]
     assert len(worker_pods) == 2
     # delete one worker pod
     await core_api.delete_namespaced_pod(name=worker_pods[0], namespace=ns)
