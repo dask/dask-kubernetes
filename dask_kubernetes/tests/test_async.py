@@ -790,6 +790,10 @@ async def test_start_with_workers(pod_spec, ns, auth):
 
 @pytest.mark.asyncio
 async def test_adapt_delete(cluster, ns):
+    """
+    testing whether KubeCluster.adapt will bring
+    back deleted worker pod (issue #244)
+    """
     cluster.adapt(maximum=2, minimum=2)
 
     start = time()
@@ -812,3 +816,4 @@ async def test_adapt_delete(cluster, ns):
     while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
         assert time() < start + 20
+    assert len(cluster.scheduler_info["workers"]) == 2
