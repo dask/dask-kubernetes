@@ -798,11 +798,11 @@ async def test_adapt_delete(cluster, ns):
 
     async def get_worker_pods(ns):
         pods_list = await core_api.list_namespaced_pod(ns)
-        return set(
+        return [
             x.metadata.name
             for x in pods_list.items
-            if x.metadata.name.startswith(cluster.name) and x.status.phase == "Running"
-        )
+            if x.metadata.name.startswith(cluster.name)
+        ]
 
     cluster.adapt(maximum=2, minimum=2)
     start = time()
@@ -813,13 +813,19 @@ async def test_adapt_delete(cluster, ns):
     worker_pods = await get_worker_pods(ns)
     assert len(worker_pods) == 2
     # delete one worker pod
-    await core_api.delete_namespaced_pod(name=next(iter(worker_pods)), namespace=ns)
-    # test whether adapt will bring it back
+    to_delete = worker_pods[0]
+    await core_api.delete_namespaced_pod(name=to_delete, namespace=ns)
+    # wait until it is deleted
     start = time()
     while True:
-        new_pods = await get_worker_pods(ns)
-        if len(new_pods) == 2 and len(new_pods & worker_pods) == 1:
+        worker_pods = await get_worker_pods(ns)
+        if to_delete not in worker_pods:
             break
+        await asyncio.sleep(0.5)
+        assert time() < start + 20
+    # test whether adapt will bring it back
+    start = time()
+    while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
         assert time() < start + 20
     assert len(cluster.scheduler_info["workers"]) == 2
