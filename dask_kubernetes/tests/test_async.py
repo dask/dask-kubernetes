@@ -794,32 +794,30 @@ async def test_adapt_delete(cluster, ns):
     testing whether KubeCluster.adapt will bring
     back deleted worker pod (issue #244)
     """
-    cluster.adapt(maximum=2, minimum=2)
+    core_api = cluster.core_api
 
+    async def get_worker_pods(ns):
+        pods_list = await core_api.list_namespaced_pod(ns)
+        return set(
+            x.metadata.name
+            for x in pods_list.items
+            if x.metadata.name.startswith(cluster.name) and x.status.phase == "Running"
+        )
+
+    cluster.adapt(maximum=2, minimum=2)
     start = time()
     while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
         assert time() < start + 20
 
-    core_api = cluster.core_api
-    pods_list = await core_api.list_namespaced_pod(ns)
-    worker_pods = set(
-        x.metadata.name
-        for x in pods_list.items
-        if x.metadata.name.startswith(cluster.name)
-    )
+    worker_pods = await get_worker_pods(ns)
     assert len(worker_pods) == 2
     # delete one worker pod
     await core_api.delete_namespaced_pod(name=next(iter(worker_pods)), namespace=ns)
     # test whether adapt will bring it back
     start = time()
     while True:
-        pods_list = await core_api.list_namespaced_pod(ns)
-        new_pods = set(
-            x.metadata.name
-            for x in pods_list.items
-            if x.metadata.name.startswith(cluster.name)
-        )
+        new_pods = get_worker_pods(ns)
         if len(new_pods) == 2 and len(new_pods & worker_pods) == 1:
             break
         await asyncio.sleep(0.1)
