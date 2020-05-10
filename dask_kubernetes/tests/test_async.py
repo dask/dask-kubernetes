@@ -817,7 +817,7 @@ async def test_adapt_delete(cluster, ns):
     # test whether adapt will bring it back
     start = time()
     while True:
-        new_pods = get_worker_pods(ns)
+        new_pods = await get_worker_pods(ns)
         if len(new_pods) == 2 and len(new_pods & worker_pods) == 1:
             break
         await asyncio.sleep(0.1)
