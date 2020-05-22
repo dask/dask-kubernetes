@@ -207,7 +207,22 @@ class Scheduler(Pod):
             self.external_address = "tcp://{host}:{port}".format(
                 host=loadbalancer_host, port=SCHEDULER_PORT
             )
-        # FIXME Set external address when using nodeport service type
+        if self.service.spec.type == "NodePort":
+            start = time.time()
+            hostname = dask.config.get("kuberntetes.scheduler-service-nodeport-host")
+            for port in self.service.spec.ports:
+                if port.name == "comm":
+                    node_port = port.node_port
+                if port.name == "dashboard":
+                    dashboard_node_port = port.node_port
+            self.external_address = "tcp://{host}:{port}".format(
+                host=hostname, port=node_port
+                )
+            self.dashboard_external_address = "http://{host}:{port}".format(
+                host=hostname, port=dashboard_node_port
+                )
+            print("External scheduler address: " + self.external_address)
+            print("External dashboard address: " + self.dashboard_external_address)
 
         # FIXME Create an optional Ingress just in case folks want to configure one
 
