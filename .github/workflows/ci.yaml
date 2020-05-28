@@ -2,12 +2,34 @@ name: "CI"
 on: [pull_request, push]
 
 jobs:
-  kind:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
 
-      - uses: engineerd/setup-kind@v0.4.0
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: |
+          flake8 dask_kubernetes
+          black --check dask_kubernetes setup.py
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Install and start kind (Kubernetes in Docker)
+        uses: engineerd/setup-kind@v0.4.0
 
       - name: Get kind info
         run: |
@@ -28,7 +50,7 @@ jobs:
       - name: Run tests inside container
         run: |
           kubectl -n dask-kubernetes-test \
-          run -i --tty --restart=Never \
+          run --restart=Never \
           dask-kubernetes-test \
           --serviceaccount=test-runner \
           --image=dask-kubernetes:test \
