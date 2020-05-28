@@ -17,6 +17,8 @@ kubernetes:
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
   scheduler-service-wait-timeout: 30
+  # Hostname(ip address) of kubernetes node for NodePort service type use
+  scheduler-service-nodeport-host: localhost
 
   scheduler-service-template:
     apiVersion: v1

@@ -209,7 +209,7 @@ class Scheduler(Pod):
             )
         if self.service.spec.type == "NodePort":
             start = time.time()
-            hostname = dask.config.get("kuberntetes.scheduler-service-nodeport-host")
+            hostname = dask.config.get("kubernetes.scheduler-service-nodeport-host")
             for port in self.service.spec.ports:
                 if port.name == "comm":
                     node_port = port.node_port
@@ -221,8 +221,6 @@ class Scheduler(Pod):
             self.dashboard_external_address = "http://{host}:{port}".format(
                 host=hostname, port=dashboard_node_port
                 )
-            print("External scheduler address: " + self.external_address)
-            print("External dashboard address: " + self.dashboard_external_address)
 
         # FIXME Create an optional Ingress just in case folks want to configure one
 
