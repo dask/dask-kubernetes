@@ -1,10 +1,6 @@
-import asyncio
-
 import pytest
 
-import kubernetes
-
-from dask_kubernetes.auth import ClusterAuth, KubeConfig, InCluster
+from dask_kubernetes.auth import KubeConfig, InCluster
 
 
 def pytest_addoption(parser):
