@@ -15,3 +15,8 @@ jobs:
           kubectl get pods -n kube-system
           echo "current-context:" $(kubectl config current-context)
           echo "environment-kubeconfig:" ${KUBECONFIG}
+
+      - name: Build testing Docker image
+        run: |
+          docker build -t dask-kubernetes:test -f ci/Dockerfile .
+          kind load docker-image dask-kubernetes:test
