@@ -27,15 +27,14 @@ jobs:
 
       - name: Run tests inside container
         run: |
-          	kubectl -n dask-kubernetes-test \
-              run -i --tty --restart=Never \
-              dask-kubernetes-test \
-              --serviceaccount=test-runner \
-              --image=dask-kubernetes:test \
-              --image-pull-policy=Never \
-              --env="USER=tester" \
-              --env="K8S_TEST_NAMESPACE=dask-kubernetes-test" \
-              --env="EXTRA_TEST_ARGS=--in-cluster" \
-              --rm=true \
-              --command -- py.test dask_kubernetes -vvv \
-		            --namespace=dask-kubernetes-test --worker-image=dask-kubernetes:test
+          kubectl -n dask-kubernetes-test \
+          run -i --tty --restart=Never \
+          dask-kubernetes-test \
+          --serviceaccount=test-runner \
+          --image=dask-kubernetes:test \
+          --image-pull-policy=Never \
+          --env="USER=tester" \
+          --env="K8S_TEST_NAMESPACE=dask-kubernetes-test" \
+          --env="EXTRA_TEST_ARGS=--in-cluster" \
+          --rm=true \
+          --command -- py.test dask_kubernetes -vvv --namespace=dask-kubernetes-test --worker-image=dask-kubernetes:test
