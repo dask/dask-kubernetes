@@ -5,7 +5,6 @@ import getpass
 import os
 import random
 from time import time
-import uuid
 import yaml
 
 import kubernetes_asyncio as kubernetes
