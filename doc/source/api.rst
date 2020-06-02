@@ -11,11 +11,18 @@ API
    KubeCluster.logs
    KubeCluster.pods
    KubeCluster.scale
+   HelmCluster
+   HelmCluster.scale
+   HelmCluster.adapt
+   HelmCluster.logs
    InCluster
    KubeConfig
    KubeAuth
 
 .. autoclass:: KubeCluster
+   :members:
+
+.. autoclass:: HelmCluster
    :members:
 
 .. autoclass:: ClusterAuth

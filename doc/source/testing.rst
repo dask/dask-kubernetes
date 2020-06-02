@@ -4,7 +4,7 @@ Testing
 During local development, we may want to test the code in three different scenarios, largely
 corresponding to real-world deployment scenarios:
 
-1. Run code locally (possibly inside a `virtual environment <https://docs.python.org/3/tutorial/venv.html>`_
+1. Run code locally (possibly inside a `virtual environment <https://docs.python.org/3/tutorial/venv.html>`_)
 2. Dockerize code and run it inside a `docker container <https://www.docker.com/resources/what-container>`_
 3. Run code inside a `Kubernetes Pod <https://kubernetes.io/docs/concepts/workloads/pods/pod/>`_
 
@@ -79,10 +79,10 @@ restart all your running containers by default.
 ^^^^^^^^
 0. Make sure you have `installed docker <https://docs.docker.com/install/>`__
 1. Install ``kind`` by following `online instructions <https://kind.sigs.k8s.io/docs/user/quick-start#installation>`__, or use::
-      
+
       make kind-bootstrap
 2. Start ``kind``::
-      
+
       make kind-start
 3. Create a namespace and role bindings for testing::
 
@@ -94,17 +94,17 @@ Build a docker image for Testing
 --------------------------------
 1. Ensure you have `installed docker <https://docs.docker.com/install/>`__
 2. Build docker image::
-      
+
       make build
 
 3. (if using ``kind``) push image to cluster nodes::
-      
+
       make push-kind
 
 Run tests locally
 -----------------
 1. Check code for formatting errors::
-      
+
       make lint
 2. (Optional) run ``kubectl config use-context <context>``, where ``context`` is either ``kind-kind`` or ``minikube``
 3. Run tests with ``make test``
@@ -112,7 +112,7 @@ Run tests locally
 Run tests in a container
 ------------------------
 Any make command, e.g. ``make lint``, can be executed in the pre-built container using::
-   
+
    make docker-make COMMAND=lint
 
 .. note::  By default, local code is mounted in the docker container, so you don't need to rebuild the image to see local changes to your code or tests.

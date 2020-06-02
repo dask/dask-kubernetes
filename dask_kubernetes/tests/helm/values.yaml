@@ -1,0 +1,5 @@
+webUI:
+  servicePort: 8087
+
+jupyter:
+  servicePort: 8088
