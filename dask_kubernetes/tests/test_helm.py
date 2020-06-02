@@ -88,7 +88,7 @@ async def test_scale_cluster(cluster):
 async def test_logs(cluster):
     from distributed.utils import Logs
 
-    logs = await cluster.logs()
+    logs = await cluster.get_logs()
 
     assert isinstance(logs, Logs)
     assert any(["scheduler" in log for log in logs])

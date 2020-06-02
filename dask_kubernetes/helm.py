@@ -55,7 +55,7 @@ class HelmCluster(Cluster):
 
     You can also access cluster logs
 
-    >>> cluster.logs()
+    >>> cluster.get_logs()
 
     See Also
     --------
@@ -138,12 +138,12 @@ class HelmCluster(Cluster):
             else:
                 await asyncio.sleep(0.2)
 
-    def logs(self):
+    def get_logs(self):
         """Get logs for Dask scheduler and workers.
 
         Examples
         --------
-        >>> cluster.logs()
+        >>> cluster.get_logs()
         {'testdask-scheduler-5c8ffb6b7b-sjgrg': ...,
         'testdask-worker-64c8b78cc-992z8': ...,
         'testdask-worker-64c8b78cc-hzpdc': ...,
@@ -152,7 +152,7 @@ class HelmCluster(Cluster):
         Each log will be a string of all logs for that container. To view
         it is recommeded that you print each log.
 
-        >>> print(cluster.logs()["testdask-scheduler-5c8ffb6b7b-sjgrg"])
+        >>> print(cluster.get_logs()["testdask-scheduler-5c8ffb6b7b-sjgrg"])
         distributed.scheduler - INFO - -----------------------------------------------
         distributed.http.proxy - INFO - To route to workers diagnostics web server please install jupyter-server-proxy: python -m pip install jupyter-server-proxy
         distributed.scheduler - INFO - -----------------------------------------------
@@ -160,9 +160,9 @@ class HelmCluster(Cluster):
         distributed.scheduler - INFO -   Scheduler at:     tcp://10.1.6.131:8786
         distributed.scheduler - INFO -   dashboard at:                     :8787
         """
-        return self.sync(self._logs)
+        return self.sync(self._get_logs)
 
-    async def _logs(self):
+    async def _get_logs(self):
         logs = Logs()
 
         pods = await self.core_api.list_namespaced_pod(
