@@ -48,6 +48,9 @@ def sync_cluster(release):
 
 def test_import():
     from dask_kubernetes import HelmCluster
+    from distributed.deploy import Cluster
+
+    assert issubclass(HelmCluster, Cluster)
 
 
 def test_raises_on_non_existant_release():
