@@ -1,0 +1,62 @@
+name: "CI"
+on: [pull_request, push]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: |
+          flake8 dask_kubernetes
+          black --check dask_kubernetes setup.py
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Install and start kind (Kubernetes in Docker)
+        uses: engineerd/setup-kind@v0.4.0
+
+      - name: Get kind info
+        run: |
+          kubectl cluster-info
+          kubectl get pods -n kube-system
+          echo "current-context:" $(kubectl config current-context)
+          echo "environment-kubeconfig:" ${KUBECONFIG}
+
+      - name: Build testing Docker image
+        run: |
+          docker build -t dask-kubernetes:test -f ci/Dockerfile .
+          kind load docker-image dask-kubernetes:test
+
+      - name: Create test runner k8s resources
+        run: |
+          kubectl apply -f ci/test-runner-setup.yaml
+
+      - name: Run tests inside container
+        run: |
+          kubectl -n dask-kubernetes-test \
+          run -i --tty --restart=Never \
+          dask-kubernetes-test \
+          --serviceaccount=test-runner \
+          --image=dask-kubernetes:test \
+          --image-pull-policy=Never \
+          --env="USER=tester" \
+          --env="K8S_TEST_NAMESPACE=dask-kubernetes-test" \
+          --env="EXTRA_TEST_ARGS=--in-cluster" \
+          --rm=true \
+          --command -- py.test dask_kubernetes -vvv --namespace=dask-kubernetes-test --worker-image=dask-kubernetes:test
