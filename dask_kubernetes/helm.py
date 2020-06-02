@@ -153,12 +153,12 @@ class HelmCluster(Cluster):
         it is recommeded that you print each log.
 
         >>> print(cluster.get_logs()["testdask-scheduler-5c8ffb6b7b-sjgrg"])
-        distributed.scheduler - INFO - -----------------------------------------------
-        distributed.http.proxy - INFO - To route to workers diagnostics web server please install jupyter-server-proxy: python -m pip install jupyter-server-proxy
+        ...
         distributed.scheduler - INFO - -----------------------------------------------
         distributed.scheduler - INFO - Clear task state
         distributed.scheduler - INFO -   Scheduler at:     tcp://10.1.6.131:8786
         distributed.scheduler - INFO -   dashboard at:                     :8787
+        ...
         """
         return self.sync(self._get_logs)
 
