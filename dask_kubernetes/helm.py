@@ -172,8 +172,10 @@ class HelmCluster(Cluster):
 
         for pod in pods.items:
             if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
-                logs[pod.metadata.name] = await self.core_api.read_namespaced_pod_log(
-                    pod.metadata.name, pod.metadata.namespace
+                logs[pod.metadata.name] = Log(
+                    await self.core_api.read_namespaced_pod_log(
+                        pod.metadata.name, pod.metadata.namespace
+                    )
                 )
 
         return logs
