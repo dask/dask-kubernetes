@@ -58,5 +58,4 @@ jobs:
           --env="USER=tester" \
           --env="K8S_TEST_NAMESPACE=dask-kubernetes-test" \
           --env="EXTRA_TEST_ARGS=--in-cluster" \
-          --rm=true \
           --command -- py.test dask_kubernetes -vvv --namespace=dask-kubernetes-test --worker-image=dask-kubernetes:test
