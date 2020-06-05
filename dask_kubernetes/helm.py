@@ -33,6 +33,11 @@ class HelmCluster(Cluster):
     namespace: str (optional)
         Namespace in which to launch the workers.
         Defaults to current namespace if available or "default"
+    port_forward_cluster_ip: bool (optional)
+        If the chart uses ClusterIP type services, forward the ports locally.
+        If you are using ``HelmCluster`` from the Jupyter session that was installed
+        by the helm chart this should be ``False``. If you are running it locally it should
+        be ``True``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -68,6 +73,7 @@ class HelmCluster(Cluster):
         release_name=None,
         auth=ClusterAuth.DEFAULT,
         namespace=None,
+        port_forward_cluster_ip=False,
         loop=None,
         asynchronous=False,
     ):
@@ -84,7 +90,8 @@ class HelmCluster(Cluster):
         self.namespace
         self.core_api = None
         self.scheduler_comm = None
-        self._supports_scaling = False
+        self.port_forward_cluster_ip = port_forward_cluster_ip
+        self._supports_scaling = True
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
 
@@ -115,15 +122,18 @@ class HelmCluster(Cluster):
             host = nodes.items[0].status.addresses[0].address
             return f"tcp://{host}:{port}"
         elif service.spec.type == "ClusterIP":
-            warnings.warn(
-                f"""
-                Your Dask cluster has not been exposed outside of your Kubernetes cluster.
-                Please port-forward the service locally if you haven't already.
+            if self.port_forward_cluster_ip:
+                warnings.warn(
+                    f"""
+                    Sorry we do not currently support local port forwarding.
 
-                kubectl port-forward --namespace {self.namespace} svc/{service_name} {port}:{port} &
-                """
-            )  # FIXME Handle this port forward here with the kubernetes library
-            return f"tcp://localhost:{port}"
+                    Please port-forward the service locally yourself with the following command.
+
+                    kubectl port-forward --namespace {self.namespace} svc/{service_name} {port}:{port} &
+                    """
+                )  # FIXME Handle this port forward here with the kubernetes library
+                return f"tcp://localhost:{port}"
+            return f"tcp://{service.spec.cluster_ip}:{port}"
         raise RuntimeError("Unable to determine scheduler address.")
 
     async def _wait_for_workers(self):

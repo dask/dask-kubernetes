@@ -50,7 +50,7 @@ jobs:
       - name: Run tests inside container
         run: |
           kubectl -n dask-kubernetes-test \
-          run -i --tty --restart=Never \
+          run --restart=Never \
           dask-kubernetes-test \
           --serviceaccount=test-runner \
           --image=dask-kubernetes:test \
