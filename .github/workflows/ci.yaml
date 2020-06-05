@@ -28,6 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@master
 
+      - name: Install helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+
       - name: Install and start kind (Kubernetes in Docker)
         uses: engineerd/setup-kind@v0.4.0
 
