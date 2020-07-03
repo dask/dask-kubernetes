@@ -369,8 +369,6 @@ async def test_kube_cluster_from_method_deprecated(
     method, tmpdir, image_name, ns, auth
 ):
     spec = {
-        "kind": "Pod",
-        "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
         "spec": {
             "containers": [
                 {
@@ -379,7 +377,10 @@ async def test_kube_cluster_from_method_deprecated(
                         "$(DASK_SCHEDULER_ADDRESS)",
                         "--nthreads",
                         "1",
+                        "--death-timeout",
+                        "60",
                     ],
+                    "command": None,
                     "image": image_name,
                     "imagePullPolicy": "IfNotPresent",
                     "name": "dask-worker",
@@ -394,9 +395,11 @@ async def test_kube_cluster_from_method_deprecated(
             yaml.dump(spec, f)
         spec = spec_path
 
+    constructor = getattr(KubeCluster, method)
+
     with pytest.warns(UserWarning) as record:
-        async with getattr(KubeCluster, method)(
-            spec_path, namespace=ns, auth=auth, **cluster_kwargs
+        async with constructor(
+            spec, namespace=ns, auth=auth, **cluster_kwargs
         ) as cluster:
             # Smoketest things still work
             cluster.adapt()
