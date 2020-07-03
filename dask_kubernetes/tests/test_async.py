@@ -203,7 +203,7 @@ async def test_env(pod_spec, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_yaml(image_name, ns, auth):
+async def test_pod_template_yaml(image_name, ns, auth):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
@@ -227,7 +227,7 @@ async def test_pod_from_yaml(image_name, ns, auth):
     with tmpfile(extension="yaml") as fn:
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
-        async with KubeCluster.from_yaml(
+        async with KubeCluster(
             f.name, namespace=ns, auth=auth, **cluster_kwargs
         ) as cluster:
             assert cluster.namespace == ns
@@ -251,7 +251,7 @@ async def test_pod_from_yaml(image_name, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
+async def test_pod_template_yaml_expand_env_vars(image_name, ns, auth):
     try:
         os.environ["FOO_IMAGE"] = image_name
 
@@ -278,7 +278,7 @@ async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
         with tmpfile(extension="yaml") as fn:
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
-            async with KubeCluster.from_yaml(
+            async with KubeCluster(
                 f.name, namespace=ns, auth=auth, **cluster_kwargs
             ) as cluster:
                 assert cluster.pod_template.spec.containers[0].image == image_name
@@ -287,7 +287,7 @@ async def test_pod_from_yaml_expand_env_vars(image_name, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_dict(image_name, ns, auth):
+async def test_pod_template_dict(image_name, ns, auth):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -311,7 +311,7 @@ async def test_pod_from_dict(image_name, ns, auth):
         },
     }
 
-    async with KubeCluster.from_dict(
+    async with KubeCluster(
         spec, namespace=ns, port=32000, auth=auth, **cluster_kwargs
     ) as cluster:
         cluster.scale(2)
@@ -333,7 +333,7 @@ async def test_pod_from_dict(image_name, ns, auth):
 
 
 @pytest.mark.asyncio
-async def test_pod_from_minimal_dict(image_name, ns, auth):
+async def test_pod_template_minimal_dict(image_name, ns, auth):
     spec = {
         "spec": {
             "containers": [
@@ -355,14 +355,56 @@ async def test_pod_from_minimal_dict(image_name, ns, auth):
         }
     }
 
-    async with KubeCluster.from_dict(
-        spec, namespace=ns, auth=auth, **cluster_kwargs
-    ) as cluster:
+    async with KubeCluster(spec, namespace=ns, auth=auth, **cluster_kwargs) as cluster:
         cluster.adapt()
         async with Client(cluster, asynchronous=True) as client:
             future = client.submit(lambda x: x + 1, 10)
             result = await future
             assert result == 11
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["from_dict", "from_yaml"])
+async def test_kube_cluster_from_method_deprecated(
+    method, tmpdir, image_name, ns, auth
+):
+    spec = {
+        "kind": "Pod",
+        "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
+        "spec": {
+            "containers": [
+                {
+                    "args": [
+                        "dask-worker",
+                        "$(DASK_SCHEDULER_ADDRESS)",
+                        "--nthreads",
+                        "1",
+                    ],
+                    "image": image_name,
+                    "imagePullPolicy": "IfNotPresent",
+                    "name": "dask-worker",
+                }
+            ]
+        },
+    }
+
+    if method == "from_yaml":
+        spec_path = str(tmpdir.join("spec.yaml"))
+        with open(spec_path, mode="w") as f:
+            yaml.dump(spec, f)
+        spec = spec_path
+
+    with pytest.warns(UserWarning) as record:
+        async with getattr(KubeCluster, method)(
+            spec_path, namespace=ns, auth=auth, **cluster_kwargs
+        ) as cluster:
+            # Smoketest things still work
+            cluster.adapt()
+            async with Client(cluster, asynchronous=True) as client:
+                future = client.submit(lambda x: x + 1, 10)
+                result = await future
+                assert result == 11
+    assert any("KubeCluster.from_yaml" in str(r.message) for r in record)
 
 
 @pytest.mark.asyncio
@@ -372,19 +414,6 @@ async def test_pod_template_from_conf(image_name, auth):
     with dask.config.set({"kubernetes.worker-template": spec}):
         async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
             assert cluster.pod_template.spec.containers[0].name == "some-name"
-
-
-@pytest.mark.asyncio
-async def test_bad_args():
-    with pytest.raises(TypeError) as info:
-        await KubeCluster("myfile.yaml", **cluster_kwargs)
-
-    assert "KubeCluster.from_yaml" in str(info.value)
-
-    with pytest.raises((ValueError, TypeError)) as info:
-        await KubeCluster({"kind": "Pod"}, **cluster_kwargs)
-
-    assert "KubeCluster.from_dict" in str(info.value)
 
 
 @pytest.mark.asyncio

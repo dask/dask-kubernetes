@@ -6,13 +6,10 @@ import os
 import string
 import time
 import uuid
+import warnings
 from weakref import finalize
 
-try:
-    import yaml
-except ImportError:
-    yaml = False
-
+import yaml
 import dask
 import dask.distributed
 import distributed.security
@@ -266,8 +263,10 @@ class KubeCluster(SpecCluster):
 
     Parameters
     ----------
-    pod_template: kubernetes.client.V1Pod
-        A Kubernetes specification for a Pod for a dask worker.
+    pod_template: (kubernetes.client.V1Pod, dict, str)
+        A Kubernetes specification for a Pod for a dask worker. Can be either a
+        ``V1Pod``, a dict representation of a pod, or a path to a yaml file
+        containing a pod specification.
     scheduler_pod_template: kubernetes.client.V1Pod (optional)
         A Kubernetes specification for a Pod for a dask scheduler.
         Defaults to the pod_template.
@@ -315,8 +314,8 @@ class KubeCluster(SpecCluster):
     You can also create clusters with worker pod specifications as dictionaries
     or stored in YAML files
 
-    >>> cluster = KubeCluster.from_yaml('worker-template.yml')
-    >>> cluster = KubeCluster.from_dict({...})
+    >>> cluster = KubeCluster('worker-template.yml')
+    >>> cluster = KubeCluster({...})
 
     Rather than explicitly setting a number of workers you can also ask the
     cluster to allocate workers dynamically based on current workload
@@ -344,7 +343,7 @@ class KubeCluster(SpecCluster):
 
     >>> pip = 'pyarrow gcsfs git+https://github.com/dask/distributed'
     >>> conda = '-c conda-forge scikit-learn'
-    >>> KubeCluster.from_yaml(..., env={'EXTRA_PIP_PACKAGES': pip,
+    >>> KubeCluster(..., env={'EXTRA_PIP_PACKAGES': pip,
     ...                                 'EXTRA_CONDA_PACKAGES': conda})
 
     You can also start a KubeCluster with no arguments *if* the worker template
@@ -361,8 +360,6 @@ class KubeCluster(SpecCluster):
 
     See Also
     --------
-    KubeCluster.from_yaml
-    KubeCluster.from_dict
     KubeCluster.adapt
     """
 
@@ -386,6 +383,14 @@ class KubeCluster(SpecCluster):
         scheduler_pod_template=None,
         **kwargs
     ):
+        if isinstance(pod_template, str):
+            with open(pod_template) as f:
+                pod_template = dask.config.expand_environment_variables(
+                    yaml.safe_load(f)
+                )
+        if isinstance(pod_template, dict):
+            pod_template = make_pod_from_dict(pod_template)
+
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
         self._generate_name = name
@@ -573,6 +578,8 @@ class KubeCluster(SpecCluster):
     def from_dict(cls, pod_spec, **kwargs):
         """ Create cluster with worker pod spec defined by Python dictionary
 
+        Deprecated, please use the `KubeCluster` constructor directly.
+
         Examples
         --------
         >>> spec = {
@@ -595,11 +602,16 @@ class KubeCluster(SpecCluster):
         --------
         KubeCluster.from_yaml
         """
-        return cls(make_pod_from_dict(pod_spec), **kwargs)
+        warnings.warn(
+            "KubeCluster.from_dict is deprecated, use the constructor directly"
+        )
+        return cls(pod_spec, **kwargs)
 
     @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
         """ Create cluster with worker pod spec defined by a YAML file
+
+        Deprecated, please use the `KubeCluster` constructor directly.
 
         We can start a cluster with pods defined in an accompanying YAML file
         like the following:
@@ -626,14 +638,10 @@ class KubeCluster(SpecCluster):
         --------
         KubeCluster.from_dict
         """
-        if not yaml:
-            raise ImportError(
-                "PyYaml is required to use yaml functionality, please install it!"
-            )
-        with open(yaml_path) as f:
-            d = yaml.safe_load(f)
-            d = dask.config.expand_environment_variables(d)
-            return cls.from_dict(d, **kwargs)
+        warnings.warn(
+            "KubeCluster.from_yaml is deprecated, use the constructor directly"
+        )
+        return cls(yaml_path, **kwargs)
 
     @property
     def namespace(self):
