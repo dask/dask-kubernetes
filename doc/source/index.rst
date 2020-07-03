@@ -59,7 +59,7 @@ Quickstart
 
    from dask_kubernetes import KubeCluster
 
-   cluster = KubeCluster.from_yaml('worker-spec.yml')
+   cluster = KubeCluster('worker-spec.yml')
    cluster.scale(10)  # specify number of workers explicitly
 
    cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
