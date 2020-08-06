@@ -23,3 +23,8 @@ Quickstart
    cluster.scale(10)  # specify number of workers explicitly
 
 For more information see the :class:`HelmCluster` API reference.
+
+.. warning::
+    It is not possible to use ``HelmCluster`` from the Jupyter session
+    which is deployed as part of the Helm Chart without first copying your
+    ``~/.kube/config`` file to that Jupyter session.
