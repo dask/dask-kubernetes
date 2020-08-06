@@ -229,16 +229,13 @@ class HelmCluster(Cluster):
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended).
 
-        While it is possible it is not recommended to run ``HelmCluster`` in adaptive mode.
-        When scaling down workers the decision on which worker to remove is left to Kubernetes, which
-        will not necessarily remove the same worker that Dask would choose. This may result in lost futures and
-        recalculation. It is recommended to manage scaling yourself with the ``HelmCluster.scale`` method.
-
         """
-        warnings.warn(
-            "\n".join(self.adapt.__doc__.split("\n")[2:]), UserWarning,
-        )  # Show a warning containing the body of the docstring
-        return self.sync(self._adapt, *args, **kwargs)
+        raise NotImplementedError(
+            "It is not recommended to run ``HelmCluster`` in adaptive mode."
+            "When scaling down workers the decision on which worker to remove is left to Kubernetes, which"
+            "will not necessarily remove the same worker that Dask would choose. This may result in lost futures and"
+            "recalculation. It is recommended to manage scaling yourself with the ``HelmCluster.scale`` method."
+        )
 
     async def _adapt(self, *args, **kwargs):
         return super().adapt(*args, **kwargs)
