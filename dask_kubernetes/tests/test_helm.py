@@ -103,5 +103,5 @@ async def test_logs(cluster):
 
 @pytest.mark.asyncio
 async def test_adaptivity_warning(cluster):
-    with pytest.warns(UserWarning):
+    with pytest.raises(NotImplementedError):
         await cluster.adapt(minimum=3, maximum=3)
