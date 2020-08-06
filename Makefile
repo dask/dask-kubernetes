@@ -30,7 +30,7 @@ format:
 	black dask_kubernetes setup.py
 
 lint:
-	flake8 dask-kubernetes
+	flake8 dask_kubernetes
 	black --check dask_kubernetes setup.py
 
 test:
@@ -87,7 +87,7 @@ kind-bootstrap:  # https://github.com/kubernetes-sigs/kind
 	curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-${OS}-${ARCHITECTURE} && \
 	chmod +x ./kind && \
 	mv kind ${BIN_PATH}
-	
+
 kind-start:
 	kind create cluster && \
 	kind export kubeconfig

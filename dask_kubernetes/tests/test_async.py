@@ -5,7 +5,6 @@ import getpass
 import os
 import random
 from time import time
-import uuid
 import yaml
 
 import kubernetes_asyncio as kubernetes
@@ -736,6 +735,9 @@ async def test_auth_tries_all_methods(pod_spec, ns):
     assert fails["count"] == 3
 
 
+@pytest.mark.xfail(
+    reason="Updating the default client configuration is broken in kubernetes"
+)
 @pytest.mark.asyncio
 async def test_auth_kubeconfig_with_filename():
     await KubeConfig(config_file=CONFIG_DEMO).load()
@@ -748,6 +750,9 @@ async def test_auth_kubeconfig_with_filename():
     assert config.ssl_ca_cert == FAKE_CA
 
 
+@pytest.mark.xfail(
+    reason="Updating the default client configuration is broken in kubernetes"
+)
 @pytest.mark.asyncio
 async def test_auth_kubeconfig_with_context():
     await KubeConfig(config_file=CONFIG_DEMO, context="exp-scratch").load()

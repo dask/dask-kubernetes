@@ -3,12 +3,9 @@ import copy
 import getpass
 import logging
 import os
-import socket
 import string
 import time
-from urllib.parse import urlparse
 import uuid
-import weakref
 from weakref import finalize
 
 try:
@@ -20,7 +17,6 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException

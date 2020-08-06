@@ -1,9 +1,5 @@
-import asyncio
-import base64
-import getpass
 import os
 from time import sleep, time
-import uuid
 import yaml
 
 import dask
@@ -11,15 +7,10 @@ import pytest
 from dask_kubernetes import (
     KubeCluster,
     make_pod_spec,
-    ClusterAuth,
-    KubeConfig,
-    KubeAuth,
 )
 from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from distributed.utils import tmpfile
-import kubernetes
-from random import random
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
