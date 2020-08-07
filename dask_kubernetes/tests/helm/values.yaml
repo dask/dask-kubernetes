@@ -1,0 +1,9 @@
+webUI:
+  servicePort: 8087
+
+jupyter:
+  servicePort: 8088
+  serviceType: "ClusterIP"
+
+scheduler:
+  serviceType: "ClusterIP"
