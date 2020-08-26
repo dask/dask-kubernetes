@@ -11,13 +11,6 @@ import kubernetes_asyncio as kubernetes
 from .auth import ClusterAuth
 from .core import _namespace_default
 
-if shutil.which("helm") is None:
-    raise ImportError(
-        "Missing dependency helm. "
-        "Please install helm following the instructions for your OS. "
-        "https://helm.sh/docs/intro/install/"
-    )
-
 
 class HelmCluster(Cluster):
     """ Connect to a Dask cluster deployed via the Helm Chart.
@@ -79,6 +72,7 @@ class HelmCluster(Cluster):
     ):
         self.release_name = release_name
         self.namespace = namespace or _namespace_default()
+        self.check_helm_dependency()
         status = subprocess.run(
             ["helm", "-n", self.namespace, "status", self.release_name],
             capture_output=True,
@@ -99,6 +93,15 @@ class HelmCluster(Cluster):
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
+
+    @staticmethod
+    def check_helm_dependency():
+        if shutil.which("helm") is None:
+            raise RuntimeError(
+                "Missing dependency helm. "
+                "Please install helm following the instructions for your OS. "
+                "https://helm.sh/docs/intro/install/"
+            )
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
