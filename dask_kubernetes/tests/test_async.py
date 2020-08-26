@@ -116,8 +116,8 @@ async def test_logs(remote_cluster):
         assert time() < start + 20
 
     logs = await cluster.logs()
-    assert len(logs) == 3
-    for _, log in logs.items():
+    assert len(logs) == 4
+    for _, log in logs.items()[1:]:
         assert "distributed.scheduler" in log or "distributed.worker" in log
 
 
