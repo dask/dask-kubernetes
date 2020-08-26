@@ -42,8 +42,9 @@ class Pod(ProcessInterface):
     Scheduler
     """
 
-    def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
+    def __init__(self, cluster, core_api, pod_template, namespace, loop=None, **kwargs):
         self._pod = None
+        self.cluster = cluster
         self.core_api = core_api
         self.pod_template = copy.deepcopy(pod_template)
         self.base_labels = self.pod_template.metadata.labels
@@ -153,6 +154,7 @@ class Scheduler(Pod):
     """
 
     def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
+        self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         super().__init__(**kwargs)
         self.service = None
         self._idle_timeout = idle_timeout
@@ -531,6 +533,7 @@ class KubeCluster(SpecCluster):
         )
 
         common_options = {
+            "cluster": self,
             "core_api": self.core_api,
             "namespace": self._namespace,
             "loop": self.loop,

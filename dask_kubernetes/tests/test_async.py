@@ -117,8 +117,12 @@ async def test_logs(remote_cluster):
 
     logs = await cluster.logs()
     assert len(logs) == 4
-    for _, log in logs.items()[1:]:
-        assert "distributed.scheduler" in log or "distributed.worker" in log
+    for _, log in logs.items():
+        assert (
+            "distributed.scheduler" in log
+            or "distributed.worker" in log
+            or "Creating scheduler pod" in log
+        )
 
 
 @pytest.mark.asyncio
