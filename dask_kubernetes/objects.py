@@ -3,7 +3,7 @@ Convenience functions for creating pod templates.
 """
 from collections import namedtuple
 import copy
-from kubernetes_asyncio import client
+from kubernetes import client
 import json
 
 try:
