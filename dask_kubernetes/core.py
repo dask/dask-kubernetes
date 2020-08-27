@@ -154,8 +154,8 @@ class Scheduler(Pod):
     """
 
     def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
-        self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         super().__init__(**kwargs)
+        self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         self.service = None
         self._idle_timeout = idle_timeout
         self._service_wait_timeout_s = service_wait_timeout_s
