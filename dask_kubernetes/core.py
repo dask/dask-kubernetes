@@ -35,15 +35,16 @@ SCHEDULER_PORT = 8786
 
 
 class Pod(ProcessInterface):
-    """ A superclass for Kubernetes Pods
+    """A superclass for Kubernetes Pods
     See Also
     --------
     Worker
     Scheduler
     """
 
-    def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
+    def __init__(self, cluster, core_api, pod_template, namespace, loop=None, **kwargs):
         self._pod = None
+        self.cluster = cluster
         self.core_api = core_api
         self.pod_template = copy.deepcopy(pod_template)
         self.base_labels = self.pod_template.metadata.labels
@@ -113,7 +114,7 @@ class Pod(ProcessInterface):
 
 
 class Worker(Pod):
-    """ A Remote Dask Worker controled by Kubernetes
+    """A Remote Dask Worker controled by Kubernetes
     Parameters
     ----------
     scheduler: str
@@ -139,7 +140,7 @@ class Worker(Pod):
 
 
 class Scheduler(Pod):
-    """ A Remote Dask Scheduler controled by Kubernetes
+    """A Remote Dask Scheduler controled by Kubernetes
     Parameters
     ----------
     idle_timeout: str, optional
@@ -154,6 +155,7 @@ class Scheduler(Pod):
 
     def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
         super().__init__(**kwargs)
+        self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         self.service = None
         self._idle_timeout = idle_timeout
         self._service_wait_timeout_s = service_wait_timeout_s
@@ -236,7 +238,7 @@ class Scheduler(Pod):
 
 
 class KubeCluster(SpecCluster):
-    """ Launch a Dask cluster on Kubernetes
+    """Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
     Dask workers on a Kubernetes cluster. The Kubernetes cluster is taken
@@ -531,6 +533,7 @@ class KubeCluster(SpecCluster):
         )
 
         common_options = {
+            "cluster": self,
             "core_api": self.core_api,
             "namespace": self._namespace,
             "loop": self.loop,
@@ -571,7 +574,7 @@ class KubeCluster(SpecCluster):
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
-        """ Create cluster with worker pod spec defined by Python dictionary
+        """Create cluster with worker pod spec defined by Python dictionary
 
         Examples
         --------
@@ -599,7 +602,7 @@ class KubeCluster(SpecCluster):
 
     @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
-        """ Create cluster with worker pod spec defined by a YAML file
+        """Create cluster with worker pod spec defined by a YAML file
 
         We can start a cluster with pods defined in an accompanying YAML file
         like the following:
@@ -655,7 +658,7 @@ class KubeCluster(SpecCluster):
         return super().scale(n)
 
     async def _logs(self, scheduler=True, workers=True):
-        """ Return logs for the scheduler and workers
+        """Return logs for the scheduler and workers
         Parameters
         ----------
         scheduler : boolean
