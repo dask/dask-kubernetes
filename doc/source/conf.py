@@ -20,7 +20,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
 
 
 # -- General configuration ------------------------------------------------
@@ -33,32 +33,32 @@ sys.path.insert(0, os.path.abspath('..'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.todo',
-    'sphinx.ext.ifconfig',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.extlinks',
-    'sphinx.ext.intersphinx',
-    'numpydoc',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.todo",
+    "sphinx.ext.ifconfig",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.extlinks",
+    "sphinx.ext.intersphinx",
+    "numpydoc",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ".rst"
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # General information about the project.
-project = 'Dask Kubernetes'
-copyright = '2020, Dask Kubernetes Developers'
-author = 'Dask Kubernetes Developers'
+project = "Dask Kubernetes"
+copyright = "2020, Dask Kubernetes Developers"
+author = "Dask Kubernetes Developers"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -66,6 +66,7 @@ author = 'Dask Kubernetes Developers'
 #
 # The short X.Y version.
 from dask_kubernetes import __version__
+
 version = __version__
 # The full version, including alpha/beta/rc tags.
 release = __version__
@@ -83,7 +84,7 @@ language = None
 exclude_patterns = []
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'default'
+pygments_style = "default"
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
@@ -96,7 +97,8 @@ todo_include_todos = False
 #
 # html_theme = 'alabaster'
 import dask_sphinx_theme
-html_theme = 'dask_sphinx_theme'
+
+html_theme = "dask_sphinx_theme"
 html_theme_path = [dask_sphinx_theme.get_html_theme_path()]
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -108,7 +110,7 @@ html_theme_path = [dask_sphinx_theme.get_html_theme_path()]
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
@@ -116,9 +118,9 @@ html_static_path = ['_static']
 # This is required for the alabaster theme
 # refs: http://alabaster.readthedocs.io/en/latest/installation.html#sidebars
 html_sidebars = {
-    '**': [
-        'relations.html',  # needs 'show_related': True theme option to display
-        'searchbox.html',
+    "**": [
+        "relations.html",  # needs 'show_related': True theme option to display
+        "searchbox.html",
     ]
 }
 
@@ -126,7 +128,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'dask-kubernetes-doc'
+htmlhelp_basename = "dask-kubernetes-doc"
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -135,15 +137,12 @@ latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     #
     # 'papersize': 'letterpaper',
-
     # The font size ('10pt', '11pt' or '12pt').
     #
     # 'pointsize': '10pt',
-
     # Additional stuff for the LaTeX preamble.
     #
     # 'preamble': '',
-
     # Latex figure (float) alignment
     #
     # 'figure_align': 'htbp',
@@ -153,8 +152,13 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'dask-kubernetes.tex', 'Dask Kubernetes Documentation',
-     'Dask kubernetes Developers', 'manual'),
+    (
+        master_doc,
+        "dask-kubernetes.tex",
+        "Dask Kubernetes Documentation",
+        "Dask kubernetes Developers",
+        "manual",
+    ),
 ]
 
 
@@ -163,8 +167,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'dask-kubernetes', 'Dask Kubernetes Documentation',
-     [author], 1)
+    (master_doc, "dask-kubernetes", "Dask Kubernetes Documentation", [author], 1)
 ]
 
 
@@ -174,11 +177,17 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Dask Kubernetes', 'Dask Kubernetes Documentation',
-     author, 'Dask-Kubernetes', 'One line description of project.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        "Dask Kubernetes",
+        "Dask Kubernetes Documentation",
+        author,
+        "Dask-Kubernetes",
+        "One line description of project.",
+        "Miscellaneous",
+    ),
 ]
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {"https://docs.python.org/": None}
