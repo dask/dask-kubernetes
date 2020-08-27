@@ -13,7 +13,7 @@ from .core import _namespace_default
 
 
 class HelmCluster(Cluster):
-    """ Connect to a Dask cluster deployed via the Helm Chart.
+    """Connect to a Dask cluster deployed via the Helm Chart.
 
     This cluster manager connects to an existing Dask deployment that was
     created by the Dask Helm Chart. Enabling you to perform basic cluster actions
@@ -226,13 +226,15 @@ class HelmCluster(Cluster):
         await self.apps_api.patch_namespaced_deployment(
             name=f"{self.release_name}-worker",
             namespace=self.namespace,
-            body={"spec": {"replicas": n_workers,}},
+            body={
+                "spec": {
+                    "replicas": n_workers,
+                }
+            },
         )
 
     def adapt(self, *args, **kwargs):
-        """Turn on adaptivity (Not recommended).
-
-        """
+        """Turn on adaptivity (Not recommended)."""
         raise NotImplementedError(
             "It is not recommended to run ``HelmCluster`` in adaptive mode."
             "When scaling down workers the decision on which worker to remove is left to Kubernetes, which"
