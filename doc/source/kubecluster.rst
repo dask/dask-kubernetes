@@ -78,7 +78,37 @@ Best Practices
     This ensures that these pods will clean themselves up if your Python
     process disappears unexpectedly.
 
+GPUs
+----
 
+Because ``dask-kubernetes`` uses standard kubernetes pod specifications, we can
+use `kubernetes device plugins
+<https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins>`_
+and add resource limits defining the number of GPUs per pod/worker.
+Additionally, we can also use tools like `dask-cuda
+<https://dask-cuda.readthedocs.io/>`_ for optimized Dask/GPU interactions.
+
+.. code-block:: yaml
+
+      kind: Pod
+      metadata:
+        labels:
+          foo: bar
+      spec:
+        restartPolicy: Never
+        containers:
+        - image: rapidsai/rapidsai:cuda11.0-runtime-ubuntu18.04-py3.8
+          imagePullPolicy: IfNotPresent
+          args: [dask-cuda-worker, $(DASK_SCHEDULER_ADDRESS), --rmm-pool-size, 10GB]
+          name: dask-cuda
+          resources:
+            limits:
+              cpu: "2"
+              memory: 6G
+              nvidia.com/gpu: 1 # requesting 1 GPU
+            requests:
+              cpu: "2"
+              memory: 6G
 Configuration
 -------------
 
