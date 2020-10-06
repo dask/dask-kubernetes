@@ -210,6 +210,9 @@ as described in the
 Deployment Details
 ------------------
 
+Workers
+~~~~~~~
+
 Workers are created directly as simple pods.  These worker pods are configured
 to shutdown if they are unable to connect to the scheduler for 60 seconds.
 The pods are cleaned up when :meth:`~dask_kubernetes.KubeCluster.close` is called,
@@ -223,3 +226,44 @@ The pods are created with two default `tolerations <https://kubernetes.io/docs/c
 If you have nodes with the corresponding taints, then the worker pods will
 schedule to those nodes (and no other pods will be able to schedule to those
 nodes).
+
+Scheduler
+~~~~~~~~~
+
+The scheduler can be deployed locally (default) or remotely.  A ``local``
+scheduler is created where the Dask client will be created.
+
+
+.. code-block:: python
+
+   from dask_kubernetes import KubeCluster
+   from dask.distributed import Client
+
+   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='local')
+   cluster.scale(10)
+   client = Client(cluster)
+
+The scheduler can also be deployed on the kubernetes cluster with
+``deploy_mode=remote``:
+
+
+.. code-block:: python
+
+   from dask_kubernetes import KubeCluster
+   from dask.distributed import Client
+
+   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='remote')
+   cluster.scale(10)
+   client = Client(cluster)
+
+
+When deploying remotely, the following k8s resources are created:
+
+- A pod with a scheduler running
+- (optional) A pod with a LoadBalancer and complimentary service (svc) to
+  expose scheduler and dashobard ports
+
+By default, the ``scheduler-service-type`` is set to ``ClusterIp``. To
+optionally use the LoadBalancer, change ``scheduler-service-type`` to
+``LoadBalancer``
+
