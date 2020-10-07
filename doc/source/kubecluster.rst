@@ -109,6 +109,8 @@ Additionally, we can also use tools like `dask-cuda
             requests:
               cpu: "2"
               memory: 6G
+
+.. _configuration:
 Configuration
 -------------
 
@@ -249,6 +251,7 @@ The scheduler can also be deployed on the kubernetes cluster with
 
 .. code-block:: python
 
+   import dask
    from dask_kubernetes import KubeCluster
    from dask.distributed import Client
 
@@ -263,7 +266,12 @@ When deploying remotely, the following k8s resources are created:
 - (optional) A pod with a LoadBalancer and complimentary service (svc) to
   expose scheduler and dashobard ports
 
-By default, the ``scheduler-service-type`` is set to ``ClusterIp``. To
-optionally use the LoadBalancer, change ``scheduler-service-type`` to
-``LoadBalancer``
+By default, the configuration option, ``scheduler-service-type``, is
+set to ``ClusterIp``. To optionally use a LoadBalancer, change ``scheduler-service-type`` to
+``LoadBalancer``.  This change can either be done with the :ref:`dask-kubernetes
+configuration file<configuration>` or programmatically with ``dask.config.set``:
+
+.. code-block:: python
+
+   dask.config.set({"kubernetes.scheduler-service-type": "LoadBalancer"})
 
