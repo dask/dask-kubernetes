@@ -78,7 +78,39 @@ Best Practices
     This ensures that these pods will clean themselves up if your Python
     process disappears unexpectedly.
 
+GPUs
+----
 
+Because ``dask-kubernetes`` uses standard kubernetes pod specifications, we can
+use `kubernetes device plugins
+<https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/#using-device-plugins>`_
+and add resource limits defining the number of GPUs per pod/worker.
+Additionally, we can also use tools like `dask-cuda
+<https://dask-cuda.readthedocs.io/>`_ for optimized Dask/GPU interactions.
+
+.. code-block:: yaml
+
+      kind: Pod
+      metadata:
+        labels:
+          foo: bar
+      spec:
+        restartPolicy: Never
+        containers:
+        - image: rapidsai/rapidsai:cuda11.0-runtime-ubuntu18.04-py3.8
+          imagePullPolicy: IfNotPresent
+          args: [dask-cuda-worker, $(DASK_SCHEDULER_ADDRESS), --rmm-pool-size, 10GB]
+          name: dask-cuda
+          resources:
+            limits:
+              cpu: "2"
+              memory: 6G
+              nvidia.com/gpu: 1 # requesting 1 GPU
+            requests:
+              cpu: "2"
+              memory: 6G
+
+.. _configuration:
 Configuration
 -------------
 
@@ -180,6 +212,9 @@ as described in the
 Deployment Details
 ------------------
 
+Workers
+~~~~~~~
+
 Workers are created directly as simple pods.  These worker pods are configured
 to shutdown if they are unable to connect to the scheduler for 60 seconds.
 The pods are cleaned up when :meth:`~dask_kubernetes.KubeCluster.close` is called,
@@ -193,3 +228,50 @@ The pods are created with two default `tolerations <https://kubernetes.io/docs/c
 If you have nodes with the corresponding taints, then the worker pods will
 schedule to those nodes (and no other pods will be able to schedule to those
 nodes).
+
+Scheduler
+~~~~~~~~~
+
+The scheduler can be deployed locally (default) or remotely.  A ``local``
+scheduler is created where the Dask client will be created.
+
+
+.. code-block:: python
+
+   from dask_kubernetes import KubeCluster
+   from dask.distributed import Client
+
+   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='local')
+   cluster.scale(10)
+   client = Client(cluster)
+
+The scheduler can also be deployed on the kubernetes cluster with
+``deploy_mode=remote``:
+
+
+.. code-block:: python
+
+   import dask
+   from dask_kubernetes import KubeCluster
+   from dask.distributed import Client
+
+   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='remote')
+   cluster.scale(10)
+   client = Client(cluster)
+
+
+When deploying remotely, the following k8s resources are created:
+
+- A pod with a scheduler running
+- (optional) A pod with a LoadBalancer and complimentary service (svc) to
+  expose scheduler and dashobard ports
+
+By default, the configuration option, ``scheduler-service-type``, is
+set to ``ClusterIp``. To optionally use a LoadBalancer, change ``scheduler-service-type`` to
+``LoadBalancer``.  This change can either be done with the :ref:`dask-kubernetes
+configuration file<configuration>` or programmatically with ``dask.config.set``:
+
+.. code-block:: python
+
+   dask.config.set({"kubernetes.scheduler-service-type": "LoadBalancer"})
+
