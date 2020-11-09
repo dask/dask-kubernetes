@@ -342,9 +342,8 @@ def test_repr(cluster):
         assert "workers=0" in text
 
 
-@pytest.mark.parametrize("name", ["foo!._", "Foo!._"])
-def test_escape_username(pod_spec, ns, monkeypatch, name):
-    monkeypatch.setenv("LOGNAME", name)
+def test_escape_username(pod_spec, ns, monkeypatch):
+    monkeypatch.setenv("LOGNAME", "Foo!")
 
     with KubeCluster(pod_spec, namespace=ns) as cluster:
         assert "foo" in cluster.name

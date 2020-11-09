@@ -619,9 +619,8 @@ async def test_repr(cluster):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("name", ["foo!._", "Foo!._"])
-async def test_escape_username(pod_spec, ns, auth, monkeypatch, name):
-    monkeypatch.setenv("LOGNAME", name)
+async def test_escape_username(pod_spec, ns, auth, monkeypatch):
+    monkeypatch.setenv("LOGNAME", "Foo!._")
 
     async with KubeCluster(
         pod_spec, namespace=ns, auth=auth, **cluster_kwargs
