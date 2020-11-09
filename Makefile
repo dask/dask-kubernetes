@@ -57,7 +57,7 @@ push-kind:
 .PHONY: k8s-deploy k8s-test k8s-clean
 
 k8s-deploy:
-	kubectl --context=${K8S_TEST_CONTEXT} apply -f kubernetes/test-runner-setup.yaml
+	kubectl --context=${K8S_TEST_CONTEXT} apply -f ci/test-runner-setup.yaml
 
 k8s-make:  # having to set USER is actually a bug
 	kubectl --context=${K8S_TEST_CONTEXT} -n ${K8S_TEST_NAMESPACE} \
