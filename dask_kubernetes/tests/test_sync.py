@@ -343,7 +343,7 @@ def test_repr(cluster):
 
 
 def test_escape_username(pod_spec, ns, monkeypatch):
-    monkeypatch.setenv("LOGNAME", "foo!")
+    monkeypatch.setenv("LOGNAME", "Foo!")
 
     with KubeCluster(pod_spec, namespace=ns) as cluster:
         assert "foo" in cluster.name

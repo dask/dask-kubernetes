@@ -742,4 +742,4 @@ def _namespace_default():
 
 def escape(s):
     valid_characters = string.ascii_letters + string.digits + "-"
-    return "".join(c for c in s if c in valid_characters)
+    return "".join(c for c in s if c in valid_characters).lower()

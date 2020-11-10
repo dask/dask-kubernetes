@@ -620,7 +620,7 @@ async def test_repr(cluster):
 
 @pytest.mark.asyncio
 async def test_escape_username(pod_spec, ns, auth, monkeypatch):
-    monkeypatch.setenv("LOGNAME", "foo!._")
+    monkeypatch.setenv("LOGNAME", "Foo!._")
 
     async with KubeCluster(
         pod_spec, namespace=ns, auth=auth, **cluster_kwargs
