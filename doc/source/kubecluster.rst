@@ -264,7 +264,8 @@ When deploying remotely, the following k8s resources are created:
 
 - A pod with a scheduler running
 - (optional) A pod with a LoadBalancer and complimentary service (svc) to
-  expose scheduler and dashobard ports
+  expose scheduler and dashboard ports
+- A PodDisruptionBudget avoid voluntary disruptions of the scheduler pod
 
 By default, the configuration option, ``scheduler-service-type``, is
 set to ``ClusterIp``. To optionally use a LoadBalancer, change ``scheduler-service-type`` to

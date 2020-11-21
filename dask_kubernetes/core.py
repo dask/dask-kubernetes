@@ -24,8 +24,10 @@ from kubernetes_asyncio.client.rest import ApiException
 from .objects import (
     make_pod_from_dict,
     make_service_from_dict,
+    make_pdb_from_dict,
     clean_pod_template,
     clean_service_template,
+    clean_pdb_template,
 )
 from .auth import ClusterAuth
 
@@ -42,10 +44,20 @@ class Pod(ProcessInterface):
     Scheduler
     """
 
-    def __init__(self, cluster, core_api, pod_template, namespace, loop=None, **kwargs):
+    def __init__(
+        self,
+        cluster,
+        core_api,
+        policy_api,
+        pod_template,
+        namespace,
+        loop=None,
+        **kwargs
+    ):
         self._pod = None
         self.cluster = cluster
         self.core_api = core_api
+        self.policy_api = policy_api
         self.pod_template = copy.deepcopy(pod_template)
         self.base_labels = self.pod_template.metadata.labels
         self.namespace = namespace
@@ -164,6 +176,7 @@ class Scheduler(Pod):
                 "--idle-timeout",
                 self._idle_timeout,
             ]
+        self.pdb = None
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
@@ -209,9 +222,15 @@ class Scheduler(Pod):
 
         # FIXME Create an optional Ingress just in case folks want to configure one
 
+        self.pdb = await self._create_pdb()
+
     async def close(self, **kwargs):
         if self.service:
             await self.core_api.delete_namespaced_service(
+                self.cluster_name, self.namespace
+            )
+        if self.pdb:
+            await self.policy_api.delete_namespaced_pod_disruption_budget(
                 self.cluster_name, self.namespace
             )
         await super().close(**kwargs)
@@ -233,6 +252,21 @@ class Scheduler(Pod):
             self.namespace, self.service_template
         )
         return await self.core_api.read_namespaced_service(
+            self.cluster_name, self.namespace
+        )
+
+    async def _create_pdb(self):
+        pdb_template_dict = dask.config.get("kubernetes.scheduler-pdb-template")
+        self.pdb_template = clean_pdb_template(make_pdb_from_dict(pdb_template_dict))
+        self.pdb_template.metadata.name = self.cluster_name
+        self.pdb_template.spec.labels = copy.deepcopy(self.base_labels)
+        self.pdb_template.spec.selector.match_labels[
+            "dask.org/cluster-name"
+        ] = self.cluster_name
+        await self.policy_api.create_namespaced_pod_disruption_budget(
+            self.namespace, self.pdb_template
+        )
+        return await self.policy_api.read_namespaced_pod_disruption_budget(
             self.cluster_name, self.namespace
         )
 
@@ -512,6 +546,7 @@ class KubeCluster(SpecCluster):
         await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
+        self.policy_api = kubernetes.client.PolicyV1beta1Api()
 
         if self._namespace is None:
             self._namespace = _namespace_default()
@@ -535,6 +570,7 @@ class KubeCluster(SpecCluster):
         common_options = {
             "cluster": self,
             "core_api": self.core_api,
+            "policy_api": self.policy_api,
             "namespace": self._namespace,
             "loop": self.loop,
         }

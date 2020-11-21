@@ -35,6 +35,16 @@ kubernetes:
           port: 8787
           targetPort: 8787
 
+  scheduler-pdb-template:
+    apiVersion: policy/v1beta1
+    kind: PodDisruptionBudget
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          dask.org/cluster-name: "" # Cluster name will be added automatically
+          dask.org/component: scheduler
+
   worker-template-path: null
 
   scheduler-template:
