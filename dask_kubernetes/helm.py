@@ -1,7 +1,9 @@
 import asyncio
+import aiohttp
 import shutil
 import subprocess
 import warnings
+from contextlib import suppress
 
 from distributed.deploy import Cluster
 from distributed.core import rpc
@@ -75,11 +77,12 @@ class HelmCluster(Cluster):
         port_forward_cluster_ip=False,
         loop=None,
         asynchronous=False,
-        scheduler_name="scheduler",
-        worker_name="worker",
+        scheduler_name="dask-scheduler",
+        worker_name="dask-worker",
     ):
         self.release_name = release_name
         self.namespace = namespace or _namespace_default()
+        self.name = self.release_name + "." + self.namespace
         self.check_helm_dependency()
         status = subprocess.run(
             ["helm", "-n", self.namespace, "status", self.release_name],
@@ -131,6 +134,11 @@ class HelmCluster(Cluster):
             host = lb.hostname or lb.ip
             return f"tcp://{host}:{port}"
         elif service.spec.type == "NodePort":
+            [port] = [
+                port.node_port
+                for port in service.spec.ports
+                if port.name == service_name
+            ]
             nodes = await self.core_api.list_node()
             host = nodes.items[0].status.addresses[0].address
             return f"tcp://{host}:{port}"
@@ -246,11 +254,46 @@ class HelmCluster(Cluster):
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended)."""
         raise NotImplementedError(
-            "It is not recommended to run ``HelmCluster`` in adaptive mode."
-            "When scaling down workers the decision on which worker to remove is left to Kubernetes, which"
-            "will not necessarily remove the same worker that Dask would choose. This may result in lost futures and"
+            "It is not recommended to run ``HelmCluster`` in adaptive mode. "
+            "When scaling down workers the decision on which worker to remove is left to Kubernetes, which "
+            "will not necessarily remove the same worker that Dask would choose. This may result in lost futures and "
             "recalculation. It is recommended to manage scaling yourself with the ``HelmCluster.scale`` method."
         )
 
     async def _adapt(self, *args, **kwargs):
         return super().adapt(*args, **kwargs)
+
+    def close(self, *args, **kwargs):
+        """Close the cluster."""
+        raise NotImplementedError(
+            "It is not possible to close a HelmCluster object. \n"
+            "Please delete the cluster via the helm CLI: \n\n"
+            f"  $ helm delete --namespace {self.namespace} {self.release_name}"
+        )
+
+    @classmethod
+    def from_name(cls, name):
+        release_name, namespace = name.split(".")
+        return cls(release_name=release_name, namespace=namespace)
+
+
+async def discover(
+    auth=ClusterAuth.DEFAULT,
+    namespace=None,
+):
+    await ClusterAuth.load_first(auth)
+    async with kubernetes.client.api_client.ApiClient() as api:
+        core_api = kubernetes.client.CoreV1Api(api)
+        namespace = namespace or _namespace_default()
+        try:
+            pods = await core_api.list_pod_for_all_namespaces(
+                label_selector=f"app=dask,component=scheduler",
+            )
+            for pod in pods.items:
+                with suppress(KeyError):
+                    yield (
+                        pod.metadata.labels["release"] + "." + pod.metadata.namespace,
+                        HelmCluster,
+                    )
+        except aiohttp.client_exceptions.ClientConnectorError:
+            warnings.warn("Unable to connect to Kubernetes cluster")
