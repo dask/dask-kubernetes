@@ -41,8 +41,11 @@ class HelmCluster(Cluster):
         Name of the Dask worker deployment in the current release.
         Defaults to "worker".
     **kwargs: dict
-        Additional keyword arguments to pass to Cluster
-
+        nodeport_host string (optional)
+            A Node address. Can be provided in case scheduler service type is NodePort
+            and you want to avoid listing Nodes at a cluster scope.
+        node_port: int (optional)
+            A NodePort for your scheduler service.
     Examples
     --------
     >>> from dask_kubernetes import HelmCluster
@@ -77,6 +80,7 @@ class HelmCluster(Cluster):
         asynchronous=False,
         scheduler_name="scheduler",
         worker_name="worker",
+        **kwargs
     ):
         self.release_name = release_name
         self.namespace = namespace or _namespace_default()
@@ -98,6 +102,10 @@ class HelmCluster(Cluster):
         self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
+
+        # Optional argument for explicit node host connection parameters.
+        self.nodeport_host = kwargs.get('nodeport_host')
+        self.node_port = kwargs.get('node_port')
 
         super().__init__(asynchronous=asynchronous)
         if not self.asynchronous:
@@ -131,8 +139,12 @@ class HelmCluster(Cluster):
             host = lb.hostname or lb.ip
             return f"tcp://{host}:{port}"
         elif service.spec.type == "NodePort":
-            nodes = await self.core_api.list_node()
-            host = nodes.items[0].status.addresses[0].address
+            if self.nodeport_host:
+                host = self.nodeport_host
+                port = self.node_port
+            else:
+                nodes = await self.core_api.list_node()
+                host = nodes.items[0].status.addresses[0].address
             return f"tcp://{host}:{port}"
         elif service.spec.type == "ClusterIP":
             if self.port_forward_cluster_ip:
