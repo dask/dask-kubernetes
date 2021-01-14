@@ -250,7 +250,11 @@ class HelmCluster(Cluster):
         await self.apps_api.patch_namespaced_deployment(
             name=f"{self.release_name}-{self.worker_name}",
             namespace=self.namespace,
-            body={"spec": {"replicas": n_workers,}},
+            body={
+                "spec": {
+                    "replicas": n_workers,
+                }
+            },
         )
 
     def adapt(self, *args, **kwargs):
