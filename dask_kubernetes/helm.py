@@ -70,16 +70,16 @@ class HelmCluster(Cluster):
     """
 
     def __init__(
-        self,
-        release_name=None,
-        auth=ClusterAuth.DEFAULT,
-        namespace=None,
-        port_forward_cluster_ip=False,
-        loop=None,
-        asynchronous=False,
-        scheduler_name="scheduler",
-        worker_name="worker",
-        **kwargs
+            self,
+            release_name=None,
+            auth=ClusterAuth.DEFAULT,
+            namespace=None,
+            port_forward_cluster_ip=False,
+            loop=None,
+            asynchronous=False,
+            scheduler_name="scheduler",
+            worker_name="worker",
+            **kwargs
     ):
         self.release_name = release_name
         self.namespace = namespace or _namespace_default()
@@ -129,7 +129,8 @@ class HelmCluster(Cluster):
         service = await self.core_api.read_namespaced_service(
             service_name, self.namespace
         )
-        [port] = [port.port for port in service.spec.ports if port.name == service_name]
+        [port] = [port.port for port in service.spec.ports if
+                  port.name == service_name]
         if service.spec.type == "LoadBalancer":
             lb = service.status.load_balancer.ingress[0]
             host = lb.hostname or lb.ip
@@ -162,7 +163,8 @@ class HelmCluster(Cluster):
         while True:
             n_workers = len(self.scheduler_info["workers"])
             deployment = await self.apps_api.read_namespaced_deployment(
-                name=f"{self.release_name}-{self.worker_name}", namespace=self.namespace
+                name=f"{self.release_name}-{self.worker_name}",
+                namespace=self.namespace
             )
             deployment_replicas = deployment.spec.replicas
             if n_workers == deployment_replicas:
