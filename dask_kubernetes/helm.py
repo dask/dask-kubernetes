@@ -40,11 +40,15 @@ class HelmCluster(Cluster):
     worker_name: str (optional)
         Name of the Dask worker deployment in the current release.
         Defaults to "worker".
-    **node_port: int (optional)
-        A NodePort for your scheduler service.
-    **nodeport_host: str (optional)
-        A Node address. Can be provided in case scheduler service type is
-        NodePort and you want to avoid listing Nodes at a cluster scope.
+    node_host: str (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which node to connect to.
+    node_port: int (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which port to connect to.
+    **kwargs: dict
+        Additional keyword arguments to pass to Cluster
+
     Examples
     --------
     >>> from dask_kubernetes import HelmCluster
@@ -79,6 +83,8 @@ class HelmCluster(Cluster):
         asynchronous=False,
         scheduler_name="scheduler",
         worker_name="worker",
+        node_host=None,
+        node_port=None,
         **kwargs,
     ):
         self.release_name = release_name
@@ -101,6 +107,8 @@ class HelmCluster(Cluster):
         self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
+        self.node_host = node_host
+        self.node_port = node_port
         self.kwargs = kwargs
 
         super().__init__(asynchronous=asynchronous)
@@ -135,14 +143,12 @@ class HelmCluster(Cluster):
             host = lb.hostname or lb.ip
             return f"tcp://{host}:{port}"
         elif service.spec.type == "NodePort":
-            nodeport_host = self.kwargs.get("nodeport_host")
-            if nodeport_host:
-                host = nodeport_host
-            else:
+            if self.node_host is None:
                 nodes = await self.core_api.list_node()
-                host = nodes.items[0].status.addresses[0].address
-            port = self.kwargs.get("node_port") or port
-            return f"tcp://{host}:{port}"
+                self.node_host = nodes.items[0].status.addresses[0].address
+            if self.node_port is None:
+                self.node_port = port
+            return f"tcp://{self.node_host}:{self.node_port}"
         elif service.spec.type == "ClusterIP":
             if self.port_forward_cluster_ip:
                 warnings.warn(
