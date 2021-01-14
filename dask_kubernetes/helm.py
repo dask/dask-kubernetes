@@ -40,12 +40,11 @@ class HelmCluster(Cluster):
     worker_name: str (optional)
         Name of the Dask worker deployment in the current release.
         Defaults to "worker".
-    **kwargs: dict
-        nodeport_host string (optional)
-            A Node address. Can be provided in case scheduler service type is NodePort
-            and you want to avoid listing Nodes at a cluster scope.
-        node_port: int (optional)
-            A NodePort for your scheduler service.
+    **node_port: int (optional)
+        A NodePort for your scheduler service.
+    **nodeport_host: str (optional)
+        A Node address. Can be provided in case scheduler service type is
+        NodePort and you want to avoid listing Nodes at a cluster scope.
     Examples
     --------
     >>> from dask_kubernetes import HelmCluster
@@ -102,10 +101,7 @@ class HelmCluster(Cluster):
         self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
-
-        # Optional argument for explicit node host connection parameters.
-        self.nodeport_host = kwargs.get('nodeport_host')
-        self.node_port = kwargs.get('node_port')
+        self.kwargs = kwargs
 
         super().__init__(asynchronous=asynchronous)
         if not self.asynchronous:
@@ -139,12 +135,13 @@ class HelmCluster(Cluster):
             host = lb.hostname or lb.ip
             return f"tcp://{host}:{port}"
         elif service.spec.type == "NodePort":
-            if self.nodeport_host:
-                host = self.nodeport_host
-                port = self.node_port
+            nodeport_host = self.kwargs.get('nodeport_host')
+            if nodeport_host:
+                host = nodeport_host
             else:
                 nodes = await self.core_api.list_node()
                 host = nodes.items[0].status.addresses[0].address
+            port = self.kwargs.get('node_port') or port
             return f"tcp://{host}:{port}"
         elif service.spec.type == "ClusterIP":
             if self.port_forward_cluster_ip:
