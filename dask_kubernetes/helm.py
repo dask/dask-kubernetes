@@ -109,9 +109,8 @@ class HelmCluster(Cluster):
         self.worker_name = worker_name
         self.node_host = node_host
         self.node_port = node_port
-        self.kwargs = kwargs
 
-        super().__init__(asynchronous=asynchronous)
+        super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
@@ -251,11 +250,7 @@ class HelmCluster(Cluster):
         await self.apps_api.patch_namespaced_deployment(
             name=f"{self.release_name}-{self.worker_name}",
             namespace=self.namespace,
-            body={
-                "spec": {
-                    "replicas": n_workers,
-                }
-            },
+            body={"spec": {"replicas": n_workers,}},
         )
 
     def adapt(self, *args, **kwargs):
