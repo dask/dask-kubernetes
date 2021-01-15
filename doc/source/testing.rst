@@ -38,11 +38,23 @@ We can set up a kubernetes cluster on the local machine using either
 4. (optional) if instead you want to run tests locally, you don't need ``docker``, but you will need to make it possible for your host to be able to talk to the pods on minikube - see section below.
 5. Create a namespace and role bindings for testing::
 
-      make k8s-deploy
+      make k8s-deploy K8S_TEST_CONTEXT=minikube
 
 (Optional) Configure network access to the ``minikube`` pods
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 .. note::  This step may vary depending on your network configuration, and it may be easier to run containerized tests in-cluster instead
+
+First lookup the IP range used by the docker instance in minikube:
+
+- Use the docker daemon inside minikube::
+
+    eval $(minikube -p minikube docker-env)
+
+- Now lookup the ip subnet used by minikube
+
+    docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' bridge
+
+Now setup a route to reach pods running in minikube:
 
 - On Linux::
 
@@ -103,6 +115,8 @@ Build a docker image for Testing
 
 Run tests locally
 -----------------
+.. note: Running tests locally is not possible if using kind
+
 1. Check code for formatting errors::
 
       make lint
