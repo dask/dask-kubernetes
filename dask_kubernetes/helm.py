@@ -4,7 +4,7 @@ import subprocess
 import warnings
 
 from distributed.deploy import Cluster
-from distributed.core import rpc
+from distributed.core import rpc, Status
 from distributed.utils import Log, Logs, LoopRunner
 import kubernetes_asyncio as kubernetes
 
@@ -205,9 +205,9 @@ class HelmCluster(Cluster):
 
     def __await__(self):
         async def _():
-            if self.status == "created":
+            if self.status == Status.created:
                 await self._start()
-            elif self.status == "running":
+            elif self.status == Status.running:
                 await self._wait_for_workers()
             return self
 
