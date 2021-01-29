@@ -445,7 +445,7 @@ class KubeCluster(SpecCluster):
         self.env = env
         self.auth = auth
         self.kwargs = kwargs
-        super().__init__(**self.kwargs)
+        super().__init__(**self.kwargs, name=self.pod_template.metadata.generate_name)
 
     def _get_pod_template(self, pod_template, pod_type):
         if not pod_template and dask.config.get(
@@ -677,10 +677,6 @@ class KubeCluster(SpecCluster):
     @property
     def namespace(self):
         return self.pod_template.metadata.namespace
-
-    @property
-    def name(self):
-        return self.pod_template.metadata.generate_name
 
     def scale(self, n):
         # A shim to maintain backward compatibility
