@@ -1,4 +1,5 @@
 import asyncio
+import json
 import shutil
 import subprocess
 import warnings
@@ -121,7 +122,30 @@ class HelmCluster(Cluster):
         await super()._start()
 
     async def _get_scheduler_address(self):
-        service_name = f"{self.release_name}-{self.scheduler_name}"
+        # find the chart name, is there a better way?
+        chart = subprocess.run(
+            [
+                "helm",
+                "-n",
+                self.namespace,
+                "list",
+                "-f",
+                self.release_name,
+                "--output",
+                "json",
+            ],
+            capture_output=True,
+            encoding="utf-8",
+        ).stdout
+        chart = json.loads(chart)[0]["chart"]
+        # extract name from {{.Chart.Name }}-{{ .Chart.Version }}
+        chart_name = "-".join(chart.split("-")[:-1])
+        # Follow the spec in the dask/dask helm chart
+        self.chart_name = (
+            f"{chart_name}-" if chart_name not in self.release_name else ""
+        )
+
+        service_name = f"{self.release_name}-{self.chart_name}{self.scheduler_name}"
         service = await self.core_api.read_namespaced_service(
             service_name, self.namespace
         )
@@ -153,7 +177,8 @@ class HelmCluster(Cluster):
         while True:
             n_workers = len(self.scheduler_info["workers"])
             deployment = await self.apps_api.read_namespaced_deployment(
-                name=f"{self.release_name}-{self.worker_name}", namespace=self.namespace
+                name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
+                namespace=self.namespace,
             )
             deployment_replicas = deployment.spec.replicas
             if n_workers == deployment_replicas:
@@ -234,7 +259,7 @@ class HelmCluster(Cluster):
 
     async def _scale(self, n_workers):
         await self.apps_api.patch_namespaced_deployment(
-            name=f"{self.release_name}-{self.worker_name}",
+            name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
             namespace=self.namespace,
             body={
                 "spec": {
