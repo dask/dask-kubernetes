@@ -609,6 +609,8 @@ class KubeCluster(SpecCluster):
         }
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
 
+        self.name = self.pod_template.metadata.generate_name
+
         await super()._start()
 
     @classmethod
