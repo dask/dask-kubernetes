@@ -447,9 +447,6 @@ class KubeCluster(SpecCluster):
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
 
-        # overwrite cluster name with pod template generated name
-        self.name = self.pod_template.metadata.generate_name
-
     def _get_pod_template(self, pod_template, pod_type):
         if not pod_template and dask.config.get(
             "kubernetes.{}-template".format(pod_type), None
