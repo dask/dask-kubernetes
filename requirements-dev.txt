@@ -3,4 +3,4 @@ black>=18.9b0
 pytest>=5.3
 pytest-asyncio>=0.10.0
 git+https://github.com/dask/dask@master
-git+https://github.com/dask/distributed@master
+git+https://github.com/dask/distributed@02a85f7891b5872aa8e7a0fc62c2891f503a7963
