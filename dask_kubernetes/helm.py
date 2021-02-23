@@ -122,8 +122,8 @@ class HelmCluster(Cluster):
         await super()._start()
 
     async def _get_scheduler_address(self):
-        # find the chart name, is there a better way?
-        chart = subprocess.run(
+        # Get the chart name
+        chart = subprocess.check_output(
             [
                 "helm",
                 "-n",
@@ -134,9 +134,8 @@ class HelmCluster(Cluster):
                 "--output",
                 "json",
             ],
-            capture_output=True,
             encoding="utf-8",
-        ).stdout
+        )
         chart = json.loads(chart)[0]["chart"]
         # extract name from {{.Chart.Name }}-{{ .Chart.Version }}
         chart_name = "-".join(chart.split("-")[:-1])
