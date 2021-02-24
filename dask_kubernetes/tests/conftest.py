@@ -1,6 +1,15 @@
 import pytest
 
+import os
+
 from dask_kubernetes.auth import KubeConfig, InCluster
+
+
+@pytest.fixture(scope="session")
+def k8s_cluster(kind_cluster):
+    os.environ["KUBECONFIG"] = str(kind_cluster.kubeconfig_path)
+    yield kind_cluster
+    del os.environ["KUBECONFIG"]
 
 
 def pytest_addoption(parser):

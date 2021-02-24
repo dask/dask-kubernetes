@@ -99,4 +99,5 @@ ENV/
 
 # mypy
 .mypy_cache/
+
 .pytest-kind/

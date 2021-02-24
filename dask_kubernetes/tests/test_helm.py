@@ -4,6 +4,8 @@ import subprocess
 import os.path
 import time
 
+from distributed.core import Status
+
 
 @pytest.fixture(scope="session")
 def release_name():
@@ -16,7 +18,7 @@ def config_path():
 
 
 @pytest.fixture(scope="session")  # Creating this fixture is slow so we should reuse it.
-def release(release_name, config_path):
+def release(k8s_cluster, release_name, config_path):
     subprocess.run(
         ["helm", "install", release_name, "dask/dask", "--wait", "-f", config_path],
         capture_output=True,
@@ -53,7 +55,7 @@ def test_import():
     assert issubclass(HelmCluster, Cluster)
 
 
-def test_raises_on_non_existant_release():
+def test_raises_on_non_existant_release(k8s_cluster):
     from dask_kubernetes import HelmCluster
 
     with pytest.raises(RuntimeError):
@@ -62,14 +64,14 @@ def test_raises_on_non_existant_release():
 
 @pytest.mark.asyncio
 async def test_create_helm_cluster(cluster, release_name):
-    assert cluster.status == "running"
+    assert cluster.status == Status.running
     assert cluster.release_name == release_name
     assert "id" in cluster.scheduler_info
 
 
 def test_create_sync_helm_cluster(sync_cluster, release_name):
     cluster = sync_cluster
-    assert cluster.status == "running"
+    assert cluster.status == Status.running
     assert cluster.release_name == release_name
     assert "id" in cluster.scheduler_info
 
