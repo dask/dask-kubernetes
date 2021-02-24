@@ -13,7 +13,7 @@ Quickstart
    helm repo add dask https://helm.dask.org
    helm repo update
 
-   helm install dask/dask --name myrelease
+   helm install myrelease dask/dask
 
 .. code-block:: python
 
