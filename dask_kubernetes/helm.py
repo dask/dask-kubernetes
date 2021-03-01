@@ -47,7 +47,7 @@ class HelmCluster(Cluster):
         A node address. Can be provided in case scheduler service type is
         ``NodePort`` and you want to manually specify which port to connect to.
     **kwargs: dict
-        Additional keyword arguments to pass to Cluster
+        Additional keyword arguments to pass to Cluster.
 
     Examples
     --------
