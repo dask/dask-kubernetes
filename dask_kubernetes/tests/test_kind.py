@@ -20,3 +20,6 @@ async def test_auth(k8s_cluster):
     core_v1_api = kubernetes.client.CoreV1Api()
     request = await core_v1_api.list_namespace()
     assert "default" in [namespace.metadata.name for namespace in request.items]
+
+    request = await core_v1_api.list_node()
+    assert "pytest-kind-control-plane" in [node.metadata.name for node in request.items]

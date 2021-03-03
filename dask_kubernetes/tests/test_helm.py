@@ -32,12 +32,15 @@ def release(k8s_cluster, release_name, config_path):
 
 
 @pytest.fixture
-async def cluster(release):
+async def cluster(k8s_cluster, release):
     from dask_kubernetes import HelmCluster
 
-    async with HelmCluster(release_name=release, asynchronous=True) as cluster:
-        await cluster
-        yield cluster
+    with k8s_cluster.port_forward("service/testdask-scheduler", 8786) as port:
+        async with HelmCluster(
+            release_name=release, port_forward_cluster_ip=port, asynchronous=True
+        ) as cluster:
+            await cluster
+            yield cluster
 
 
 @pytest.fixture

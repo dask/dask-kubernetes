@@ -30,7 +30,7 @@ class HelmCluster(Cluster):
         If the chart uses ClusterIP type services, forward the ports locally.
         If you are using ``HelmCluster`` from the Jupyter session that was installed
         by the helm chart this should be ``False``. If you are running it locally it should
-        be ``True``.
+        be the port you are forwarding to ``<port>``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -142,10 +142,10 @@ class HelmCluster(Cluster):
 
                     Please port-forward the service locally yourself with the following command.
 
-                    kubectl port-forward --namespace {self.namespace} svc/{service_name} {port}:{port} &
+                    kubectl port-forward --namespace {self.namespace} svc/{service_name} {self.port_forward_cluster_ip}:{port} &
                     """
                 )  # FIXME Handle this port forward here with the kubernetes library
-                return f"tcp://localhost:{port}"
+                return f"tcp://localhost:{self.port_forward_cluster_ip}"
             return f"tcp://{service.spec.cluster_ip}:{port}"
         raise RuntimeError("Unable to determine scheduler address.")
 
