@@ -6,10 +6,6 @@ import kubernetes_asyncio as kubernetes
 from dask_kubernetes.auth import ClusterAuth
 
 
-def test_kubernetes_version(k8s_cluster):
-    assert k8s_cluster.api.version == ("1", "20")
-
-
 def test_config_detection(k8s_cluster):
     assert b"pytest-kind" in check_output(["kubectl", "config", "current-context"])
 
