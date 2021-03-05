@@ -43,8 +43,14 @@ class HelmCluster(Cluster):
     worker_name: str (optional)
         Name of the Dask worker deployment in the current release.
         Defaults to "worker".
+    node_host: str (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which node to connect to.
+    node_port: int (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which port to connect to.
     **kwargs: dict
-        Additional keyword arguments to pass to Cluster
+        Additional keyword arguments to pass to Cluster.
 
     Examples
     --------
@@ -80,6 +86,9 @@ class HelmCluster(Cluster):
         asynchronous=False,
         scheduler_name="scheduler",
         worker_name="worker",
+        node_host=None,
+        node_port=None,
+        **kwargs,
     ):
         self.release_name = release_name
         self.namespace = namespace or namespace_default()
@@ -102,8 +111,10 @@ class HelmCluster(Cluster):
         self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
+        self.node_host = node_host
+        self.node_port = node_port
 
-        super().__init__(asynchronous=asynchronous)
+        super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
