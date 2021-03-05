@@ -14,10 +14,9 @@ from distributed.core import Status
 @pytest.fixture(scope="session")
 def chart_repo():
     repo_name = "dask"
-    if repo_name not in subprocess.check_output(["helm", "repo", "list"]).decode():
-        subprocess.check_output(
-            ["helm", "repo", "add", repo_name, "https://helm.dask.org/"]
-        )
+    subprocess.check_output(
+        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"]
+    )
     subprocess.check_output(["helm", "repo", "update"])
     return repo_name
 
