@@ -27,8 +27,8 @@ class DummyApiClient(client.ApiClient):
     def __init__(self):
         self.configuration = Configuration.get_default_copy()
 
-    def deserialize(self, dict_):
-        return super().deserialize(_FakeResponse(json.dumps(dict_)))
+    def deserialize(self, dict_, klass):
+        return super().deserialize(_FakeResponse(json.dumps(dict_)), klass)
 
 
 SERIALIZATION_API_CLIENT = DummyApiClient()
