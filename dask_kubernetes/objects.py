@@ -15,20 +15,24 @@ except ImportError:
 
 _FakeResponse = namedtuple("_FakeResponse", ["data"])
 
+
 class DummyApiClient(client.ApiClient):
     """A Dummy API client that is to be used solely for serialization/deserialization.
-    
+
     This is to avoid starting a threadpool at initialization and for adapting the
     deserialize method to accept a python dictionary instead of a Response-like
     interface.
     """
+
     def __init__(self):
         self.configuration = Configuration.get_default_copy()
 
     def deserialize(self, dict_):
         return super().deserialize(_FakeResponse(json.dumps(dict_)))
 
+
 SERIALIZATION_API_CLIENT = DummyApiClient()
+
 
 def _set_k8s_attribute(obj, attribute, value):
     """
@@ -174,8 +178,6 @@ def make_pod_spec(
     for key, value in extra_pod_config.items():
         _set_k8s_attribute(pod.spec, key, value)
     return pod
-
-
 
 
 def make_pod_from_dict(dict_):
