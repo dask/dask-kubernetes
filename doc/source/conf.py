@@ -57,7 +57,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Dask Kubernetes"
-copyright = "2020, Dask Kubernetes Developers"
+copyright = "2021, Dask Kubernetes Developers"
 author = "Dask Kubernetes Developers"
 
 # The version info for the project you're documenting, acts as replacement for
