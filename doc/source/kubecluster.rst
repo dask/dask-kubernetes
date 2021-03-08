@@ -117,7 +117,7 @@ Configuration
 You can use `Dask's configuration <https://docs.dask.org/en/latest/configuration.html>`_
 to control the behavior of Dask-kubernetes.  You can see a full set of
 configuration options
-`here <https://github.com/dask/dask-kubernetes/blob/master/dask_kubernetes/kubernetes.yaml>`_.
+`here <https://github.com/dask/dask-kubernetes/blob/main/dask_kubernetes/kubernetes.yaml>`_.
 Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
