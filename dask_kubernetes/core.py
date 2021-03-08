@@ -424,7 +424,6 @@ class KubeCluster(SpecCluster):
         scheduler_pod_template=None,
         **kwargs
     ):
-        check_dependency("kubectl")
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
         self._generate_name = dask.config.get("kubernetes.name", override_with=name)

@@ -69,6 +69,7 @@ async def get_external_address_for_scheduler_service(
 
 
 async def port_forward_service(service_name, remote_port, local_port=None):
+    check_dependency("kubectl")
     if not local_port:
         local_port = random.randint(49152, 65535)  # IANA suggested range
     kproc = subprocess.Popen(
