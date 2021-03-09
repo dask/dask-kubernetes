@@ -364,11 +364,11 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
 
 
 @pytest.mark.asyncio
-async def test_pod_template_from_conf(docker_image, auth):
+async def test_pod_template_from_conf(docker_image):
     spec = {"spec": {"containers": [{"name": "some-name", "image": docker_image}]}}
 
     with dask.config.set({"kubernetes.worker-template": spec}):
-        async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
+        async with KubeCluster(**cluster_kwargs) as cluster:
             assert cluster.pod_template.spec.containers[0].name == "some-name"
 
 
