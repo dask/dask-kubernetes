@@ -1,7 +1,9 @@
 """
 Defines different methods to configure a connection to a Kubernetes cluster.
 """
+import contextlib
 import logging
+import os
 
 import kubernetes
 import kubernetes_asyncio
@@ -122,6 +124,11 @@ class KubeConfig(ClusterAuth):
         self.persist_config = persist_config
 
     async def load(self):
+        with contextlib.suppress(KeyError):
+            if self.config_file is None:
+                self.config_file = os.path.abspath(
+                    os.path.expanduser(os.environ["KUBECONFIG"])
+                )
         kubernetes.config.load_kube_config(
             self.config_file, self.context, None, self.persist_config
         )

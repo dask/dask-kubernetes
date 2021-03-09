@@ -1,37 +1,38 @@
 Dask Kubernetes
 ===============
 
+.. currentmodule:: dask_kubernetes
+
 Dask Kubernetes provides cluster managers for Kubernetes.
 
-``KubeCluster`` deploys Dask workers on Kubernetes clusters using native
-Kubernetes APIs.  It is designed to dynamically launch short-lived deployments
-of workers during the lifetime of a Python process.
+:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using native
+Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
 
-Currently, it is designed to be run from a pod on a Kubernetes cluster that
-has permissions to launch other pods. However, it can also work with a remote
-Kubernetes cluster (configured via a kubeconfig file), as long as it is possible
-to interact with the Kubernetes API and access services on the cluster.
-
-``HelmCluster`` is for managing an existing Dask cluster which has been deployed using
+:class:`HelmCluster` is for managing an existing Dask cluster which has been deployed using
 `Helm <https://helm.sh>`_. You must have already installed the `Dask Helm chart <https://helm.dask.org/>`_
-and have the cluster running. You can then use ``HelmCluster`` to manage scaling and retrieve logs.
+and have the cluster running. You can then use it to manage scaling and retrieve logs.
 
-See https://docs.dask.org/en/latest/setup/kubernetes.html for more.
-
-Quickstart
-----------
-
-- :ref:`kubecluster`
-- :ref:`helmcluster`
-
+For more general information on running Dask on Kubernetes see `this page <https://docs.dask.org/en/latest/setup/kubernetes.html>`_.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
+   :caption: Overview
 
    installing
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Cluster Managers
+
    kubecluster
    helmcluster
-   api
-   history
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Developer
+
    testing
+   history
