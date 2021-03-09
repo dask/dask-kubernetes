@@ -1,6 +1,5 @@
 FROM daskdev/dask:latest
 
-WORKDIR /usr/local/src
-COPY . .
-
-RUN pip install -e . && pip install -r requirements-dev.txt
+# Install latest dev builds of Dask and Distributed
+RUN pip install git+https://github.com/dask/distributed@main
+RUN pip install git+https://github.com/dask/dask@main

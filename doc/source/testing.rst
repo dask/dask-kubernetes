@@ -1,125 +1,70 @@
 Testing
 =======
 
-During local development, we may want to test the code in three different scenarios, largely
-corresponding to real-world deployment scenarios:
+Running the test suite for ``dask-kubernetes`` doesn't require an existing Kubernetes cluster but does require
+`Docker <https://docs.docker.com/get-docker/>`_, `kubectl <https://kubernetes.io/docs/tasks/tools/#kubectl>`_ and `helm <https://helm.sh/docs/intro/install/>`_.
 
-1. Run code locally (possibly inside a `virtual environment <https://docs.python.org/3/tutorial/venv.html>`_
-2. Dockerize code and run it inside a `docker container <https://www.docker.com/resources/what-container>`_
-3. Run code inside a `Kubernetes Pod <https://kubernetes.io/docs/concepts/workloads/pods/pod/>`_
+You will also need to install the test dependencies::
 
-Running *integration tests* with either of these options requires access to a Kubernetes cluster
-to spawn worker pods.
+    $ pip install -r requirements_test.txt
 
-.. note:: In CI, we perform static checks in a container (option 2 above), and run tests in a Pod (option 3 above)
+Tests are run using `pytest <https://docs.pytest.org/en/stable/>`_::
 
-Set up local development environment
-------------------------------------
-1. Make sure you have ``make`` installed
-2. Run ``make install`` to install dependencies in your current python environment
+    $ pytest
+    ============================================== test session starts ==============================================
+    platform darwin -- Python 3.8.8, pytest-6.2.2, py-1.10.0, pluggy-0.13.1 --
+    cachedir: .pytest_cache
+    rootdir: /Users/jtomlinson/Projects/dask/dask-kubernetes, configfile: setup.cfg
+    plugins: anyio-2.2.0, asyncio-0.14.0, kind-21.1.3
+    collected 64 items
 
-You can now run ``make lint``, ``make test`` etc. - however, many tests will require access
-to a kubernetes cluster, as described below.
+    ...
+    ================= 56 passed, 1 skipped, 6 xfailed, 1 xpassed, 53 warnings in 404.19s (0:06:44) ==================
 
-Set up a local Kubernetes cluster
----------------------------------
-We can set up a kubernetes cluster on the local machine using either
-`minikube <https://minikube.sigs.k8s.io/>`_ or `kind <https://kind.sigs.k8s.io/>`_
+Kind
+----
 
-``minikube``
-^^^^^^^^^^^^
-1. Install ``minikube`` by following `online instructions <https://kubernetes.io/docs/tasks/tools/install-minikube/>`__, or use::
+To test ``dask-kubernetes`` against a real Kubernetes cluster we use the `pytest-kind <https://pypi.org/project/pytest-kind/>`_ plugin.
 
-      make kubectl-bootstrap
-2. Start ``minikube`` with::
+`Kind <https://kind.sigs.k8s.io/>`_ stands for Kubernetes in Docker and will create a full Kubernetes cluster within a single Docker container on your system.
+Kubernetes will then make use of the lower level `containerd <https://containerd.io/>`_ runtime to start additional containers, so your Kubernetes pods will not
+appear in your ``docker ps`` output.
 
-      minikube start
-3. (recommended) to run containerized tests in a pod, make sure you have `installed docker <https://docs.docker.com/install/>`__ and run ``eval $(shell minikube docker-env)`` before building the Docker image
-4. (optional) if instead you want to run tests locally, you don't need ``docker``, but you will need to make it possible for your host to be able to talk to the pods on minikube - see section below.
-5. Create a namespace and role bindings for testing::
+By default we set the ``--keep-cluster`` flag in ``setup.cfg`` which means the Kubernetes container will persist between ``pytest`` runs
+to avoid creation/teardown time. Therefore you may want to manually remove the container when you are done working on ``dask-kubernetes``::
 
-      make k8s-deploy
+    $ docker rm pytest-kind-control-plane
 
-(Optional) Configure network access to the ``minikube`` pods
-""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-.. note::  This step may vary depending on your network configuration, and it may be easier to run containerized tests in-cluster instead
+When you run the tests for the first time a config file will be created called ``.pytest-kind/pytest-kind/kubeconfig`` which is used for authenticating
+with the Kubernetes cluster running in the container. If you wish to inspect the cluster yourself for debugging purposes you can set the environment
+variable ``KUBECONFIG`` to point to that file, then use ``kubectl`` or ``helm`` as normal::
 
-- On Linux::
+    $ export KUBECONFIG=.pytest-kind/pytest-kind/kubeconfig
+    $ kubectl get nodes
+    NAME                        STATUS   ROLES                  AGE   VERSION
+    pytest-kind-control-plane   Ready    control-plane,master   10m   v1.20.2
+    $ helm list
+    NAME    NAMESPACE       REVISION        UPDATED STATUS  CHART   APP VERSION
 
-   sudo ip route add 172.17.0.0/16 via $(minikube ip)
+Docker image
+------------
 
-- On OS X::
+Within the test suite there is a fixture which creates a Docker image called ``dask-kubernetes:dev`` from `this Dockerfile <https://github.com/dask/dask-kubernetes/blob/main/ci/Dockerfile>`_.
+This image will be imported into the kind cluster and then be used in all Dask clusters created.
+This is the official Dask Docker image but with the very latest trunks of ``dask`` and ``distrubuted`` installed. It is recommended that you also have the
+latest development install of those projects in your local development environment too.
 
-   sudo route -n add -net 172.17.0.0/16 $(minikube ip)
+This image may go stale over time so you might want to periodically delete it to ensure it gets recreated with the latest code changes::
 
-If you get an error message like the following::
+   $ docker rmi dask-kubernetes:dev
 
-   RTNETLINK answers: File exists
+Linting and formatting
+----------------------
 
-it most likely means you have docker running on your host using the same
-IP range minikube is using. You can fix this by editing your
-``/etc/docker/daemon.json`` file to add the following:
+To accept Pull Requests to ``dask-kubernetes`` we require that they pass ``black`` formatting and ``flake8`` linting.
 
-.. code-block:: json
+To save developer time we support using `pre-commit <https://pre-commit.com/>`_ which runs ``black`` and ``flake8`` every time
+you attempt to locally commit code::
 
-   {
-      "bip": "172.19.1.1/16"
-   }
-
-If some JSON already exists in that file, make sure to just add the
-``bip`` key rather than replace it all. The final file needs to be valid
-JSON.
-
-Once edited, restart docker with ``sudo systemctl restart docker``. It
-should come up using a different IP range, and you can run the
-``sudo ip route add`` command again. Note that restarting docker will
-restart all your running containers by default.
-
-``kind``
-^^^^^^^^
-0. Make sure you have `installed docker <https://docs.docker.com/install/>`__
-1. Install ``kind`` by following `online instructions <https://kind.sigs.k8s.io/docs/user/quick-start#installation>`__, or use::
-      
-      make kind-bootstrap
-2. Start ``kind``::
-      
-      make kind-start
-3. Create a namespace and role bindings for testing::
-
-      make k8s-deploy
-
-4. Remember that local images will need to be pushed to ``kind`` nodes with ``make push-kind``
-
-Build a docker image for Testing
---------------------------------
-1. Ensure you have `installed docker <https://docs.docker.com/install/>`__
-2. Build docker image::
-      
-      make build
-
-3. (if using ``kind``) push image to cluster nodes::
-      
-      make push-kind
-
-Run tests locally
------------------
-1. Check code for formatting errors::
-      
-      make lint
-2. (Optional) run ``kubectl config use-context <context>``, where ``context`` is either ``kind-kind`` or ``minikube``
-3. Run tests with ``make test``
-
-Run tests in a container
-------------------------
-Any make command, e.g. ``make lint``, can be executed in the pre-built container using::
-   
-   make docker-make COMMAND=lint
-
-.. note::  By default, local code is mounted in the docker container, so you don't need to rebuild the image to see local changes to your code or tests.
-.. note:: Tests requiring cluster access will not run without further setup, run them in a Pod insted - see below
-
-Run tests in a pod
-------------------
-Similar to running tests in a docker container, simply run::
-
-   make k8s-make COMMAND=test
+   $ pip install pre-commit
+   $ pre-commit install

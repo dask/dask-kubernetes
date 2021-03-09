@@ -1,0 +1,16 @@
+webUI:
+  servicePort: 8087
+
+jupyter:
+  enabled: false
+
+scheduler:
+  serviceType: "ClusterIP"
+  image:
+    repository: "dask-kubernetes"  # Container image repository.
+    tag: "dev"  # Container image tag.
+
+worker:
+  image:
+    repository: "dask-kubernetes"  # Container image repository.
+    tag: "dev"  # Container image tag.
