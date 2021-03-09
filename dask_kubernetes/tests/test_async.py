@@ -769,7 +769,7 @@ async def test_start_with_workers(k8s_cluster, pod_spec):
 
 
 @pytest.mark.asyncio
-async def test_adapt_delete(cluster):
+async def test_adapt_delete(cluster, ns):
     """
     testing whether KubeCluster.adapt will bring
     back deleted worker pod (issue #244)
@@ -777,11 +777,12 @@ async def test_adapt_delete(cluster):
     core_api = cluster.core_api
 
     async def get_worker_pods():
-        pods_list = await core_api.list_namespaced_pod()
+        pods_list = await core_api.list_namespaced_pod(
+            namespace=ns, label_selector=f"dask.org/component=worker,dask.org/cluster-name={cluster.name}"
+        )
         return [
             x.metadata.name
             for x in pods_list.items
-            if x.metadata.name.startswith(cluster.name)
         ]
 
     cluster.adapt(maximum=2, minimum=2)
@@ -794,7 +795,7 @@ async def test_adapt_delete(cluster):
     assert len(worker_pods) == 2
     # delete one worker pod
     to_delete = worker_pods[0]
-    await core_api.delete_namespaced_pod(name=to_delete)
+    await core_api.delete_namespaced_pod(name=to_delete, namespace=ns)
     # wait until it is deleted
     start = time()
     while True:
