@@ -49,7 +49,7 @@ variable ``KUBECONFIG`` to point to that file, then use ``kubectl`` or ``helm`` 
 Docker image
 ------------
 
-Within the test suite there is a fixture which creates a Docker image called ``dask-kubernetes:dev`` from `this Dockerfile <https://github.com/dask/dask-kubernetes/blob/master/ci/Dockerfile>`_.
+Within the test suite there is a fixture which creates a Docker image called ``dask-kubernetes:dev`` from `this Dockerfile <https://github.com/dask/dask-kubernetes/blob/main/ci/Dockerfile>`_.
 This image will be imported into the kind cluster and then be used in all Dask clusters created.
 This is the official Dask Docker image but with the very latest trunks of ``dask`` and ``distrubuted`` installed. It is recommended that you also have the
 latest development install of those projects in your local development environment too.
