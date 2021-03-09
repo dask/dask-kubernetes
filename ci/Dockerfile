@@ -1,11 +1,5 @@
 FROM daskdev/dask:latest
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    make \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /usr/local/src/dask_kubernetes
-COPY . .
-
-RUN make install
+# Install latest dev builds of Dask and Distributed
+RUN pip install git+https://github.com/dask/distributed@main
+RUN pip install git+https://github.com/dask/dask@main

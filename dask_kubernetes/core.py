@@ -3,12 +3,9 @@ import copy
 import getpass
 import logging
 import os
-import socket
 import string
 import time
-from urllib.parse import urlparse
 import uuid
-import weakref
 from weakref import finalize
 
 try:
@@ -20,7 +17,6 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.comm.utils import offload
 from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
@@ -28,10 +24,19 @@ from kubernetes_asyncio.client.rest import ApiException
 from .objects import (
     make_pod_from_dict,
     make_service_from_dict,
+    make_pdb_from_dict,
     clean_pod_template,
     clean_service_template,
+    clean_pdb_template,
 )
 from .auth import ClusterAuth
+from .utils import (
+    namespace_default,
+    escape,
+    format_labels,
+    get_external_address_for_scheduler_service,
+    check_dependency,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +44,27 @@ SCHEDULER_PORT = 8786
 
 
 class Pod(ProcessInterface):
-    """ A superclass for Kubernetes Pods
+    """A superclass for Kubernetes Pods
     See Also
     --------
     Worker
     Scheduler
     """
 
-    def __init__(self, core_api, pod_template, namespace, loop=None, **kwargs):
+    def __init__(
+        self,
+        cluster,
+        core_api,
+        policy_api,
+        pod_template,
+        namespace,
+        loop=None,
+        **kwargs
+    ):
         self._pod = None
+        self.cluster = cluster
         self.core_api = core_api
+        self.policy_api = policy_api
         self.pod_template = copy.deepcopy(pod_template)
         self.base_labels = self.pod_template.metadata.labels
         self.namespace = namespace
@@ -117,7 +133,7 @@ class Pod(ProcessInterface):
 
 
 class Worker(Pod):
-    """ A Remote Dask Worker controled by Kubernetes
+    """A Remote Dask Worker controled by Kubernetes
     Parameters
     ----------
     scheduler: str
@@ -143,7 +159,7 @@ class Worker(Pod):
 
 
 class Scheduler(Pod):
-    """ A Remote Dask Scheduler controled by Kubernetes
+    """A Remote Dask Scheduler controled by Kubernetes
     Parameters
     ----------
     idle_timeout: str, optional
@@ -158,6 +174,7 @@ class Scheduler(Pod):
 
     def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
         super().__init__(**kwargs)
+        self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         self.service = None
         self._idle_timeout = idle_timeout
         self._service_wait_timeout_s = service_wait_timeout_s
@@ -166,6 +183,7 @@ class Scheduler(Pod):
                 "--idle-timeout",
                 self._idle_timeout,
             ]
+        self.pdb = None
 
     async def start(self, **kwargs):
         await super().start(**kwargs)
@@ -186,34 +204,19 @@ class Scheduler(Pod):
             namespace=self.namespace,
             port=SCHEDULER_PORT,
         )
-        if self.service.spec.type == "LoadBalancer":
-            # Wait for load balancer to be assigned
-            start = time.time()
-            while self.service.status.load_balancer.ingress is None:
-                if (
-                    self._service_wait_timeout_s > 0
-                    and time.time() > start + self._service_wait_timeout_s
-                ):
-                    raise asyncio.TimeoutError(
-                        "Timed out waiting for Load Balancer to be provisioned."
-                    )
-                self.service = await self.core_api.read_namespaced_service(
-                    self.cluster_name, self.namespace
-                )
-                await asyncio.sleep(0.2)
+        self.external_address = await get_external_address_for_scheduler_service(
+            self.core_api, self.service
+        )
 
-            [loadbalancer_ingress] = self.service.status.load_balancer.ingress
-            loadbalancer_host = loadbalancer_ingress.hostname or loadbalancer_ingress.ip
-            self.external_address = "tcp://{host}:{port}".format(
-                host=loadbalancer_host, port=SCHEDULER_PORT
-            )
-        # FIXME Set external address when using nodeport service type
-
-        # FIXME Create an optional Ingress just in case folks want to configure one
+        self.pdb = await self._create_pdb()
 
     async def close(self, **kwargs):
         if self.service:
             await self.core_api.delete_namespaced_service(
+                self.cluster_name, self.namespace
+            )
+        if self.pdb:
+            await self.policy_api.delete_namespaced_pod_disruption_budget(
                 self.cluster_name, self.namespace
             )
         await super().close(**kwargs)
@@ -234,13 +237,44 @@ class Scheduler(Pod):
         await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
         )
-        return await self.core_api.read_namespaced_service(
+        service = await self.core_api.read_namespaced_service(
+            self.cluster_name, self.namespace
+        )
+        if service.spec.type == "LoadBalancer":
+            # Wait for load balancer to be assigned
+            start = time.time()
+            while service.status.load_balancer.ingress is None:
+                if (
+                    self._service_wait_timeout_s > 0
+                    and time.time() > start + self._service_wait_timeout_s
+                ):
+                    raise asyncio.TimeoutError(
+                        "Timed out waiting for Load Balancer to be provisioned."
+                    )
+                service = await self.core_api.read_namespaced_service(
+                    self.cluster_name, self.namespace
+                )
+                await asyncio.sleep(0.2)
+        return service
+
+    async def _create_pdb(self):
+        pdb_template_dict = dask.config.get("kubernetes.scheduler-pdb-template")
+        self.pdb_template = clean_pdb_template(make_pdb_from_dict(pdb_template_dict))
+        self.pdb_template.metadata.name = self.cluster_name
+        self.pdb_template.spec.labels = copy.deepcopy(self.base_labels)
+        self.pdb_template.spec.selector.match_labels[
+            "dask.org/cluster-name"
+        ] = self.cluster_name
+        await self.policy_api.create_namespaced_pod_disruption_budget(
+            self.namespace, self.pdb_template
+        )
+        return await self.policy_api.read_namespaced_pod_disruption_budget(
             self.cluster_name, self.namespace
         )
 
 
 class KubeCluster(SpecCluster):
-    """ Launch a Dask cluster on Kubernetes
+    """Launch a Dask cluster on Kubernetes
 
     This starts a local Dask scheduler and then dynamically launches
     Dask workers on a Kubernetes cluster. The Kubernetes cluster is taken
@@ -392,15 +426,30 @@ class KubeCluster(SpecCluster):
     ):
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
-        self._generate_name = name
-        self._namespace = namespace
-        self._n_workers = n_workers
-        self._idle_timeout = idle_timeout
-        self._deploy_mode = deploy_mode
-        self._protocol = protocol
-        self._interface = interface
-        self._dashboard_address = dashboard_address
-        self._scheduler_service_wait_timeout = scheduler_service_wait_timeout
+        self._generate_name = dask.config.get("kubernetes.name", override_with=name)
+        self.namespace = dask.config.get(
+            "kubernetes.namespace", override_with=namespace
+        )
+        self._n_workers = dask.config.get(
+            "kubernetes.count.start", override_with=n_workers
+        )
+        self._idle_timeout = dask.config.get(
+            "kubernetes.idle-timeout", override_with=idle_timeout
+        )
+        self._deploy_mode = dask.config.get(
+            "kubernetes.deploy-mode", override_with=deploy_mode
+        )
+        self._protocol = dask.config.get("kubernetes.protocol", override_with=protocol)
+        self._interface = dask.config.get(
+            "kubernetes.interface", override_with=interface
+        )
+        self._dashboard_address = dask.config.get(
+            "kubernetes.dashboard_address", override_with=dashboard_address
+        )
+        self._scheduler_service_wait_timeout = dask.config.get(
+            "kubernetes.scheduler-service-wait-timeout",
+            override_with=scheduler_service_wait_timeout,
+        )
         self.security = security
         if self.security and not isinstance(
             self.security, distributed.security.Security
@@ -408,9 +457,9 @@ class KubeCluster(SpecCluster):
             raise RuntimeError(
                 "Security object is not a valid distributed.security.Security object"
             )
-        self.host = host
-        self.port = port
-        self.env = env
+        self.host = dask.config.get("kubernetes.host", override_with=host)
+        self.port = dask.config.get("kubernetes.port", override_with=port)
+        self.env = dask.config.get("kubernetes.env", override_with=env)
         self.auth = auth
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
@@ -444,7 +493,7 @@ class KubeCluster(SpecCluster):
         pod_template.metadata.labels["dask.org/component"] = pod_type
         pod_template.metadata.labels["user"] = escape(getpass.getuser())
         pod_template.metadata.labels["app"] = "dask"
-        pod_template.metadata.namespace = self._namespace
+        pod_template.metadata.namespace = self.namespace
 
         if self.env:
             pod_template.spec.containers[0].env.extend(
@@ -458,36 +507,6 @@ class KubeCluster(SpecCluster):
         return pod_template
 
     async def _start(self):
-        self._generate_name = self._generate_name or dask.config.get("kubernetes.name")
-        self._namespace = self._namespace or dask.config.get("kubernetes.namespace")
-        self._idle_timeout = self._idle_timeout or dask.config.get(
-            "kubernetes.idle-timeout"
-        )
-        self._scheduler_service_wait_timeout = (
-            self._scheduler_service_wait_timeout
-            or dask.config.get("kubernetes.scheduler-service-wait-timeout")
-        )
-        self._deploy_mode = self._deploy_mode or dask.config.get(
-            "kubernetes.deploy-mode"
-        )
-
-        self._n_workers = (
-            self._n_workers
-            if self._n_workers is not None
-            else dask.config.get("kubernetes.count.start")
-        )
-        self.host = self.host or dask.config.get("kubernetes.host")
-        self.port = (
-            self.port if self.port is not None else dask.config.get("kubernetes.port")
-        )
-        self._protocol = self._protocol or dask.config.get("kubernetes.protocol")
-        self._interface = self._interface or dask.config.get("kubernetes.interface")
-        self._dashboard_address = self._dashboard_address or dask.config.get(
-            "kubernetes.dashboard_address"
-        )
-        self.env = (
-            self.env if self.env is not None else dask.config.get("kubernetes.env")
-        )
 
         self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
         self.scheduler_pod_template = self._get_pod_template(
@@ -514,9 +533,10 @@ class KubeCluster(SpecCluster):
         await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
+        self.policy_api = kubernetes.client.PolicyV1beta1Api()
 
-        if self._namespace is None:
-            self._namespace = _namespace_default()
+        if self.namespace is None:
+            self.namespace = namespace_default()
 
         self._generate_name = self._generate_name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
@@ -530,13 +550,11 @@ class KubeCluster(SpecCluster):
             self.scheduler_pod_template, pod_type="scheduler"
         )
 
-        finalize(
-            self, _cleanup_resources, self._namespace, self.pod_template.metadata.labels
-        )
-
         common_options = {
+            "cluster": self,
             "core_api": self.core_api,
-            "namespace": self._namespace,
+            "policy_api": self.policy_api,
+            "namespace": self.namespace,
             "loop": self.loop,
         }
 
@@ -571,11 +589,13 @@ class KubeCluster(SpecCluster):
         }
         self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
 
+        self.name = self.pod_template.metadata.generate_name
+
         await super()._start()
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
-        """ Create cluster with worker pod spec defined by Python dictionary
+        """Create cluster with worker pod spec defined by Python dictionary
 
         Examples
         --------
@@ -603,7 +623,7 @@ class KubeCluster(SpecCluster):
 
     @classmethod
     def from_yaml(cls, yaml_path, **kwargs):
-        """ Create cluster with worker pod spec defined by a YAML file
+        """Create cluster with worker pod spec defined by a YAML file
 
         We can start a cluster with pods defined in an accompanying YAML file
         like the following:
@@ -639,14 +659,6 @@ class KubeCluster(SpecCluster):
             d = dask.config.expand_environment_variables(d)
             return cls.from_dict(d, **kwargs)
 
-    @property
-    def namespace(self):
-        return self.pod_template.metadata.namespace
-
-    @property
-    def name(self):
-        return self.pod_template.metadata.generate_name
-
     def scale(self, n):
         # A shim to maintain backward compatibility
         # https://github.com/dask/distributed/issues/3054
@@ -659,7 +671,7 @@ class KubeCluster(SpecCluster):
         return super().scale(n)
 
     async def _logs(self, scheduler=True, workers=True):
-        """ Return logs for the scheduler and workers
+        """Return logs for the scheduler and workers
         Parameters
         ----------
         scheduler : boolean
@@ -686,61 +698,3 @@ class KubeCluster(SpecCluster):
                 logs[key] = log
 
         return logs
-
-
-def _cleanup_resources(namespace, labels):
-    """ Remove all pods with these labels in this namespace """
-    import kubernetes
-
-    core_api = kubernetes.client.CoreV1Api()
-
-    pods = core_api.list_namespaced_pod(namespace, label_selector=format_labels(labels))
-    for pod in pods.items:
-        try:
-            core_api.delete_namespaced_pod(pod.metadata.name, namespace)
-            logger.info("Deleted pod: %s", pod.metadata.name)
-        except kubernetes.client.rest.ApiException as e:
-            # ignore error if pod is already removed
-            if e.status != 404:
-                raise
-
-    services = core_api.list_namespaced_service(
-        namespace, label_selector=format_labels(labels)
-    )
-    for service in services.items:
-        try:
-            core_api.delete_namespaced_service(service.metadata.name, namespace)
-            logger.info("Deleted service: %s", service.metadata.name)
-        except kubernetes.client.rest.ApiException as e:
-            # ignore error if service is already removed
-            if e.status != 404:
-                raise
-
-
-def format_labels(labels):
-    """ Convert a dictionary of labels into a comma separated string """
-    if labels:
-        return ",".join(["{}={}".format(k, v) for k, v in labels.items()])
-    else:
-        return ""
-
-
-def _namespace_default():
-    """
-    Get current namespace if running in a k8s cluster
-
-    If not in a k8s cluster with service accounts enabled, default to
-    'default'
-
-    Taken from https://github.com/jupyterhub/kubespawner/blob/master/kubespawner/spawner.py#L125
-    """
-    ns_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-    if os.path.exists(ns_path):
-        with open(ns_path) as f:
-            return f.read().strip()
-    return "default"
-
-
-def escape(s):
-    valid_characters = string.ascii_letters + string.digits + "-"
-    return "".join(c for c in s if c in valid_characters)

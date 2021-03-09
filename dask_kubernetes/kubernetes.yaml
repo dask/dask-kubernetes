@@ -8,7 +8,7 @@ kubernetes:
   port: 0
   env: {}
   idle-timeout: null
-  deploy-mode: "local"
+  deploy-mode: "remote"
   interface: null
   protocol: "tcp://"
   dashboard_address: ":8787"
@@ -34,6 +34,16 @@ kubernetes:
           protocol: TCP
           port: 8787
           targetPort: 8787
+
+  scheduler-pdb-template:
+    apiVersion: policy/v1beta1
+    kind: PodDisruptionBudget
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          dask.org/cluster-name: "" # Cluster name will be added automatically
+          dask.org/component: scheduler
 
   worker-template-path: null
 
@@ -87,4 +97,3 @@ kubernetes:
     #       requests:
     #         cpu: "1.75"
     #         memory: 6G
-

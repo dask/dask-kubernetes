@@ -3,7 +3,7 @@ Convenience functions for creating pod templates.
 """
 from collections import namedtuple
 import copy
-from kubernetes_asyncio import client
+from kubernetes import client
 import json
 
 try:
@@ -182,6 +182,14 @@ def make_service_from_dict(dict_):
     )
 
 
+def make_pdb_from_dict(dict_):
+    # FIXME: We can't use the 'deserialize' function since
+    # that expects a response object!
+    return SERIALIZATION_API_CLIENT.deserialize(
+        _FakeResponse(data=json.dumps(dict_)), client.V1beta1PodDisruptionBudget
+    )
+
+
 def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
     """ Normalize pod template and check for type errors """
     if isinstance(pod_template, str):
@@ -236,7 +244,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
         pod_template.spec.tolerations.extend(tolerations)
 
     # add default node affinity to k8s.dask.org/node-purpose=worker
-    if match_node_purpose is not "ignore":
+    if match_node_purpose != "ignore":
         # for readability
         affinity = pod_template.spec.affinity
 
@@ -303,3 +311,20 @@ def clean_service_template(service_template):
         service_template.metadata.labels = {}
 
     return service_template
+
+
+def clean_pdb_template(pdb_template):
+    """ Normalize pdb template and check for type errors """
+
+    pdb_template = copy.deepcopy(pdb_template)
+
+    # Make sure metadata / labels objects exist, so they can be modified
+    # later without a lot of `is None` checks
+    if pdb_template.metadata is None:
+        pdb_template.metadata = client.V1ObjectMeta()
+    if pdb_template.metadata.labels is None:
+        pdb_template.metadata.labels = {}
+    if pdb_template.spec.selector is None:
+        pdb_template.spec.selector = client.V1LabelSelector()
+
+    return pdb_template
