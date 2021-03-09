@@ -778,12 +778,10 @@ async def test_adapt_delete(cluster, ns):
 
     async def get_worker_pods():
         pods_list = await core_api.list_namespaced_pod(
-            namespace=ns, label_selector=f"dask.org/component=worker,dask.org/cluster-name={cluster.name}"
+            namespace=ns,
+            label_selector=f"dask.org/component=worker,dask.org/cluster-name={cluster.name}",
         )
-        return [
-            x.metadata.name
-            for x in pods_list.items
-        ]
+        return [x.metadata.name for x in pods_list.items]
 
     cluster.adapt(maximum=2, minimum=2)
     start = time()
