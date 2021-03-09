@@ -86,7 +86,7 @@ def test_env(pod_spec, loop):
             assert all(v["ABC"] == "DEF" for v in env.values())
 
 
-def dont_test_pod_template_yaml(image_name, loop):
+def dont_test_pod_template_yaml(docker_image, loop):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
@@ -111,7 +111,6 @@ def dont_test_pod_template_yaml(image_name, loop):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         with KubeCluster(f.name, loop=loop) as cluster:
-            assert cluster.namespace == ns
             cluster.scale(2)
             with Client(cluster, loop=loop) as client:
                 future = client.submit(lambda x: x + 1, 10)
@@ -130,7 +129,7 @@ def dont_test_pod_template_yaml(image_name, loop):
                 assert all(client.has_what().values())
 
 
-def test_pod_template_yaml_expand_env_vars(image_name, loop):
+def test_pod_template_yaml_expand_env_vars(docker_image, loop):
     try:
         os.environ["FOO_IMAGE"] = docker_image
 
@@ -158,12 +157,12 @@ def test_pod_template_yaml_expand_env_vars(image_name, loop):
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
             with KubeCluster(f.name, loop=loop) as cluster:
-                assert cluster.pod_template.spec.containers[0].image == image_name
+                assert cluster.pod_template.spec.containers[0].image == docker_image
     finally:
         del os.environ["FOO_IMAGE"]
 
 
-def test_pod_template_dict(image_name, loop):
+def test_pod_template_dict(docker_image, loop):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -204,7 +203,7 @@ def test_pod_template_dict(image_name, loop):
             assert all(client.has_what().values())
 
 
-def test_pod_template_minimal_dict(image_name, loop):
+def test_pod_template_minimal_dict(docker_image, loop):
     spec = {
         "spec": {
             "containers": [
@@ -243,15 +242,11 @@ def test_pod_template_from_conf(docker_image):
 
 
 def test_bad_args():
-    with pytest.raises(TypeError) as info:
+    with pytest.raises(FileNotFoundError) as info:
         KubeCluster("myfile.yaml")
 
-    assert "KubeCluster.from_yaml" in str(info.value)
-
-    with pytest.raises((ValueError, TypeError)) as info:
+    with pytest.raises((ValueError, TypeError, AttributeError)) as info:
         KubeCluster({"kind": "Pod"})
-
-    assert "KubeCluster.from_dict" in str(info.value)
 
 
 def test_constructor_parameters(pod_spec, loop):

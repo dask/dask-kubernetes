@@ -236,7 +236,6 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         async with KubeCluster(f.name, **cluster_kwargs) as cluster:
-            assert cluster.namespace == ns
             cluster.scale(2)
             await cluster
             async with Client(cluster, asynchronous=True) as client:
@@ -365,51 +364,8 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("method", ["from_dict", "from_yaml"])
-async def test_kube_cluster_from_method_deprecated(method, tmpdir, docker_image):
-    spec = {
-        "spec": {
-            "containers": [
-                {
-                    "args": [
-                        "dask-worker",
-                        "$(DASK_SCHEDULER_ADDRESS)",
-                        "--nthreads",
-                        "1",
-                        "--death-timeout",
-                        "60",
-                    ],
-                    "command": None,
-                    "image": docker_image,
-                    "imagePullPolicy": "IfNotPresent",
-                    "name": "dask-worker",
-                }
-            ]
-        },
-    }
-
-    if method == "from_yaml":
-        spec_path = str(tmpdir.join("spec.yaml"))
-        with open(spec_path, mode="w") as f:
-            yaml.dump(spec, f)
-        spec = spec_path
-
-    constructor = getattr(KubeCluster, method)
-
-    with pytest.warns(UserWarning) as record:
-        async with constructor(spec, **cluster_kwargs) as cluster:
-            # Smoketest things still work
-            cluster.adapt()
-            async with Client(cluster, asynchronous=True) as client:
-                future = client.submit(lambda x: x + 1, 10)
-                result = await future
-                assert result == 11
-    assert any("KubeCluster.from_yaml" in str(r.message) for r in record)
-
-
-@pytest.mark.asyncio
-async def test_pod_template_from_conf(image_name, auth):
-    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
+async def test_pod_template_from_conf(docker_image, auth):
+    spec = {"spec": {"containers": [{"name": "some-name", "image": docker_image}]}}
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         async with KubeCluster(auth=auth, **cluster_kwargs) as cluster:
