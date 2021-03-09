@@ -6,7 +6,6 @@ import socket
 import subprocess
 import string
 import time
-import warnings
 from weakref import finalize
 
 from dask.distributed import Client

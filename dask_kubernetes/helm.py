@@ -1,6 +1,5 @@
 import asyncio
 import subprocess
-import warnings
 
 from distributed.deploy import Cluster
 from distributed.core import rpc, Status

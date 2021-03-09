@@ -86,7 +86,7 @@ def test_env(pod_spec, loop):
             assert all(v["ABC"] == "DEF" for v in env.values())
 
 
-def dont_test_pod_from_yaml(docker_image, loop):
+def dont_test_pod_from_yaml(docker_image, loop, ns):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},

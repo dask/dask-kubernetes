@@ -2,7 +2,6 @@ import pytest
 
 import subprocess
 import os.path
-import time
 
 from distributed.core import Status
 
