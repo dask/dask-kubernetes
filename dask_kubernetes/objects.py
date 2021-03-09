@@ -6,15 +6,32 @@ import copy
 from kubernetes import client
 import json
 
+from kubernetes.client.configuration import Configuration
+
 try:
     import yaml
 except ImportError:
     yaml = False
 
-# FIXME: ApiClient provides us serialize / deserialize methods,
-# but unfortunately also starts a threadpool for no reason! This
-# takes up resources, so we try to not make too many.
-SERIALIZATION_API_CLIENT = client.ApiClient()
+_FakeResponse = namedtuple("_FakeResponse", ["data"])
+
+
+class DummyApiClient(client.ApiClient):
+    """A Dummy API client that is to be used solely for serialization/deserialization.
+
+    This is to avoid starting a threadpool at initialization and for adapting the
+    deserialize method to accept a python dictionary instead of a Response-like
+    interface.
+    """
+
+    def __init__(self):
+        self.configuration = Configuration.get_default_copy()
+
+    def deserialize(self, dict_, klass):
+        return super().deserialize(_FakeResponse(json.dumps(dict_)), klass)
+
+
+SERIALIZATION_API_CLIENT = DummyApiClient()
 
 
 def _set_k8s_attribute(obj, attribute, value):
@@ -163,30 +180,17 @@ def make_pod_spec(
     return pod
 
 
-_FakeResponse = namedtuple("_FakeResponse", ["data"])
-
-
 def make_pod_from_dict(dict_):
-    # FIXME: We can't use the 'deserialize' function since
-    # that expects a response object!
-    return SERIALIZATION_API_CLIENT.deserialize(
-        _FakeResponse(data=json.dumps(dict_)), client.V1Pod
-    )
+    return SERIALIZATION_API_CLIENT.deserialize(dict_, client.V1Pod)
 
 
 def make_service_from_dict(dict_):
-    # FIXME: We can't use the 'deserialize' function since
-    # that expects a response object!
-    return SERIALIZATION_API_CLIENT.deserialize(
-        _FakeResponse(data=json.dumps(dict_)), client.V1Service
-    )
+    return SERIALIZATION_API_CLIENT.deserialize(dict_, client.V1Service)
 
 
 def make_pdb_from_dict(dict_):
-    # FIXME: We can't use the 'deserialize' function since
-    # that expects a response object!
     return SERIALIZATION_API_CLIENT.deserialize(
-        _FakeResponse(data=json.dumps(dict_)), client.V1beta1PodDisruptionBudget
+        dict_, client.V1beta1PodDisruptionBudget
     )
 
 
