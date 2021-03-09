@@ -1,14 +1,23 @@
 Installing
 ==========
 
+.. currentmodule:: dask_kubernetes
+
 You can install dask-kubernetes with ``pip``, ``conda``, or by installing from source.
+
+Dependencies
+------------
+
+To use :class:`KubeCluster` you may need to have ``kubectl`` installed (`official install guide <https://kubernetes.io/docs/tasks/tools/#kubectl>`_).
+
+To use :class:`HelmCluster` you will need to have ``helm`` installed (`official install guide <https://helm.sh/docs/intro/install/>`_).
 
 Pip
 ---
 
-Pip can be used to install both dask-kubernetes and its dependencies.::
+Pip can be used to install dask-kubernetes and its Python dependencies::
 
-   pip install dask-kubernetes --upgrade # Install everything from last released version
+   pip install dask-kubernetes --upgrade  # Install everything from last released version
 
 Conda
 -----
