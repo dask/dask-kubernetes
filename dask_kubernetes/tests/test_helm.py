@@ -34,7 +34,7 @@ def config_path():
 
 @pytest.fixture(scope="session")
 def release_name():
-    return "testdask"
+    return "testrelease"
 
 
 @pytest.fixture(scope="session")  # Creating this fixture is slow so we should reuse it.
