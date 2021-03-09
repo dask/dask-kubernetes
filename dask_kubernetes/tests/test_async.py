@@ -766,3 +766,45 @@ async def test_start_with_workers(k8s_cluster, pod_spec):
         async with Client(cluster, asynchronous=True) as client:
             while len(cluster.scheduler_info["workers"]) != 2:
                 await asyncio.sleep(0.1)
+
+
+@pytest.mark.asyncio
+async def test_adapt_delete(cluster, ns):
+    """
+    testing whether KubeCluster.adapt will bring
+    back deleted worker pod (issue #244)
+    """
+    core_api = cluster.core_api
+
+    async def get_worker_pods():
+        pods_list = await core_api.list_namespaced_pod(
+            namespace=ns,
+            label_selector=f"dask.org/component=worker,dask.org/cluster-name={cluster.name}",
+        )
+        return [x.metadata.name for x in pods_list.items]
+
+    cluster.adapt(maximum=2, minimum=2)
+    start = time()
+    while len(cluster.scheduler_info["workers"]) != 2:
+        await asyncio.sleep(0.1)
+        assert time() < start + 20
+
+    worker_pods = await get_worker_pods()
+    assert len(worker_pods) == 2
+    # delete one worker pod
+    to_delete = worker_pods[0]
+    await core_api.delete_namespaced_pod(name=to_delete, namespace=ns)
+    # wait until it is deleted
+    start = time()
+    while True:
+        worker_pods = await get_worker_pods()
+        if to_delete not in worker_pods:
+            break
+        await asyncio.sleep(0.5)
+        assert time() < start + 20
+    # test whether adapt will bring it back
+    start = time()
+    while len(cluster.scheduler_info["workers"]) != 2:
+        await asyncio.sleep(0.1)
+        assert time() < start + 20
+    assert len(cluster.scheduler_info["workers"]) == 2
