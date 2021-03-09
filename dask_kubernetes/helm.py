@@ -1,5 +1,4 @@
 import asyncio
-import shutil
 import subprocess
 import warnings
 
@@ -9,7 +8,11 @@ from distributed.utils import Log, Logs, LoopRunner
 import kubernetes_asyncio as kubernetes
 
 from .auth import ClusterAuth
-from .core import _namespace_default
+from .utils import (
+    namespace_default,
+    get_external_address_for_scheduler_service,
+    check_dependency,
+)
 
 
 class HelmCluster(Cluster):
@@ -30,7 +33,7 @@ class HelmCluster(Cluster):
         If the chart uses ClusterIP type services, forward the ports locally.
         If you are using ``HelmCluster`` from the Jupyter session that was installed
         by the helm chart this should be ``False``. If you are running it locally it should
-        be ``True``.
+        be the port you are forwarding to ``<port>``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -88,8 +91,9 @@ class HelmCluster(Cluster):
         **kwargs,
     ):
         self.release_name = release_name
-        self.namespace = namespace or _namespace_default()
-        self.check_helm_dependency()
+        self.namespace = namespace or namespace_default()
+        check_dependency("helm")
+        check_dependency("kubectl")
         status = subprocess.run(
             ["helm", "-n", self.namespace, "status", self.release_name],
             capture_output=True,
@@ -115,15 +119,6 @@ class HelmCluster(Cluster):
             self._loop_runner.start()
             self.sync(self._start)
 
-    @staticmethod
-    def check_helm_dependency():
-        if shutil.which("helm") is None:
-            raise RuntimeError(
-                "Missing dependency helm. "
-                "Please install helm following the instructions for your OS. "
-                "https://helm.sh/docs/intro/install/"
-            )
-
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
         self.core_api = kubernetes.client.CoreV1Api()
@@ -136,32 +131,12 @@ class HelmCluster(Cluster):
         service = await self.core_api.read_namespaced_service(
             service_name, self.namespace
         )
-        [port] = [port.port for port in service.spec.ports if port.name == service_name]
-        if service.spec.type == "LoadBalancer":
-            lb = service.status.load_balancer.ingress[0]
-            host = lb.hostname or lb.ip
-            return f"tcp://{host}:{port}"
-        elif service.spec.type == "NodePort":
-            if self.node_host is None:
-                nodes = await self.core_api.list_node()
-                self.node_host = nodes.items[0].status.addresses[0].address
-            if self.node_port is None:
-                self.node_port = port
-            return f"tcp://{self.node_host}:{self.node_port}"
-        elif service.spec.type == "ClusterIP":
-            if self.port_forward_cluster_ip:
-                warnings.warn(
-                    f"""
-                    Sorry we do not currently support local port forwarding.
-
-                    Please port-forward the service locally yourself with the following command.
-
-                    kubectl port-forward --namespace {self.namespace} svc/{service_name} {port}:{port} &
-                    """
-                )  # FIXME Handle this port forward here with the kubernetes library
-                return f"tcp://localhost:{port}"
-            return f"tcp://{service.spec.cluster_ip}:{port}"
-        raise RuntimeError("Unable to determine scheduler address.")
+        address = await get_external_address_for_scheduler_service(
+            self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
+        )
+        if address is None:
+            raise RuntimeError("Unable to determine scheduler address.")
+        return address
 
     async def _wait_for_workers(self):
         while True:
@@ -209,11 +184,19 @@ class HelmCluster(Cluster):
 
         for pod in pods.items:
             if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
-                logs[pod.metadata.name] = Log(
-                    await self.core_api.read_namespaced_pod_log(
-                        pod.metadata.name, pod.metadata.namespace
+                try:
+                    if pod.status.phase != "Running":
+                        raise ValueError(
+                            f"Cannot get logs for pod with status {pod.status.phase}.",
+                        )
+                    log = Log(
+                        await self.core_api.read_namespaced_pod_log(
+                            pod.metadata.name, pod.metadata.namespace
+                        )
                     )
-                )
+                except (ValueError, kubernetes.client.exceptions.ApiException):
+                    log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
+                logs[pod.metadata.name] = log
 
         return logs
 

@@ -1,7 +1,7 @@
 .. _kubecluster:
 
-Kube Cluster
-============
+KubeCluster
+===========
 
 Quickstart
 ----------
@@ -109,6 +109,7 @@ Additionally, we can also use tools like `dask-cuda
             requests:
               cpu: "2"
               memory: 6G
+              nvidia.com/gpu: 1 # requesting 1 GPU
 
 .. _configuration:
 Configuration
@@ -117,7 +118,7 @@ Configuration
 You can use `Dask's configuration <https://docs.dask.org/en/latest/configuration.html>`_
 to control the behavior of Dask-kubernetes.  You can see a full set of
 configuration options
-`here <https://github.com/dask/dask-kubernetes/blob/master/dask_kubernetes/kubernetes.yaml>`_.
+`here <https://github.com/dask/dask-kubernetes/blob/main/dask_kubernetes/kubernetes.yaml>`_.
 Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
@@ -148,9 +149,8 @@ Some notable ones are described below:
 Role-Based Access Control (RBAC)
 --------------------------------
 
-In order to spawn worker (or separate scheduler) Dask pods, the service
-account creating those pods will require a set of RBAC permissions.
-Create a service account you will use for Dask, and then attach the
+In order to spawn a Dask cluster, the service account creating those pods will require
+a set of RBAC permissions. Create a service account you will use for Dask, and then attach the
 following Role to that ServiceAccount via a RoleBinding:
 
 .. code-block:: yaml
@@ -177,13 +177,6 @@ following Role to that ServiceAccount via a RoleBinding:
       verbs:
       - "get"
       - "list"
-
-If you intend to use the newer Dask functionality in which the scheduler
-is created in its own pod and accessed via a service, you will also
-need:
-
-.. code-block:: yaml
-
     - apiGroups:
       - "" # indicates the core API group
       resources:
@@ -212,6 +205,56 @@ as described in the
 Deployment Details
 ------------------
 
+Scheduler
+~~~~~~~~~
+
+Before workers are created a scheduler will be deployed with the following resources:
+
+- A pod with a scheduler running
+- A service (svc) to expose scheduler and dashboard ports
+- A PodDisruptionBudget avoid voluntary disruptions of the scheduler pod
+
+By default the Dask configuration option ``kubernetes.scheduler-service-type`` is
+set to ``ClusterIp``. In order to connect to the scheduler the ``KubeCluster`` will first attempt to connect directly,
+but this will only be successful if ``dask-kubernetes`` is being run from within the Kubernetes cluster.
+If it is unsuccessful it will attempt to port forward the service locally using the ``kubectl`` utility.
+
+If you update the service type to ``NodePort``. The scheduler will be exposed on the same random high port on all
+nodes in the cluster. In this case ``KubeCluster`` will attempt to list nodes in order to get an IP to connect on
+and requires additional permissions to do so.
+
+.. code-block:: yaml
+
+    - apiGroups:
+      - ""  # indicates the core API group
+      resources:
+      - "nodes"
+      verbs:
+      - "get"
+      - "list"
+
+
+If you set the service type to ``LoadBalancer`` then ``KubeCluster`` will connect to the external address of the assigned
+loadbalancer, but this does require that your Kubernetes cluster has the appropriate operator to assign loadbalancers.
+
+Legacy mode
+^^^^^^^^^^^
+
+For backward compatibility with previous versions of ``dask-kubernetes`` it is also possible to run the scheduler locally.
+A ``local`` scheduler is created where the Dask client will be created.
+
+.. code-block:: python
+
+   from dask_kubernetes import KubeCluster
+   from dask.distributed import Client
+
+   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='local')
+   cluster.scale(10)
+   client = Client(cluster)
+
+In this mode the Dask workers will attempt to connect to the machine where you are running ``dask-kubernetes``.
+Generally this will need to be within the Kubernetes cluster in order for the workers to make a successful connection.
+
 Workers
 ~~~~~~~
 
@@ -229,50 +272,31 @@ If you have nodes with the corresponding taints, then the worker pods will
 schedule to those nodes (and no other pods will be able to schedule to those
 nodes).
 
-Scheduler
-~~~~~~~~~
+API
+---
 
-The scheduler can be deployed locally (default) or remotely.  A ``local``
-scheduler is created where the Dask client will be created.
+.. currentmodule:: dask_kubernetes
 
+.. autosummary::
+   KubeCluster
+   KubeCluster.adapt
+   KubeCluster.from_dict
+   KubeCluster.from_yaml
+   KubeCluster.get_logs
+   KubeCluster.pods
+   KubeCluster.scale
+   InCluster
+   KubeConfig
+   KubeAuth
 
-.. code-block:: python
+.. autoclass:: KubeCluster
+   :members:
 
-   from dask_kubernetes import KubeCluster
-   from dask.distributed import Client
+.. autoclass:: ClusterAuth
+   :members:
 
-   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='local')
-   cluster.scale(10)
-   client = Client(cluster)
+.. autoclass:: InCluster
 
-The scheduler can also be deployed on the kubernetes cluster with
-``deploy_mode=remote``:
+.. autoclass:: KubeConfig
 
-
-.. code-block:: python
-
-   import dask
-   from dask_kubernetes import KubeCluster
-   from dask.distributed import Client
-
-   cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='remote')
-   cluster.scale(10)
-   client = Client(cluster)
-
-
-When deploying remotely, the following k8s resources are created:
-
-- A pod with a scheduler running
-- (optional) A pod with a LoadBalancer and complimentary service (svc) to
-  expose scheduler and dashboard ports
-- A PodDisruptionBudget avoid voluntary disruptions of the scheduler pod
-
-By default, the configuration option, ``scheduler-service-type``, is
-set to ``ClusterIp``. To optionally use a LoadBalancer, change ``scheduler-service-type`` to
-``LoadBalancer``.  This change can either be done with the :ref:`dask-kubernetes
-configuration file<configuration>` or programmatically with ``dask.config.set``:
-
-.. code-block:: python
-
-   dask.config.set({"kubernetes.scheduler-service-type": "LoadBalancer"})
-
+.. autoclass:: KubeAuth

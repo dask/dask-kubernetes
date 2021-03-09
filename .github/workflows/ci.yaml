@@ -5,58 +5,29 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
         with:
-          python-version: 3.8
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install -r requirements-dev.txt
-
-      - name: Lint
-        run: |
-          flake8 dask_kubernetes
-          black --check dask_kubernetes setup.py
+          python-version: "3.7"
+      - uses: pre-commit/action@v2.0.0
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.8"]
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install and start kind (Kubernetes in Docker)
-        uses: engineerd/setup-kind@v0.5.0
-
-      - name: Get kind info
+      - name: Install deps
         run: |
-          kubectl cluster-info
-          kubectl get pods -n kube-system
-          echo "current-context:" $(kubectl config current-context)
-          echo "environment-kubeconfig:" ${KUBECONFIG}
+          pip install -e .
+          pip install -r requirements-test.txt
+          pip install git+https://github.com/dask/distributed@main
+          pip install git+https://github.com/dask/dask@main
 
-      - name: Build testing Docker image
-        run: |
-          docker build -t dask-kubernetes:test -f ci/Dockerfile .
-          kind load docker-image dask-kubernetes:test
-
-      - name: Create test runner k8s resources
-        run: |
-          kubectl apply -f ci/test-runner-setup.yaml
-
-      - name: Run tests inside container
-        run: |
-          kubectl -n dask-kubernetes-test \
-          run --restart=Never \
-          dask-kubernetes-test \
-          --serviceaccount=test-runner \
-          --image=dask-kubernetes:test \
-          --image-pull-policy=Never \
-          --env="USER=tester" \
-          --env="K8S_TEST_NAMESPACE=dask-kubernetes-test" \
-          --env="EXTRA_TEST_ARGS=--in-cluster" \
-          --attach \
-          --command -- py.test dask_kubernetes -vvv --namespace=dask-kubernetes-test --worker-image=dask-kubernetes:test
+      - name: Run tests
+        run: pytest
