@@ -1,8 +1,6 @@
 import asyncio
 import json
-import shutil
 import subprocess
-import warnings
 
 from distributed.deploy import Cluster
 from distributed.core import rpc, Status

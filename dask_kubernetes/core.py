@@ -3,11 +3,9 @@ import copy
 import getpass
 import logging
 import os
-import string
 import time
 import uuid
 import warnings
-from weakref import finalize
 
 import yaml
 import dask
@@ -30,9 +28,7 @@ from .auth import ClusterAuth
 from .utils import (
     namespace_default,
     escape,
-    format_labels,
     get_external_address_for_scheduler_service,
-    check_dependency,
 )
 
 logger = logging.getLogger(__name__)
