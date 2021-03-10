@@ -35,4 +35,5 @@ For more general information on running Dask on Kubernetes see `this page <https
    :caption: Developer
 
    testing
+   releasing
    history
