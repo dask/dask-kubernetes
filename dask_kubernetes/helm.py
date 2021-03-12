@@ -4,14 +4,19 @@ import shutil
 import subprocess
 import warnings
 from contextlib import suppress
+import json
 
 from distributed.deploy import Cluster
-from distributed.core import rpc
+from distributed.core import rpc, Status
 from distributed.utils import Log, Logs, LoopRunner
 import kubernetes_asyncio as kubernetes
 
 from .auth import ClusterAuth
-from .core import _namespace_default
+from .utils import (
+    namespace_default,
+    get_external_address_for_scheduler_service,
+    check_dependency,
+)
 
 
 class HelmCluster(Cluster):
@@ -32,7 +37,7 @@ class HelmCluster(Cluster):
         If the chart uses ClusterIP type services, forward the ports locally.
         If you are using ``HelmCluster`` from the Jupyter session that was installed
         by the helm chart this should be ``False``. If you are running it locally it should
-        be ``True``.
+        be the port you are forwarding to ``<port>``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -42,8 +47,14 @@ class HelmCluster(Cluster):
     worker_name: str (optional)
         Name of the Dask worker deployment in the current release.
         Defaults to "worker".
+    node_host: str (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which node to connect to.
+    node_port: int (optional)
+        A node address. Can be provided in case scheduler service type is
+        ``NodePort`` and you want to manually specify which port to connect to.
     **kwargs: dict
-        Additional keyword arguments to pass to Cluster
+        Additional keyword arguments to pass to Cluster.
 
     Examples
     --------
@@ -77,13 +88,17 @@ class HelmCluster(Cluster):
         port_forward_cluster_ip=False,
         loop=None,
         asynchronous=False,
-        scheduler_name="dask-scheduler",
-        worker_name="dask-worker",
+        scheduler_name="scheduler",
+        worker_name="worker",
+        node_host=None,
+        node_port=None,
+        **kwargs,
     ):
         self.release_name = release_name
-        self.namespace = namespace or _namespace_default()
+        self.namespace = namespace or namespace_default()
         self.name = self.release_name + "." + self.namespace
-        self.check_helm_dependency()
+        check_dependency("helm")
+        check_dependency("kubectl")
         status = subprocess.run(
             ["helm", "-n", self.namespace, "status", self.release_name],
             capture_output=True,
@@ -101,20 +116,13 @@ class HelmCluster(Cluster):
         self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
+        self.node_host = node_host
+        self.node_port = node_port
 
-        super().__init__(asynchronous=asynchronous)
+        super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
-
-    @staticmethod
-    def check_helm_dependency():
-        if shutil.which("helm") is None:
-            raise RuntimeError(
-                "Missing dependency helm. "
-                "Please install helm following the instructions for your OS. "
-                "https://helm.sh/docs/intro/install/"
-            )
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
@@ -124,44 +132,45 @@ class HelmCluster(Cluster):
         await super()._start()
 
     async def _get_scheduler_address(self):
-        service_name = f"{self.release_name}-{self.scheduler_name}"
+        # Get the chart name
+        chart = subprocess.check_output(
+            [
+                "helm",
+                "-n",
+                self.namespace,
+                "list",
+                "-f",
+                self.release_name,
+                "--output",
+                "json",
+            ],
+            encoding="utf-8",
+        )
+        chart = json.loads(chart)[0]["chart"]
+        # extract name from {{.Chart.Name }}-{{ .Chart.Version }}
+        chart_name = "-".join(chart.split("-")[:-1])
+        # Follow the spec in the dask/dask helm chart
+        self.chart_name = (
+            f"{chart_name}-" if chart_name not in self.release_name else ""
+        )
+
+        service_name = f"{self.release_name}-{self.chart_name}{self.scheduler_name}"
         service = await self.core_api.read_namespaced_service(
             service_name, self.namespace
         )
-        [port] = [port.port for port in service.spec.ports if port.name == service_name]
-        if service.spec.type == "LoadBalancer":
-            lb = service.status.load_balancer.ingress[0]
-            host = lb.hostname or lb.ip
-            return f"tcp://{host}:{port}"
-        elif service.spec.type == "NodePort":
-            [port] = [
-                port.node_port
-                for port in service.spec.ports
-                if port.name == service_name
-            ]
-            nodes = await self.core_api.list_node()
-            host = nodes.items[0].status.addresses[0].address
-            return f"tcp://{host}:{port}"
-        elif service.spec.type == "ClusterIP":
-            if self.port_forward_cluster_ip:
-                warnings.warn(
-                    f"""
-                    Sorry we do not currently support local port forwarding.
-
-                    Please port-forward the service locally yourself with the following command.
-
-                    kubectl port-forward --namespace {self.namespace} svc/{service_name} {port}:{port} &
-                    """
-                )  # FIXME Handle this port forward here with the kubernetes library
-                return f"tcp://localhost:{port}"
-            return f"tcp://{service.spec.cluster_ip}:{port}"
-        raise RuntimeError("Unable to determine scheduler address.")
+        address = await get_external_address_for_scheduler_service(
+            self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
+        )
+        if address is None:
+            raise RuntimeError("Unable to determine scheduler address.")
+        return address
 
     async def _wait_for_workers(self):
         while True:
             n_workers = len(self.scheduler_info["workers"])
             deployment = await self.apps_api.read_namespaced_deployment(
-                name=f"{self.release_name}-{self.worker_name}", namespace=self.namespace
+                name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
+                namespace=self.namespace,
             )
             deployment_replicas = deployment.spec.replicas
             if n_workers == deployment_replicas:
@@ -203,19 +212,27 @@ class HelmCluster(Cluster):
 
         for pod in pods.items:
             if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
-                logs[pod.metadata.name] = Log(
-                    await self.core_api.read_namespaced_pod_log(
-                        pod.metadata.name, pod.metadata.namespace
+                try:
+                    if pod.status.phase != "Running":
+                        raise ValueError(
+                            f"Cannot get logs for pod with status {pod.status.phase}.",
+                        )
+                    log = Log(
+                        await self.core_api.read_namespaced_pod_log(
+                            pod.metadata.name, pod.metadata.namespace
+                        )
                     )
-                )
+                except (ValueError, kubernetes.client.exceptions.ApiException):
+                    log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
+                logs[pod.metadata.name] = log
 
         return logs
 
     def __await__(self):
         async def _():
-            if self.status == "created":
+            if self.status == Status.created:
                 await self._start()
-            elif self.status == "running":
+            elif self.status == Status.running:
                 await self._wait_for_workers()
             return self
 
@@ -242,7 +259,7 @@ class HelmCluster(Cluster):
 
     async def _scale(self, n_workers):
         await self.apps_api.patch_namespaced_deployment(
-            name=f"{self.release_name}-{self.worker_name}",
+            name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
             namespace=self.namespace,
             body={
                 "spec": {
@@ -263,9 +280,9 @@ class HelmCluster(Cluster):
     async def _adapt(self, *args, **kwargs):
         return super().adapt(*args, **kwargs)
 
-    def close(self, *args, **kwargs):
+    async def _close(self, *args, **kwargs):
         """Close the cluster."""
-        raise NotImplementedError(
+        warnings.warn(
             "It is not possible to close a HelmCluster object. \n"
             "Please delete the cluster via the helm CLI: \n\n"
             f"  $ helm delete --namespace {self.namespace} {self.release_name}"
@@ -284,7 +301,7 @@ async def discover(
     await ClusterAuth.load_first(auth)
     async with kubernetes.client.api_client.ApiClient() as api:
         core_api = kubernetes.client.CoreV1Api(api)
-        namespace = namespace or _namespace_default()
+        namespace = namespace or namespace_default()
         try:
             pods = await core_api.list_pod_for_all_namespaces(
                 label_selector=f"app=dask,component=scheduler",

@@ -1,48 +1,30 @@
 import pytest
 
-from dask_kubernetes.auth import KubeConfig, InCluster
+import os
+import subprocess
 
+from dask_kubernetes.utils import check_dependency
 
-def pytest_addoption(parser):
-    parser.addoption(
-        "--worker-image",
-        default="daskdev/dask:latest",
-        help="Worker image to use for testing",
-    )
-    parser.addoption("--context", default=None, help="kubectl context to use")
-    parser.addoption(
-        "--in-cluster", action="store_true", default=False, help="are we in cluster?"
-    )
-    parser.addoption("--namespace", default="default", help="Cluster namespace to use")
-
-
-@pytest.fixture
-def image_name(request):
-    return request.config.getoption("--worker-image")
+check_dependency("helm")
+check_dependency("kubectl")
+check_dependency("docker")
 
 
 @pytest.fixture(scope="session")
-def context(request):
-    return request.config.getoption("--context")
+def docker_image():
+    image_name = "dask-kubernetes:dev"
+    subprocess.check_output(["docker", "build", "-t", image_name, "./ci/"])
+    return image_name
 
 
 @pytest.fixture(scope="session")
-def in_cluster(request):
-    return request.config.getoption("--in-cluster")
+def k8s_cluster(kind_cluster, docker_image):
+    os.environ["KUBECONFIG"] = str(kind_cluster.kubeconfig_path)
+    kind_cluster.load_docker_image(docker_image)
+    yield kind_cluster
+    del os.environ["KUBECONFIG"]
 
 
 @pytest.fixture(scope="session")
-def auth(in_cluster, context):
-    if in_cluster:
-        auth = [InCluster()]
-    elif context:
-        auth = [KubeConfig(context=context)]
-    else:
-        auth = None
-    return auth
-
-
-@pytest.fixture(scope="module")
-def ns(request):
-    """Use this fixture in all integration tests that need live K8S cluster."""
-    return request.config.getoption("--namespace")
+def ns(k8s_cluster):
+    return "default"

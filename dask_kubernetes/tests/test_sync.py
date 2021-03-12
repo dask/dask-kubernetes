@@ -20,15 +20,15 @@ FAKE_CA = os.path.join(TEST_DIR, "fake-ca-file")
 
 
 @pytest.fixture
-def pod_spec(image_name):
+def pod_spec(docker_image):
     yield make_pod_spec(
-        image=image_name, extra_container_config={"imagePullPolicy": "IfNotPresent"}
+        image=docker_image, extra_container_config={"imagePullPolicy": "IfNotPresent"}
     )
 
 
 @pytest.fixture
-def cluster(pod_spec, ns):
-    with KubeCluster(pod_spec, namespace=ns) as cluster:
+def cluster(pod_spec):
+    with KubeCluster(pod_spec) as cluster:
         yield cluster
 
 
@@ -41,7 +41,7 @@ def client(cluster):
 def test_fixtures(client, cluster):
     client.scheduler_info()
     cluster.scale(1)
-    assert client.submit(lambda x: x + 1, 10).result(timeout=10) == 11
+    assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
 def test_basic(cluster, client):
@@ -76,8 +76,8 @@ def test_ipython_display(cluster):
         sleep(0.5)
 
 
-def test_env(pod_spec, loop, ns):
-    with KubeCluster(pod_spec, env={"ABC": "DEF"}, loop=loop, namespace=ns) as cluster:
+def test_env(pod_spec, loop):
+    with KubeCluster(pod_spec, env={"ABC": "DEF"}, loop=loop) as cluster:
         cluster.scale(1)
         with Client(cluster, loop=loop) as client:
             while not cluster.scheduler_info["workers"]:
@@ -86,7 +86,7 @@ def test_env(pod_spec, loop, ns):
             assert all(v["ABC"] == "DEF" for v in env.values())
 
 
-def dont_test_pod_from_yaml(image_name, loop, ns):
+def dont_test_pod_template_yaml(docker_image, loop):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
@@ -99,7 +99,7 @@ def dont_test_pod_from_yaml(image_name, loop, ns):
                         "--nthreads",
                         "1",
                     ],
-                    "image": image_name,
+                    "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
                     "name": "dask-worker",
                 }
@@ -110,8 +110,7 @@ def dont_test_pod_from_yaml(image_name, loop, ns):
     with tmpfile(extension="yaml") as fn:
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
-        with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
-            assert cluster.namespace == ns
+        with KubeCluster(f.name, loop=loop) as cluster:
             cluster.scale(2)
             with Client(cluster, loop=loop) as client:
                 future = client.submit(lambda x: x + 1, 10)
@@ -130,9 +129,9 @@ def dont_test_pod_from_yaml(image_name, loop, ns):
                 assert all(client.has_what().values())
 
 
-def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
+def test_pod_template_yaml_expand_env_vars(docker_image, loop):
     try:
-        os.environ["FOO_IMAGE"] = image_name
+        os.environ["FOO_IMAGE"] = docker_image
 
         test_yaml = {
             "kind": "Pod",
@@ -157,13 +156,13 @@ def test_pod_from_yaml_expand_env_vars(image_name, loop, ns):
         with tmpfile(extension="yaml") as fn:
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
-            with KubeCluster.from_yaml(f.name, loop=loop, namespace=ns) as cluster:
-                assert cluster.pod_template.spec.containers[0].image == image_name
+            with KubeCluster(f.name, loop=loop) as cluster:
+                assert cluster.pod_template.spec.containers[0].image == docker_image
     finally:
         del os.environ["FOO_IMAGE"]
 
 
-def test_pod_from_dict(image_name, loop, ns):
+def test_pod_template_dict(docker_image, loop):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -179,7 +178,7 @@ def test_pod_from_dict(image_name, loop, ns):
                         "60",
                     ],
                     "command": None,
-                    "image": image_name,
+                    "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
                     "name": "dask-worker",
                 }
@@ -187,7 +186,7 @@ def test_pod_from_dict(image_name, loop, ns):
         },
     }
 
-    with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
+    with KubeCluster(spec, loop=loop) as cluster:
         cluster.scale(2)
         with Client(cluster, loop=loop) as client:
             future = client.submit(lambda x: x + 1, 10)
@@ -204,7 +203,7 @@ def test_pod_from_dict(image_name, loop, ns):
             assert all(client.has_what().values())
 
 
-def test_pod_from_minimal_dict(image_name, loop, ns):
+def test_pod_template_minimal_dict(docker_image, loop):
     spec = {
         "spec": {
             "containers": [
@@ -218,7 +217,7 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
                         "60",
                     ],
                     "command": None,
-                    "image": image_name,
+                    "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
                     "name": "worker",
                 }
@@ -226,7 +225,7 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
         }
     }
 
-    with KubeCluster.from_dict(spec, loop=loop, namespace=ns) as cluster:
+    with KubeCluster(spec, loop=loop) as cluster:
         cluster.adapt()
         with Client(cluster, loop=loop) as client:
             future = client.submit(lambda x: x + 1, 10)
@@ -234,8 +233,8 @@ def test_pod_from_minimal_dict(image_name, loop, ns):
             assert result == 11
 
 
-def test_pod_template_from_conf(image_name):
-    spec = {"spec": {"containers": [{"name": "some-name", "image": image_name}]}}
+def test_pod_template_from_conf(docker_image):
+    spec = {"spec": {"containers": [{"name": "some-name", "image": docker_image}]}}
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         with KubeCluster() as cluster:
@@ -243,24 +242,17 @@ def test_pod_template_from_conf(image_name):
 
 
 def test_bad_args():
-    with pytest.raises(TypeError) as info:
+    with pytest.raises(FileNotFoundError) as info:
         KubeCluster("myfile.yaml")
 
-    assert "KubeCluster.from_yaml" in str(info.value)
-
-    with pytest.raises((ValueError, TypeError)) as info:
+    with pytest.raises((ValueError, TypeError, AttributeError)) as info:
         KubeCluster({"kind": "Pod"})
 
-    assert "KubeCluster.from_dict" in str(info.value)
 
-
-def test_constructor_parameters(pod_spec, loop, ns):
+def test_constructor_parameters(pod_spec, loop):
     env = {"FOO": "BAR", "A": 1}
-    with KubeCluster(
-        pod_spec, name="myname", namespace=ns, loop=loop, env=env
-    ) as cluster:
+    with KubeCluster(pod_spec, name="myname", loop=loop, env=env) as cluster:
         pod = cluster.pod_template
-        assert pod.metadata.namespace == ns
 
         var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
         assert var and var[0].value == "BAR"
@@ -304,7 +296,7 @@ def test_scale_up_down(cluster, client):
     # assert set(cluster.scheduler_info["workers"]) == {b}
 
 
-def test_automatic_startup(image_name, ns):
+def test_automatic_startup(docker_image):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"foo": "bar"}},
@@ -317,7 +309,7 @@ def test_automatic_startup(image_name, ns):
                         "--nthreads",
                         "1",
                     ],
-                    "image": image_name,
+                    "image": docker_image,
                     "name": "dask-worker",
                 }
             ]
@@ -328,7 +320,7 @@ def test_automatic_startup(image_name, ns):
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
         with dask.config.set({"kubernetes.worker-template-path": fn}):
-            with KubeCluster(namespace=ns) as cluster:
+            with KubeCluster() as cluster:
                 assert cluster.pod_template.metadata.labels["foo"] == "bar"
 
 
@@ -342,17 +334,17 @@ def test_repr(cluster):
         assert "workers=0" in text
 
 
-def test_escape_username(pod_spec, ns, monkeypatch):
+def test_escape_username(pod_spec, monkeypatch):
     monkeypatch.setenv("LOGNAME", "Foo!")
 
-    with KubeCluster(pod_spec, namespace=ns) as cluster:
+    with KubeCluster(pod_spec) as cluster:
         assert "foo" in cluster.name
         assert "!" not in cluster.name
         assert "foo" in cluster.pod_template.metadata.labels["user"]
 
 
-def test_escape_name(pod_spec, ns):
-    with KubeCluster(pod_spec, namespace=ns, name="foo@bar") as cluster:
+def test_escape_name(pod_spec):
+    with KubeCluster(pod_spec, name="foo@bar") as cluster:
         assert "@" not in str(cluster.pod_template)
 
 

@@ -3,13 +3,13 @@ from dask_kubernetes.objects import make_pod_spec, make_pod_from_dict
 from distributed.utils_test import loop  # noqa: F401
 
 
-def test_extra_pod_config(image_name, loop):
+def test_extra_pod_config(docker_image, loop):
     """
     Test that our pod config merging process works fine
     """
     with KubeCluster(
         make_pod_spec(
-            image_name, extra_pod_config={"automountServiceAccountToken": False}
+            docker_image, extra_pod_config={"automountServiceAccountToken": False}
         ),
         loop=loop,
         n_workers=0,
@@ -20,13 +20,13 @@ def test_extra_pod_config(image_name, loop):
         assert pod.spec.automount_service_account_token is False
 
 
-def test_extra_container_config(image_name, loop):
+def test_extra_container_config(docker_image, loop):
     """
     Test that our container config merging process works fine
     """
     with KubeCluster(
         make_pod_spec(
-            image_name,
+            docker_image,
             extra_container_config={
                 "imagePullPolicy": "IfNotPresent",
                 "securityContext": {"runAsUser": 0},
@@ -42,13 +42,13 @@ def test_extra_container_config(image_name, loop):
         assert pod.spec.containers[0].security_context == {"runAsUser": 0}
 
 
-def test_container_resources_config(image_name, loop):
+def test_container_resources_config(docker_image, loop):
     """
     Test container resource requests / limits being set properly
     """
     with KubeCluster(
         make_pod_spec(
-            image_name, memory_request="0.5G", memory_limit="1G", cpu_limit="1"
+            docker_image, memory_request="0.5G", memory_limit="1G", cpu_limit="1"
         ),
         loop=loop,
         n_workers=0,
@@ -62,13 +62,13 @@ def test_container_resources_config(image_name, loop):
         assert "cpu" not in pod.spec.containers[0].resources.requests
 
 
-def test_extra_container_config_merge(image_name, loop):
+def test_extra_container_config_merge(docker_image, loop):
     """
     Test that our container config merging process works recursively fine
     """
     with KubeCluster(
         make_pod_spec(
-            image_name,
+            docker_image,
             extra_container_config={
                 "env": [{"name": "BOO", "value": "FOO"}],
                 "args": ["last-item"],
@@ -89,13 +89,13 @@ def test_extra_container_config_merge(image_name, loop):
         assert pod.spec.containers[0].args[-1] == "last-item"
 
 
-def test_extra_container_config_merge(image_name, loop):
+def test_extra_container_config_merge(docker_image, loop):
     """
     Test that our container config merging process works recursively fine
     """
     with KubeCluster(
         make_pod_spec(
-            image_name,
+            docker_image,
             env={"TEST": "HI"},
             extra_container_config={
                 "env": [{"name": "BOO", "value": "FOO"}],

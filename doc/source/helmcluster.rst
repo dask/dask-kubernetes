@@ -1,7 +1,7 @@
 .. _helmcluster:
 
-Helm Cluster
-============
+HelmCluster
+===========
 
 Quickstart
 ----------
@@ -13,7 +13,7 @@ Quickstart
    helm repo add dask https://helm.dask.org
    helm repo update
 
-   helm install dask/dask --name myrelease
+   helm install myrelease dask/dask
 
 .. code-block:: python
 
@@ -28,3 +28,17 @@ For more information see the :class:`HelmCluster` API reference.
     It is not possible to use ``HelmCluster`` from the Jupyter session
     which is deployed as part of the Helm Chart without first copying your
     ``~/.kube/config`` file to that Jupyter session.
+
+API
+---
+
+.. currentmodule:: dask_kubernetes
+
+.. autosummary::
+   HelmCluster
+   HelmCluster.scale
+   HelmCluster.adapt
+   HelmCluster.logs
+
+.. autoclass:: HelmCluster
+   :members:
