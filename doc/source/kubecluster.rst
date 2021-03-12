@@ -187,6 +187,16 @@ following Role to that ServiceAccount via a RoleBinding:
       - "watch"
       - "create"
       - "delete"
+    - apiGroups:
+      - "policy"  # indicates the policy API group
+      resources:
+      - "poddisruptionbudgets"
+      verbs:
+      - "get"
+      - "list"
+      - "watch"
+      - "create"
+      - "delete"
 
 
 Docker Images
