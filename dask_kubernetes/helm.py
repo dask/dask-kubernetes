@@ -1,6 +1,5 @@
 import asyncio
 import aiohttp
-import shutil
 import subprocess
 import warnings
 from contextlib import suppress
@@ -304,7 +303,7 @@ async def discover(
         namespace = namespace or namespace_default()
         try:
             pods = await core_api.list_pod_for_all_namespaces(
-                label_selector=f"app=dask,component=scheduler",
+                label_selector="app=dask,component=scheduler",
             )
             for pod in pods.items:
                 with suppress(KeyError):
