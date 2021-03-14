@@ -331,7 +331,7 @@ class KubeCluster(SpecCluster):
         Set to 0 to disable the timeout (not recommended).
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
-        Defaults to ``"local"``.
+        Defaults to ``"remote"``.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
