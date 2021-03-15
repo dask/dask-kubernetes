@@ -4,6 +4,11 @@ import subprocess
 import os.path
 
 from distributed.core import Status
+from dask_ctl.discovery import (
+    list_discovery_methods,
+    discover_cluster_names,
+    discover_clusters,
+)
 
 ###############
 # Fixtures
@@ -127,3 +132,25 @@ async def test_logs(cluster):
 async def test_adaptivity_warning(cluster):
     with pytest.raises(NotImplementedError):
         await cluster.adapt(minimum=3, maximum=3)
+
+
+@pytest.mark.asyncio
+async def test_discovery(release, release_name):
+    discovery = "helmcluster"
+
+    assert discovery in list_discovery_methods()
+
+    clusters_names = [
+        cluster async for cluster in discover_cluster_names(discovery=discovery)
+    ]
+    assert len(clusters_names) == 1
+
+    clusters = [cluster async for cluster in discover_clusters(discovery=discovery)]
+    assert len(clusters) == 1
+
+    [cluster] = clusters
+    assert cluster.status == Status.running
+    assert cluster.release_name == release_name
+    assert "id" in cluster.scheduler_info
+
+    assert b"testrelease" in subprocess.check_output(["daskctl", "cluster", "list"])
