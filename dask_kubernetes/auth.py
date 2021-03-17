@@ -1,14 +1,129 @@
 """
 Defines different methods to configure a connection to a Kubernetes cluster.
 """
+import asyncio
 import contextlib
+import copy
+import datetime
 import logging
 import os
 
 import kubernetes
 import kubernetes_asyncio
 
+from kubernetes_asyncio.client import Configuration
+from kubernetes_asyncio.config.kube_config import KubeConfigLoader, KubeConfigMerger
+from kubernetes_asyncio.config.google_auth import google_auth_credentials
+from kubernetes_asyncio.config.dateutil import parse_rfc3339
+
 logger = logging.getLogger(__name__)
+
+tzUTC = datetime.timezone.utc
+
+class AutoRefreshKubeConfigLoader(KubeConfigLoader):
+    """
+    Extends KubeConfigLoader, automatically attempts to refresh authentication
+    credentials before they expire.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(AutoRefreshKubeConfigLoader, self).__init__(*args, **kwargs)
+        self.last_refreshed = None
+        self.token_expire_ts = None
+
+    async def refresh_at(self, when):
+        """
+        Refresh kuberenetes authentication
+        Parameters
+        ----------
+        when : seconds before we should refresh
+        """
+
+        print(f"Refresh_at coroutine sleeping for {when} seconds.")
+        await asyncio.sleep(when)
+        if (self.provider == 'gcp'):
+            print(f"Refreshing GCP token")
+            await self.refresh_gcp_token()
+        else:
+            #TODO
+            print("Unsupported auto refresh")
+
+    async def refresh_gcp_token(self):
+        if 'config' not in self._user['auth-provider']:
+            self._user['auth-provider'].value['config'] = {}
+
+        config = self._user['auth-provider']['config']
+
+        print("Calling refresh gcp token")
+
+        if ((not self.token_expire_ts) or
+                (self.token_expire_ts >= datetime.datetime.now(tz=tzUTC))):
+
+            if self._get_google_credentials is not None:
+                if asyncio.iscoroutinefunction(self._get_google_credentials):
+                    credentials = await self._get_google_credentials()
+                else:
+                    credentials = self._get_google_credentials()
+            else:
+                credentials = await google_auth_credentials(config)
+
+            config.value['access-token'] = credentials.token
+            config.value['expiry'] = credentials.expiry
+
+            # Set our token expiry to be actual expiry - 20%
+            expiry = parse_rfc3339(config.value['expiry'])
+            scaled_expiry_delta = datetime.timedelta(
+                seconds=0.2 * (expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
+            asyncio.create_task(self.refresh_at(scaled_expiry_delta.total_seconds()))
+
+            self.last_refreshed = datetime.datetime.now(tz=tzUTC)
+            self.token_expire_ts = expiry - scaled_expiry_delta
+
+            if self._config_persister:
+                self._config_persister(self._config.value)
+
+        self.token = "Bearer %s" % config['access-token']
+
+    async def load_gcp_token(self):
+        """
+        Overrride default implementation so that we can keep track of the expiration timestamp
+        and automatically refresh auth tokens.
+
+        Returns
+        -------
+        Bearer Token, kubectl 'access-token'
+        """
+        await self.refresh_gcp_token()
+
+        return self.token
+
+
+class AutoRefreshConfiguration(Configuration):
+    """
+    Extends kubernetes_async Configuration to support automatic token refresh.
+    """
+    def __init__(self, loader, *args, **kwargs):
+        super(AutoRefreshConfiguration, self).__init__(*args, **kwargs)
+        self.loader = loader
+
+    # Adapted from kubernetes_asyncio/client/configuration.py#L169
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k not in ('logger', 'logger_file_handler', 'loader'):
+                setattr(result, k, copy.deepcopy(v, memo))
+
+        # shallow copy loader object
+        result.loader = self.loader
+        # shallow copy of loggers
+        result.logger = copy.copy(self.logger)
+        # use setters to configure loggers
+        result.logger_file = self.logger_file
+        result.debug = self.debug
+
+        return result
 
 
 class ClusterAuth(object):
@@ -45,7 +160,6 @@ class ClusterAuth(object):
 
         Parameters
         ----------
-
         auth: List[ClusterAuth] (optional)
             Configuration methods to attempt in order.  Defaults to
             ``[InCluster(), KubeConfig()]``.
@@ -122,19 +236,38 @@ class KubeConfig(ClusterAuth):
         self.config_file = config_file
         self.context = context
         self.persist_config = persist_config
+        self.loader = None
 
     async def load(self):
         with contextlib.suppress(KeyError):
             if self.config_file is None:
                 self.config_file = os.path.abspath(
-                    os.path.expanduser(os.environ["KUBECONFIG"])
+                    os.path.expanduser(os.environ.get("KUBECONFIG", '~/.kube/config'))
                 )
-        kubernetes.config.load_kube_config(
-            self.config_file, self.context, None, self.persist_config
-        )
-        await kubernetes_asyncio.config.load_kube_config(
-            self.config_file, self.context, None, self.persist_config
-        )
+
+        self.loader = await self.load_kube_config()
+
+    # Adapted from from kubernetes_asyncio/config/kube_config.py#L515
+    def get_kube_config_loader_for_yaml_file(self):
+        kcfg = KubeConfigMerger(self.config_file)
+        config_persister = None
+        if (self.persist_config):
+            config_persister = kcfg.save_changes()
+
+        return AutoRefreshKubeConfigLoader(config_dict=kcfg.config,
+                                           config_base_path=None,
+                                           config_persister=config_persister)
+
+    # Adapted from kubernetes_asyncio/config/kube_config.py#L537
+    async def load_kube_config(self):
+        # Create a config loader, this will automatically refresh our credentials before they expire
+        loader = self.get_kube_config_loader_for_yaml_file()
+
+        # Grab our async + callback aware configuration
+        config = AutoRefreshConfiguration(loader)
+
+        await loader.load_and_set(config)
+        Configuration.set_default(config)
 
 
 class KubeAuth(ClusterAuth):
@@ -172,6 +305,7 @@ class KubeAuth(ClusterAuth):
         # values.
         config = type.__call__(kubernetes.client.Configuration)
         config.host = host
+
         for key, value in kwargs.items():
             setattr(config, key, value)
         self.config = config
