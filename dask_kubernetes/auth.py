@@ -101,6 +101,7 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 class AutoRefreshConfiguration(Configuration):
     """
     Extends kubernetes_async Configuration to support automatic token refresh.
+    Lets us keep track of the loader object
     """
     def __init__(self, loader, *args, **kwargs):
         super(AutoRefreshConfiguration, self).__init__(*args, **kwargs)
@@ -236,7 +237,6 @@ class KubeConfig(ClusterAuth):
         self.config_file = config_file
         self.context = context
         self.persist_config = persist_config
-        self.loader = None
 
     async def load(self):
         with contextlib.suppress(KeyError):
@@ -245,7 +245,7 @@ class KubeConfig(ClusterAuth):
                     os.path.expanduser(os.environ.get("KUBECONFIG", '~/.kube/config'))
                 )
 
-        self.loader = await self.load_kube_config()
+        await self.load_kube_config()
 
     # Adapted from from kubernetes_asyncio/config/kube_config.py#L515
     def get_kube_config_loader_for_yaml_file(self):
