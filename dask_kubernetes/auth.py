@@ -31,7 +31,7 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         self.last_refreshed = None
         self.token_expire_ts = None
 
-    async def refresh_at(self, when):
+    async def refresh_after(self, when):
         """
         Refresh kuberenetes authentication
         Parameters
@@ -65,24 +65,29 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
                 else:
                     credentials = self._get_google_credentials()
             else:
-                credentials = await google_auth_credentials(config)
+                _config = {
+                    'cmd-args': config['cmd-args'] + " --force-auth-refresh",
+                    'cmd-path': config['cmd-path']
+                }
+                credentials = await google_auth_credentials(_config)
 
             config.value['access-token'] = credentials.token
             config.value['expiry'] = credentials.expiry
 
             # Set our token expiry to be actual expiry - 20%
             expiry = parse_rfc3339(config.value['expiry'])
-            scaled_expiry_delta = datetime.timedelta(
-                seconds=0.2 * (expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
-            asyncio.create_task(self.refresh_at(scaled_expiry_delta.total_seconds()))
+            expiry_delta = datetime.timedelta(
+                seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
+            scaled_expiry_delta = datetime.timedelta(seconds=0.8 * expiry_delta.total_seconds())
+            asyncio.create_task(self.refresh_after(scaled_expiry_delta.total_seconds()))
 
             self.last_refreshed = datetime.datetime.now(tz=tzUTC)
-            self.token_expire_ts = expiry - scaled_expiry_delta
+            self.token_expire_ts = self.last_refreshed + scaled_expiry_delta
 
             if self._config_persister:
                 self._config_persister(self._config.value)
 
-        self.token = "Bearer %s" % config['access-token']
+            self.token = "Bearer %s" % config['access-token']
 
     async def load_gcp_token(self):
         """
@@ -105,6 +110,7 @@ class AutoRefreshConfiguration(Configuration):
     """
     def __init__(self, loader, *args, **kwargs):
         super(AutoRefreshConfiguration, self).__init__(*args, **kwargs)
+        self.refresh_api_key_hook = AutoRefreshConfiguration.refresh_api_key
         self.loader = loader
 
     # Adapted from kubernetes_asyncio/client/configuration.py#L169
@@ -125,6 +131,13 @@ class AutoRefreshConfiguration(Configuration):
         result.debug = self.debug
 
         return result
+
+    @staticmethod
+    def refresh_api_key(client_configuration):
+        if (client_configuration.loader.token_expire_ts <=
+                datetime.datetime.now(tz=tzUTC)):
+            print("Refresh_api_called.")
+            client_configuration.api_key['authorization'] = client_configuration.loader.token
 
 
 class ClusterAuth(object):
