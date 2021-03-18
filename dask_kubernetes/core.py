@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from contextlib import suppress
 import getpass
 import logging
 import os
@@ -7,14 +8,17 @@ import time
 import uuid
 import warnings
 
+import aiohttp
 import yaml
 import dask
 import dask.distributed
 import distributed.security
+from distributed.core import rpc, Status
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.utils import Log, Logs
+from distributed.utils import Log, Logs, import_term
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
+from kubernetes.client import V1Pod
 
 from .objects import (
     make_pod_from_dict,
@@ -29,6 +33,8 @@ from .utils import (
     namespace_default,
     escape,
     get_external_address_for_scheduler_service,
+    b64_dump,
+    b64_load,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,22 +53,18 @@ class Pod(ProcessInterface):
     def __init__(
         self,
         cluster,
-        core_api,
-        policy_api,
         pod_template,
         namespace,
-        loop=None,
-        **kwargs
+        **kwargs,
     ):
         self._pod = None
         self.cluster = cluster
-        self.core_api = core_api
-        self.policy_api = policy_api
+        self.core_api = cluster.core_api
+        self.policy_api = cluster.policy_api
         self.pod_template = copy.deepcopy(pod_template)
         self.base_labels = self.pod_template.metadata.labels
         self.namespace = namespace
         self.name = None
-        self.loop = loop
         self.kwargs = kwargs
         super().__init__()
 
@@ -71,20 +73,23 @@ class Pod(ProcessInterface):
         return self.pod_template.metadata.labels["dask.org/cluster-name"]
 
     async def start(self, **kwargs):
-        retry_count = 0  # Retry 10 times
-        while True:
-            try:
-                self._pod = await self.core_api.create_namespaced_pod(
-                    self.namespace, self.pod_template
-                )
-                return await super().start(**kwargs)
-            except ApiException as e:
-                if retry_count < 10:
-                    logger.debug("Error when creating pod, retrying... - %s", str(e))
-                    await asyncio.sleep(1)
-                    retry_count += 1
-                else:
-                    raise e
+        if not self._pod:
+            retry_count = 0  # Retry 10 times
+            while True:
+                try:
+                    self._pod = await self.core_api.create_namespaced_pod(
+                        self.namespace, self.pod_template
+                    )
+                    return await super().start(**kwargs)
+                except ApiException as e:
+                    if retry_count < 10:
+                        logger.debug(
+                            "Error when creating pod, retrying... - %s", str(e)
+                        )
+                        await asyncio.sleep(1)
+                        retry_count += 1
+                    else:
+                        raise e
 
     async def close(self, **kwargs):
         name, namespace = self._pod.metadata.name, self.namespace
@@ -115,14 +120,24 @@ class Pod(ProcessInterface):
                 raise e
         return Log(log)
 
+    async def refresh_pod(self, name=None):
+        if name is None:
+            name = self._pod.metadata.name
+        self._pod = await self.core_api.read_namespaced_pod(name, self.namespace)
+
     async def describe_pod(self):
-        self._pod = await self.core_api.read_namespaced_pod(
-            self._pod.metadata.name, self.namespace
-        )
+        await self.refresh_pod()
         return self._pod
 
     def __repr__(self):
         return "<Pod %s: status=%s>" % (type(self).__name__, self.status)
+
+    @classmethod
+    async def from_name(cls, name, spec, *args, **kwargs):
+        pod = cls(*args, **spec, **kwargs)
+        await pod.refresh_pod(name=name)
+        pod.status = Status.running
+        return pod
 
 
 class Worker(Pod):
@@ -167,6 +182,7 @@ class Scheduler(Pod):
 
     def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
         super().__init__(**kwargs)
+        self.pod_template.metadata.labels["dask.org/component"] = "scheduler"
         self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         self.service = None
         self._idle_timeout = idle_timeout
@@ -191,17 +207,19 @@ class Scheduler(Pod):
                     self.address = line.split("Scheduler at:")[1].strip()
             await asyncio.sleep(0.1)
 
-        self.service = await self._create_service()
-        self.address = "tcp://{name}.{namespace}:{port}".format(
-            name=self.service.metadata.name,
-            namespace=self.namespace,
-            port=SCHEDULER_PORT,
-        )
-        self.external_address = await get_external_address_for_scheduler_service(
-            self.core_api, self.service
-        )
+        if not self.service:
+            self.service = await self._create_service()
+            self.address = "tcp://{name}.{namespace}:{port}".format(
+                name=self.service.metadata.name,
+                namespace=self.namespace,
+                port=SCHEDULER_PORT,
+            )
+            self.external_address = await get_external_address_for_scheduler_service(
+                self.core_api, self.service
+            )
 
-        self.pdb = await self._create_pdb()
+        if not self.pdb:
+            self.pdb = await self._create_pdb()
 
     async def close(self, **kwargs):
         if self.service:
@@ -264,6 +282,27 @@ class Scheduler(Pod):
         return await self.policy_api.read_namespaced_pod_disruption_budget(
             self.cluster_name, self.namespace
         )
+
+    @classmethod
+    async def from_name(cls, name, spec):
+        scheduler = await super().from_name(name, spec)
+        scheduler.service = await scheduler.core_api.read_namespaced_service(
+            scheduler.cluster_name, scheduler.namespace
+        )
+        scheduler.address = "tcp://{name}.{namespace}:{port}".format(
+            name=scheduler.service.metadata.name,
+            namespace=scheduler.namespace,
+            port=SCHEDULER_PORT,
+        )
+        scheduler.external_address = await get_external_address_for_scheduler_service(
+            scheduler.core_api, scheduler.service
+        )
+        scheduler.pdb = (
+            await scheduler.policy_api.read_namespaced_pod_disruption_budget(
+                scheduler.cluster_name, scheduler.namespace
+            )
+        )
+        return scheduler
 
 
 class KubeCluster(SpecCluster):
@@ -415,7 +454,8 @@ class KubeCluster(SpecCluster):
         security=None,
         scheduler_service_wait_timeout=None,
         scheduler_pod_template=None,
-        **kwargs
+        from_name=None,
+        **kwargs,
     ):
         if isinstance(pod_template, str):
             with open(pod_template) as f:
@@ -463,6 +503,7 @@ class KubeCluster(SpecCluster):
         self.env = dask.config.get("kubernetes.env", override_with=env)
         self.auth = auth
         self.kwargs = kwargs
+        self.from_name = from_name
         super().__init__(**self.kwargs)
 
     def _get_pod_template(self, pod_template, pod_type):
@@ -509,28 +550,6 @@ class KubeCluster(SpecCluster):
 
     async def _start(self):
 
-        self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
-        self.scheduler_pod_template = self._get_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
-        )
-        if not self.pod_template:
-            msg = (
-                "Worker pod specification not provided. See KubeCluster "
-                "docstring for ways to specify workers"
-            )
-            raise ValueError(msg)
-
-        base_pod_template = self.pod_template
-        self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
-
-        if not self.scheduler_pod_template:
-            self.scheduler_pod_template = base_pod_template
-            self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
-
-        self.scheduler_pod_template = clean_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
-        )
-
         await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
@@ -539,60 +558,212 @@ class KubeCluster(SpecCluster):
         if self.namespace is None:
             self.namespace = namespace_default()
 
-        self._generate_name = self._generate_name.format(
-            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
-        )
-        self._generate_name = escape(self._generate_name)
+        if self.from_name:
+            await self._start_from_name()
+        else:
 
+            self.pod_template = self._get_pod_template(
+                self.pod_template, pod_type="worker"
+            )
+            self.scheduler_pod_template = self._get_pod_template(
+                self.scheduler_pod_template, pod_type="scheduler"
+            )
+            if not self.pod_template:
+                msg = (
+                    "Worker pod specification not provided. See KubeCluster "
+                    "docstring for ways to specify workers"
+                )
+                raise ValueError(msg)
+
+            base_pod_template = self.pod_template
+            self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
+
+            if not self.scheduler_pod_template:
+                self.scheduler_pod_template = base_pod_template
+                self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
+
+            self.scheduler_pod_template = clean_pod_template(
+                self.scheduler_pod_template, pod_type="scheduler"
+            )
+
+            self._generate_name = self._generate_name.format(
+                user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+            )
+            self._generate_name = escape(self._generate_name)
+
+            self.pod_template = self._fill_pod_templates(
+                self.pod_template, pod_type="worker"
+            )
+            self.scheduler_pod_template = self._fill_pod_templates(
+                self.scheduler_pod_template, pod_type="scheduler"
+            )
+
+            common_options = {
+                "cluster": self,
+                "namespace": self.namespace,
+            }
+
+            if self._deploy_mode == "local":
+                self.scheduler_spec = {
+                    "cls": dask.distributed.Scheduler,
+                    "options": {
+                        "protocol": self._protocol,
+                        "interface": self._interface,
+                        "host": self.host,
+                        "port": self.port,
+                        "dashboard_address": self._dashboard_address,
+                        "security": self.security,
+                    },
+                }
+            elif self._deploy_mode == "remote":
+                self.scheduler_spec = {
+                    "cls": Scheduler,
+                    "options": {
+                        "idle_timeout": self._idle_timeout,
+                        "service_wait_timeout_s": self._scheduler_service_wait_timeout,
+                        "pod_template": self.scheduler_pod_template,
+                        **common_options,
+                    },
+                }
+            else:
+                raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
+
+            self.new_spec = {
+                "cls": Worker,
+                "options": {"pod_template": self.pod_template, **common_options},
+            }
+            self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
+
+            self.name = self.pod_template.metadata.generate_name
+
+            await self.serialize_to_secret(self.name)
+
+        await super()._start()
+
+    async def _start_from_name(self):
+        self.name = self.from_name
+        self.worker_spec = {}
+        await self.deserialize_from_secret(self.name)
+
+        [scheduler_pod] = (
+            await self.core_api.list_namespaced_pod(
+                self.namespace,
+                label_selector=f"dask.org/cluster-name={self.name},dask.org/component=scheduler",
+            )
+        ).items
+        self.scheduler = await Scheduler.from_name(
+            scheduler_pod.metadata.name, self.scheduler_spec["options"]
+        )
+
+        worker_pods = (
+            await self.core_api.list_namespaced_pod(
+                self.namespace,
+                label_selector=f"dask.org/cluster-name={self.name},dask.org/component=worker",
+            )
+        ).items
+        self.workers = {
+            pod.metadata.name: await Worker.from_name(
+                pod.metadata.name, self.new_spec["options"], self.scheduler.address
+            )
+            for pod in worker_pods
+        }
+        self.worker_spec = {pod.metadata.name: self.new_spec for pod in worker_pods}
+        self._i = len(self.workers) + 1
+
+    async def serialize_to_secret(self, cluster_name):
+        """Create a Secret and store attributes for this class."""
+        secret = kubernetes.client.V1Secret()
+        secret.metadata = kubernetes.client.V1ObjectMeta(name=cluster_name)
+        secret.type = "Opaque"
+        secret.data = {
+            "pod_template": b64_dump(self.pod_template.to_dict()),
+            "scheduler_pod_template": b64_dump(self.scheduler_pod_template.to_dict()),
+            "_generate_name": b64_dump(self._generate_name),
+            "namespace": b64_dump(self.namespace),
+            "_n_workers": b64_dump(self._n_workers),
+            "_idle_timeout": b64_dump(self._idle_timeout),
+            "_deploy_mode": b64_dump(self._deploy_mode),
+            "_protocol": b64_dump(self._protocol),
+            "_interface": b64_dump(self._interface),
+            "_dashboard_address": b64_dump(self._dashboard_address),
+            "_scheduler_service_wait_timeout": b64_dump(
+                self._scheduler_service_wait_timeout
+            ),
+            # "security": self.security,
+            "host": b64_dump(self.host),
+            "port": b64_dump(self.port),
+            "env": b64_dump(self.env),
+            "kwargs": b64_dump(self.kwargs),
+            "scheduler_spec": b64_dump(
+                {
+                    "cls": f"{self.scheduler_spec['cls'].__module__}.{self.scheduler_spec['cls'].__name__}",
+                    "options": {
+                        **self.scheduler_spec["options"],
+                        "cluster": None,
+                        "pod_template": None,
+                    },
+                }
+            ),
+            "new_spec": b64_dump(
+                {
+                    "cls": f"{self.new_spec['cls'].__module__}.{self.new_spec['cls'].__name__}",
+                    "options": {
+                        **self.new_spec["options"],
+                        "cluster": None,
+                        "pod_template": None,
+                    },
+                }
+            ),
+        }
+        await self.core_api.create_namespaced_secret(self.namespace, secret)
+
+    async def deserialize_from_secret(self, cluster_name):
+        """Load class attributed from Secret."""
+        secret = await self.core_api.read_namespaced_secret(
+            name=cluster_name, namespace=self.namespace
+        )
+        self._generate_name = b64_load(secret.data["_generate_name"])
+        self.pod_template = make_pod_from_dict(b64_load(secret.data["pod_template"]))
         self.pod_template = self._fill_pod_templates(
             self.pod_template, pod_type="worker"
         )
-        self.scheduler_pod_template = self._fill_pod_templates(
-            self.scheduler_pod_template, pod_type="scheduler"
+        self.scheduler_pod_template = make_pod_from_dict(
+            b64_load(secret.data["scheduler_pod_template"])
+        )
+        self.namespace = b64_load(secret.data["namespace"])
+        self._n_workers = b64_load(secret.data["_n_workers"])
+        self._idle_timeout = b64_load(secret.data["_idle_timeout"])
+        self._deploy_mode = b64_load(secret.data["_deploy_mode"])
+        self._protocol = b64_load(secret.data["_protocol"])
+        self._interface = b64_load(secret.data["_interface"])
+        self._dashboard_address = b64_load(secret.data["_dashboard_address"])
+        self._scheduler_service_wait_timeout = b64_load(
+            secret.data["_scheduler_service_wait_timeout"]
+        )
+        # self.security = secret.data["security"]
+        self.host = b64_load(secret.data["host"])
+        self.port = b64_load(secret.data["port"])
+        self.env = b64_load(secret.data["env"])
+        self.kwargs = b64_load(secret.data["kwargs"])
+        self.scheduler_spec = {}
+        self.scheduler_spec["options"] = b64_load(secret.data["scheduler_spec"])[
+            "options"
+        ]
+        self.scheduler_spec["options"]["cluster"] = self
+        self.scheduler_spec["options"]["pod_template"] = self.scheduler_pod_template
+        self.scheduler_spec["cls"] = import_term(
+            b64_load(secret.data["scheduler_spec"])["cls"]
         )
 
-        common_options = {
-            "cluster": self,
-            "core_api": self.core_api,
-            "policy_api": self.policy_api,
-            "namespace": self.namespace,
-            "loop": self.loop,
-        }
+        self.new_spec = {}
+        self.new_spec["options"] = b64_load(secret.data["new_spec"])["options"]
+        self.new_spec["options"]["cluster"] = self
+        self.new_spec["options"]["pod_template"] = self.pod_template
+        self.new_spec["cls"] = import_term(b64_load(secret.data["new_spec"])["cls"])
 
-        if self._deploy_mode == "local":
-            self.scheduler_spec = {
-                "cls": dask.distributed.Scheduler,
-                "options": {
-                    "protocol": self._protocol,
-                    "interface": self._interface,
-                    "host": self.host,
-                    "port": self.port,
-                    "dashboard_address": self._dashboard_address,
-                    "security": self.security,
-                },
-            }
-        elif self._deploy_mode == "remote":
-            self.scheduler_spec = {
-                "cls": Scheduler,
-                "options": {
-                    "idle_timeout": self._idle_timeout,
-                    "service_wait_timeout_s": self._scheduler_service_wait_timeout,
-                    "pod_template": self.scheduler_pod_template,
-                    **common_options,
-                },
-            }
-        else:
-            raise RuntimeError("Unknown deploy mode %s" % self._deploy_mode)
-
-        self.new_spec = {
-            "cls": Worker,
-            "options": {"pod_template": self.pod_template, **common_options},
-        }
-        self.worker_spec = {i: self.new_spec for i in range(self._n_workers)}
-
-        self.name = self.pod_template.metadata.generate_name
-
-        await super()._start()
+    async def _close(self):
+        await self.core_api.delete_namespaced_secret(self.name, self.namespace)
+        await super()._close()
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
@@ -702,3 +873,35 @@ class KubeCluster(SpecCluster):
                 logs[key] = log
 
         return logs
+
+    @classmethod
+    def from_name(cls, name, asynchronous=False, shutdown_on_close=False):
+        """Construct a KubeCluster object to represent an existing cluster."""
+        return cls(
+            from_name=name,
+            asynchronous=asynchronous,
+            shutdown_on_close=shutdown_on_close,
+        )
+
+
+async def discover(
+    auth=ClusterAuth.DEFAULT,
+    namespace=None,
+):
+    await ClusterAuth.load_first(auth)
+    async with kubernetes.client.api_client.ApiClient() as api:
+        core_api = kubernetes.client.CoreV1Api(api)
+        namespace = namespace or namespace_default()
+        try:
+            pods = await core_api.list_namespaced_pod(
+                namespace,
+                label_selector="dask.org/component=scheduler",
+            )
+            for pod in pods.items:
+                with suppress(KeyError):
+                    yield (
+                        pod.metadata.labels["dask.org/cluster-name"],
+                        KubeCluster,
+                    )
+        except aiohttp.client_exceptions.ClientConnectorError:
+            warnings.warn("Unable to connect to Kubernetes cluster")

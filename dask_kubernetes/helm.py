@@ -288,9 +288,11 @@ class HelmCluster(Cluster):
         )
 
     @classmethod
-    def from_name(cls, name):
+    def from_name(cls, name, asynchronous=False):
         release_name, namespace = name.split(".")
-        return cls(release_name=release_name, namespace=namespace)
+        return cls(
+            release_name=release_name, namespace=namespace, asynchronous=asynchronous
+        )
 
 
 async def discover(
@@ -302,7 +304,8 @@ async def discover(
         core_api = kubernetes.client.CoreV1Api(api)
         namespace = namespace or namespace_default()
         try:
-            pods = await core_api.list_pod_for_all_namespaces(
+            pods = await core_api.list_namespaced_pod(
+                namespace,
                 label_selector="app=dask,component=scheduler",
             )
             for pod in pods.items:

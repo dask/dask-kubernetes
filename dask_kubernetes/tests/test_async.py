@@ -4,6 +4,7 @@ import base64
 import getpass
 import os
 import random
+import subprocess
 from time import time
 import yaml
 
@@ -20,8 +21,14 @@ from dask_kubernetes import (
     KubeConfig,
     KubeAuth,
 )
+from distributed.core import Status
 from distributed.utils import tmpfile
 from distributed.utils_test import captured_logger
+from dask_ctl.discovery import (
+    list_discovery_methods,
+    discover_cluster_names,
+    discover_clusters,
+)
 
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
@@ -808,3 +815,51 @@ async def test_adapt_delete(cluster, ns):
         await asyncio.sleep(0.1)
         assert time() < start + 20
     assert len(cluster.scheduler_info["workers"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_from_name(cluster):
+    await cluster.scale(1)
+    cluster.shutdown_on_close = False
+    name = cluster.name
+    del cluster
+
+    cluster = await KubeCluster.from_name(name, asynchronous=True)
+    assert "id" in cluster.scheduler_info
+    assert cluster.status == Status.running
+
+    async with Client(cluster, asynchronous=True) as client:
+        await cluster.scale(2)
+        await cluster
+        await client.wait_for_workers(2)
+
+        # Ensure that inter-worker communication works well
+        futures = client.map(lambda x: x + 1, range(10))
+        total = client.submit(sum, futures)
+        assert (await total) == sum(map(lambda x: x + 1, range(10)))
+        assert all((await client.has_what()).values())
+
+
+@pytest.mark.asyncio
+async def test_discovery(cluster):
+    await cluster.scale(1)
+
+    name = cluster.name
+    discovery = "kubecluster"
+
+    assert discovery in list_discovery_methods()
+
+    clusters_names = [
+        cluster async for cluster in discover_cluster_names(discovery=discovery)
+    ]
+    assert len(clusters_names) == 1
+
+    clusters = [cluster async for cluster in discover_clusters(discovery=discovery)]
+    assert len(clusters) == 1
+
+    [cluster] = clusters
+    assert isinstance(cluster, KubeCluster)
+
+    assert name in subprocess.check_output(["daskctl", "cluster", "list"]).decode(
+        "utf-8"
+    )

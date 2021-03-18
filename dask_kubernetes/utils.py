@@ -7,6 +7,8 @@ import subprocess
 import string
 import time
 from weakref import finalize
+import json
+import base64
 
 from dask.distributed import Client
 
@@ -77,7 +79,9 @@ async def port_forward_service(service_name, remote_port, local_port=None):
             "port-forward",
             f"service/{service_name}",
             f"{local_port}:{remote_port}",
-        ]
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     time.sleep(1)
     finalize(kproc, kproc.kill)
@@ -104,3 +108,21 @@ def check_dependency(dependency):
             f"Missing dependency {dependency}. "
             f"Please install {dependency} following the instructions for your OS. "
         )
+
+
+def b64_dump(obj):
+    """Dump an object to a base64 endoded JSON."""
+    s = json.dumps(obj)
+    s_bytes = s.encode("ascii")
+    b64_bytes = base64.b64encode(s_bytes)
+    b64 = b64_bytes.decode("ascii")
+    return b64
+
+
+def b64_load(b64):
+    """Load an object from base64 endoded JSON."""
+    b64_bytes = b64.encode("ascii")
+    s_bytes = base64.b64decode(b64_bytes)
+    s = s_bytes.decode("ascii")
+    obj = json.loads(s)
+    return obj

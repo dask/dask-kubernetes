@@ -202,6 +202,8 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
     # later without a lot of `is None` checks
     if pod_template.metadata is None:
         pod_template.metadata = client.V1ObjectMeta()
+    if isinstance(pod_template.metadata, dict):
+        pod_template.metadata = client.V1ObjectMeta(**pod_template.metadata)
     if pod_template.metadata.labels is None:
         pod_template.metadata.labels = {}
 
