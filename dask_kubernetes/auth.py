@@ -28,25 +28,58 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 
     def __init__(self, *args, **kwargs):
         super(AutoRefreshKubeConfigLoader, self).__init__(*args, **kwargs)
+
+        self._retry_count = 0
+        self._max_retries = float('Inf')
+        self.auto_refresh = True
+        self.refresh_task = None
         self.last_refreshed = None
         self.token_expire_ts = None
 
-    async def refresh_after(self, when):
+    def __del__(self):
+        self.auto_refresh = False
+        if (self.refresh_task):
+            self.refresh_task.cancel()
+
+    async def refresh_after(self, when, reschedule_on_failure=False):
         """
         Refresh kuberenetes authentication
         Parameters
         ----------
-        when : seconds before we should refresh
+        when : Seconds before we should refresh. This should be set to some delta before
+            the actual token expiration time, or you will likely see authentication race
+            / failure conditions.
         """
 
-        print(f"Refresh_at coroutine sleeping for {when} seconds.")
-        await asyncio.sleep(when)
-        if (self.provider == 'gcp'):
-            print(f"Refreshing GCP token")
-            await self.refresh_gcp_token()
-        else:
-            #TODO
-            print("Unsupported auto refresh")
+        if (not self.auto_refresh):
+            return
+
+        logger.debug(msg=f"Refresh_at coroutine sleeping for "
+                         f"{int(when // 60)} minutes {(when % 60):0.2f} seconds.")
+        try:
+            await asyncio.sleep(when)
+            if (self.provider == 'gcp'):
+                await self.refresh_gcp_token()
+            elif (self.provider == 'oidc'):
+                # TODO
+                return
+            elif ('exec' in self._user):
+                # TODO
+                return
+
+        except Exception as e:
+            logger.warning(
+                msg=f"Authentication refresh failed for provider '{self.provider}.'",
+                exc_info=e
+            )
+            if (not reschedule_on_failure or
+                    self._retry_count > self._max_retries):
+                raise
+
+            logger.info(msg=f"Retrying '{self.provider}' in 30 seconds.")
+            self._retry_count += 1
+            self.refresh_task = asyncio.create_task(self.refresh_after(30))
+
 
     async def refresh_gcp_token(self):
         if 'config' not in self._user['auth-provider']:
@@ -54,19 +87,20 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 
         config = self._user['auth-provider']['config']
 
-        print("Calling refresh gcp token")
-
         if ((not self.token_expire_ts) or
-                (self.token_expire_ts >= datetime.datetime.now(tz=tzUTC))):
+                (self.token_expire_ts <= datetime.datetime.now(tz=tzUTC))):
 
+            logger.debug("Refreshing GCP token.")
             if self._get_google_credentials is not None:
                 if asyncio.iscoroutinefunction(self._get_google_credentials):
                     credentials = await self._get_google_credentials()
                 else:
                     credentials = self._get_google_credentials()
             else:
+                # config is read-only.
+                extra_args = " --force-auth-refresh"
                 _config = {
-                    'cmd-args': config['cmd-args'] + " --force-auth-refresh",
+                    'cmd-args': config['cmd-args'] + extra_args,
                     'cmd-path': config['cmd-path']
                 }
                 credentials = await google_auth_credentials(_config)
@@ -79,7 +113,11 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             expiry_delta = datetime.timedelta(
                 seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
             scaled_expiry_delta = datetime.timedelta(seconds=0.8 * expiry_delta.total_seconds())
-            asyncio.create_task(self.refresh_after(scaled_expiry_delta.total_seconds()))
+
+            self.refresh_task = asyncio.create_task(
+                self.refresh_after(when=scaled_expiry_delta.total_seconds(),
+                                   reschedule_on_failure=True)
+            )
 
             self.last_refreshed = datetime.datetime.now(tz=tzUTC)
             self.token_expire_ts = self.last_refreshed + scaled_expiry_delta
@@ -91,7 +129,7 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 
     async def load_gcp_token(self):
         """
-        Overrride default implementation so that we can keep track of the expiration timestamp
+        Override default implementation so that we can keep track of the expiration timestamp
         and automatically refresh auth tokens.
 
         Returns
@@ -110,11 +148,15 @@ class AutoRefreshConfiguration(Configuration):
     """
     def __init__(self, loader, *args, **kwargs):
         super(AutoRefreshConfiguration, self).__init__(*args, **kwargs)
-        self.refresh_api_key_hook = AutoRefreshConfiguration.refresh_api_key
+        self.refresh_api_key_hook = self.refresh_api_key
+        self.last_refreshed = datetime.datetime.now(tz=tzUTC)
         self.loader = loader
 
     # Adapted from kubernetes_asyncio/client/configuration.py#L169
     def __deepcopy__(self, memo):
+        """
+        Modified so that we don't try to deep copy the loader off the config
+        """
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
@@ -132,12 +174,18 @@ class AutoRefreshConfiguration(Configuration):
 
         return result
 
-    @staticmethod
-    def refresh_api_key(client_configuration):
-        if (client_configuration.loader.token_expire_ts <=
-                datetime.datetime.now(tz=tzUTC)):
-            print("Refresh_api_called.")
+    def refresh_api_key(self, client_configuration):
+        """
+        Checks to see if the loader has updated the authentication token. If it
+        has, the token is copied from the loader into the current configuration.
+
+        This function is assigned to Configuration.refresh_api_key_hook, and will
+        fire when entering get_api_key_with_prefix, before the api_key is retrieved.
+        """
+        if (self.last_refreshed < self.loader.last_refreshed):
+            logger.debug("Entering refresh_api_key_hook")
             client_configuration.api_key['authorization'] = client_configuration.loader.token
+            self.last_refreshed = datetime.datetime.now(tz=tzUTC)
 
 
 class ClusterAuth(object):
