@@ -2,9 +2,11 @@
 Defines different methods to configure a connection to a Kubernetes cluster.
 """
 import asyncio
+import base64
 import contextlib
 import copy
 import datetime
+import json
 import logging
 import os
 
@@ -41,6 +43,35 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         if (self.refresh_task):
             self.refresh_task.cancel()
 
+    def extract_oid_expiration_from_provider(self, provider):
+        parts = provider['config']['id-token'].split('.')
+
+        if len(parts) != 3:
+            raise ValueError('oidc: JWT tokens should contain 3 period-delimited parts')
+
+        id_token = parts[1]
+        # Re-pad the unpadded JWT token
+        id_token += (4 - len(id_token) % 4) * '='
+        jwt_attributes = json.loads(base64.b64decode(id_token).decode('utf8'))
+        expires = jwt_attributes.get('exp')
+
+        return expires
+
+    async def create_refresh_task_from_expiration_timestamp(self, expiration_timestamp):
+        # Set our token expiry to be actual expiry - 20%
+        expiry = parse_rfc3339(expiration_timestamp)
+        expiry_delta = datetime.timedelta(
+            seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
+        scaled_expiry_delta = datetime.timedelta(seconds=0.8 * expiry_delta.total_seconds())
+
+        self.refresh_task = asyncio.create_task(
+            self.refresh_after(when=scaled_expiry_delta.total_seconds(),
+                               reschedule_on_failure=True)
+        )
+
+        self.last_refreshed = datetime.datetime.now(tz=tzUTC)
+        self.token_expire_ts = self.last_refreshed + scaled_expiry_delta
+
     async def refresh_after(self, when, reschedule_on_failure=False):
         """
         Refresh kuberenetes authentication
@@ -61,10 +92,10 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             if (self.provider == 'gcp'):
                 await self.refresh_gcp_token()
             elif (self.provider == 'oidc'):
-                # TODO
+                await self.refresh_oid_token()
                 return
             elif ('exec' in self._user):
-                # TODO
+                logger.warning(msg="Auto-refresh doesn't support generic ExecProvider")
                 return
 
         except Exception as e:
@@ -80,6 +111,22 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             self._retry_count += 1
             self.refresh_task = asyncio.create_task(self.refresh_after(30))
 
+    async def refresh_oid_token(self):
+        provider = self._user['auth-provider']
+
+        if 'config' not in provider:
+            raise ValueError('oidc: missing configuration')
+
+        if ((not self.token_expire_ts) or
+                (self.token_expire_ts <= datetime.datetime.now(tz=tzUTC))):
+
+            await self._refresh_oidc(provider)
+            expires = self.extract_oid_expiration_from_provider(provider=provider)
+
+            await self.create_refresh_task_from_expiration_timestamp(
+                expiration_timestamp=expires)
+
+            self.token = 'Bearer {}'.format(provider['config']['id-token'])
 
     async def refresh_gcp_token(self):
         if 'config' not in self._user['auth-provider']:
@@ -109,23 +156,18 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             config.value['expiry'] = credentials.expiry
 
             # Set our token expiry to be actual expiry - 20%
-            expiry = parse_rfc3339(config.value['expiry'])
-            expiry_delta = datetime.timedelta(
-                seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
-            scaled_expiry_delta = datetime.timedelta(seconds=0.8 * expiry_delta.total_seconds())
-
-            self.refresh_task = asyncio.create_task(
-                self.refresh_after(when=scaled_expiry_delta.total_seconds(),
-                                   reschedule_on_failure=True)
-            )
-
-            self.last_refreshed = datetime.datetime.now(tz=tzUTC)
-            self.token_expire_ts = self.last_refreshed + scaled_expiry_delta
+            await self.create_refresh_task_from_expiration_timestamp(
+                expiration_timestamp=config.value['expiry'])
 
             if self._config_persister:
                 self._config_persister(self._config.value)
 
             self.token = "Bearer %s" % config['access-token']
+
+    async def _load_oid_token(self):
+        await self.refresh_oid_token()
+
+        return self.token
 
     async def load_gcp_token(self):
         """
