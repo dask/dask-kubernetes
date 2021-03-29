@@ -41,30 +41,50 @@ def release_name():
     return "testrelease"
 
 
+@pytest.fixture(scope="session")
+def test_namespace():
+    return "testdaskns"
+
+
 @pytest.fixture(scope="session")  # Creating this fixture is slow so we should reuse it.
-def release(k8s_cluster, chart_name, release_name, config_path):
+def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
     subprocess.check_output(
-        ["helm", "install", release_name, chart_name, "--wait", "-f", config_path]
+        [
+            "helm",
+            "install",
+            "--create-namespace",
+            "-n",
+            test_namespace,
+            release_name,
+            chart_name,
+            "--wait",
+            "-f",
+            config_path,
+        ]
     )
     # time.sleep(10)  # Wait for scheduler to start. TODO Replace with more robust check.
     yield release_name
-    subprocess.check_output(["helm", "delete", release_name])
+    subprocess.check_output(["helm", "delete", "-n", test_namespace, release_name])
 
 
 @pytest.fixture
-async def cluster(k8s_cluster, release):
+async def cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
-    async with HelmCluster(release_name=release, asynchronous=True) as cluster:
+    async with HelmCluster(
+        release_name=release, namespace=test_namespace, asynchronous=True
+    ) as cluster:
         await cluster
         yield cluster
 
 
 @pytest.fixture
-def sync_cluster(k8s_cluster, release):
+def sync_cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
-    with HelmCluster(release_name=release, asynchronous=False) as cluster:
+    with HelmCluster(
+        release_name=release, namespace=test_namespace, asynchronous=False
+    ) as cluster:
         yield cluster
 
 

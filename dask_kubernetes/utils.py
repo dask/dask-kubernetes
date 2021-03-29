@@ -63,18 +63,35 @@ async def get_external_address_for_scheduler_service(
         except socket.gaierror:
             # If we are outside it will fail and we need to port forward the service.
             host = "localhost"
-            port = await port_forward_service(service.metadata.name, port)
+            port = await port_forward_service(
+                service.metadata.name, service.metadata.namespace, port
+            )
     return f"tcp://{host}:{port}"
 
 
-async def port_forward_service(service_name, remote_port, local_port=None):
+def _random_free_port(low, high, retries=20):
+    conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while retries:
+        guess = random.randint(low, high)
+        try:
+            conn.bind(("", guess))
+            conn.close()
+            return guess
+        except OSError:
+            retries -= 1
+    raise ConnectionError("Not able to find a free port.")
+
+
+async def port_forward_service(service_name, namespace, remote_port, local_port=None):
     check_dependency("kubectl")
     if not local_port:
-        local_port = random.randint(49152, 65535)  # IANA suggested range
+        local_port = _random_free_port(49152, 65535)  # IANA suggested range
     kproc = subprocess.Popen(
         [
             "kubectl",
             "port-forward",
+            "--namespace",
+            f"{namespace}",
             f"service/{service_name}",
             f"{local_port}:{remote_port}",
         ]
