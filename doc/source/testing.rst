@@ -6,7 +6,7 @@ Running the test suite for ``dask-kubernetes`` doesn't require an existing Kuber
 
 You will also need to install the test dependencies::
 
-    $ pip install -r requirements_test.txt
+    $ pip install -r requirements-test.txt
 
 Tests are run using `pytest <https://docs.pytest.org/en/stable/>`_::
 
