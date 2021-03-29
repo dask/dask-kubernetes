@@ -77,7 +77,7 @@ def _random_free_port(low, high, retries=20):
             conn.bind(("", guess))
             conn.close()
             return guess
-        except:  # silently pass all errors?
+        except OSError:
             retries -= 1
     raise ConnectionError("Not able to find a free port.")
 
