@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 tzUTC = datetime.timezone.utc
 
+
 class AutoRefreshKubeConfigLoader(KubeConfigLoader):
     """
     Extends KubeConfigLoader, automatically attempts to refresh authentication
@@ -32,7 +33,7 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         super(AutoRefreshKubeConfigLoader, self).__init__(*args, **kwargs)
 
         self._retry_count = 0
-        self._max_retries = float('Inf')
+        self._max_retries = float("Inf")
         self.auto_refresh = True
         self.refresh_task = None
         self.last_refreshed = None
@@ -40,33 +41,58 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 
     def __del__(self):
         self.auto_refresh = False
-        if (self.refresh_task):
-            self.refresh_task.cancel()
 
     def extract_oid_expiration_from_provider(self, provider):
-        parts = provider['config']['id-token'].split('.')
+        """
+        Extracts the expiration datestamp for the provider token
+        Parameters
+        ----------
+        provider : authentication provider dictionary.
+
+        Returns
+        -------
+        expires : expiration timestamp
+        """
+        parts = provider["config"]["id-token"].split(".")
 
         if len(parts) != 3:
-            raise ValueError('oidc: JWT tokens should contain 3 period-delimited parts')
+            raise ValueError("oidc: JWT tokens should contain 3 period-delimited parts")
 
         id_token = parts[1]
         # Re-pad the unpadded JWT token
-        id_token += (4 - len(id_token) % 4) * '='
-        jwt_attributes = json.loads(base64.b64decode(id_token).decode('utf8'))
-        expires = jwt_attributes.get('exp')
+        id_token += (4 - len(id_token) % 4) * "="
+        jwt_attributes = json.loads(base64.b64decode(id_token).decode("utf8"))
+        expires = jwt_attributes.get("exp")
 
         return expires
 
     async def create_refresh_task_from_expiration_timestamp(self, expiration_timestamp):
+        """
+        Takes an expiration timestamp, and creates a refresh task to ensure that the token
+        does not expire.
+
+        Parameters
+        ----------
+        expiration_timestamp : time at which the current authentication token will expire
+
+        Returns
+        -------
+        N/A
+        """
         # Set our token expiry to be actual expiry - 20%
         expiry = parse_rfc3339(expiration_timestamp)
         expiry_delta = datetime.timedelta(
-            seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds())
-        scaled_expiry_delta = datetime.timedelta(seconds=0.8 * expiry_delta.total_seconds())
+            seconds=(expiry - datetime.datetime.now(tz=tzUTC)).total_seconds()
+        )
+        scaled_expiry_delta = datetime.timedelta(
+            seconds=0.8 * expiry_delta.total_seconds()
+        )
 
         self.refresh_task = asyncio.create_task(
-            self.refresh_after(when=scaled_expiry_delta.total_seconds(),
-                               reschedule_on_failure=True)
+            self.refresh_after(
+                when=scaled_expiry_delta.total_seconds(), reschedule_on_failure=True
+            ),
+            name="dask_auth_auto_refresh"
         )
 
         self.last_refreshed = datetime.datetime.now(tz=tzUTC)
@@ -80,62 +106,88 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         when : Seconds before we should refresh. This should be set to some delta before
             the actual token expiration time, or you will likely see authentication race
             / failure conditions.
+
+        reschedule_on_failure : If the refresh task fails, re-try in 30 seconds, until
+            _max_retries is exceeded, then raise an exception.
         """
 
-        if (not self.auto_refresh):
+        if not self.auto_refresh:
             return
 
-        logger.debug(msg=f"Refresh_at coroutine sleeping for "
-                         f"{int(when // 60)} minutes {(when % 60):0.2f} seconds.")
+        logger.debug(
+            msg=f"Refresh_at coroutine sleeping for "
+            f"{int(when // 60)} minutes {(when % 60):0.2f} seconds."
+        )
         try:
             await asyncio.sleep(when)
-            if (self.provider == 'gcp'):
+            if self.provider == "gcp":
                 await self.refresh_gcp_token()
-            elif (self.provider == 'oidc'):
+            elif self.provider == "oidc":
                 await self.refresh_oid_token()
                 return
-            elif ('exec' in self._user):
+            elif "exec" in self._user:
                 logger.warning(msg="Auto-refresh doesn't support generic ExecProvider")
                 return
 
         except Exception as e:
             logger.warning(
                 msg=f"Authentication refresh failed for provider '{self.provider}.'",
-                exc_info=e
+                exc_info=e,
             )
-            if (not reschedule_on_failure or
-                    self._retry_count > self._max_retries):
+            if not reschedule_on_failure or self._retry_count > self._max_retries:
                 raise
 
-            logger.info(msg=f"Retrying '{self.provider}' in 30 seconds.")
+            logger.warning(msg=f"Retrying '{self.provider}' in 30 seconds.")
             self._retry_count += 1
             self.refresh_task = asyncio.create_task(self.refresh_after(30))
 
     async def refresh_oid_token(self):
-        provider = self._user['auth-provider']
+        """
+        Adapted from kubernetes_asyncio/config/kube_config:_load_oid_token
 
-        if 'config' not in provider:
-            raise ValueError('oidc: missing configuration')
+        Refreshes the existing oid token, if necessary, and creates a refresh task
+        that will keep the token from expiring.
 
-        if ((not self.token_expire_ts) or
-                (self.token_expire_ts <= datetime.datetime.now(tz=tzUTC))):
+        Returns
+        -------
+        """
+        provider = self._user["auth-provider"]
 
+        logger.debug("Refreshing OID token.")
+
+        if "config" not in provider:
+            raise ValueError("oidc: missing configuration")
+
+        if (not self.token_expire_ts) or (
+            self.token_expire_ts <= datetime.datetime.now(tz=tzUTC)
+        ):
             await self._refresh_oidc(provider)
             expires = self.extract_oid_expiration_from_provider(provider=provider)
 
             await self.create_refresh_task_from_expiration_timestamp(
-                expiration_timestamp=expires)
+                expiration_timestamp=expires
+            )
 
-            self.token = 'Bearer {}'.format(provider['config']['id-token'])
+            self.token = "Bearer {}".format(provider["config"]["id-token"])
 
     async def refresh_gcp_token(self):
-        if 'config' not in self._user['auth-provider']:
-            self._user['auth-provider'].value['config'] = {}
+        """
+        Adapted from kubernetes_asyncio/config/kube_config:load_gcp_token
 
-        config = self._user['auth-provider']['config']
+        Refreshes the existing gcp token, if necessary, and creates a refresh task
+        that will keep the token from expiring.
 
-        if ((not self.token_expire_ts) or
-                (self.token_expire_ts <= datetime.datetime.now(tz=tzUTC))):
+        Returns
+        -------
+        """
+        if "config" not in self._user["auth-provider"]:
+            self._user["auth-provider"].value["config"] = {}
+
+        config = self._user["auth-provider"]["config"]
+
+        if (not self.token_expire_ts) or (
+            self.token_expire_ts <= datetime.datetime.now(tz=tzUTC)
+        ):
 
             logger.debug("Refreshing GCP token.")
             if self._get_google_credentials is not None:
@@ -147,36 +199,43 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
                 # config is read-only.
                 extra_args = " --force-auth-refresh"
                 _config = {
-                    'cmd-args': config['cmd-args'] + extra_args,
-                    'cmd-path': config['cmd-path']
+                    "cmd-args": config["cmd-args"] + extra_args,
+                    "cmd-path": config["cmd-path"],
                 }
                 credentials = await google_auth_credentials(_config)
 
-            config.value['access-token'] = credentials.token
-            config.value['expiry'] = credentials.expiry
+            config.value["access-token"] = credentials.token
+            config.value["expiry"] = credentials.expiry
 
             # Set our token expiry to be actual expiry - 20%
             await self.create_refresh_task_from_expiration_timestamp(
-                expiration_timestamp=config.value['expiry'])
+                expiration_timestamp=config.value["expiry"]
+            )
 
             if self._config_persister:
                 self._config_persister(self._config.value)
 
-            self.token = "Bearer %s" % config['access-token']
+            self.token = "Bearer %s" % config["access-token"]
 
     async def _load_oid_token(self):
+        """
+        Overrides KubeConfigLoader implementation.
+        Returns
+        -------
+        Auth token
+        """
         await self.refresh_oid_token()
 
         return self.token
 
     async def load_gcp_token(self):
         """
-        Override default implementation so that we can keep track of the expiration timestamp
+        Override KubeConfigLoader implementation so that we can keep track of the expiration timestamp
         and automatically refresh auth tokens.
 
         Returns
         -------
-        Bearer Token, kubectl 'access-token'
+        GCP access token
         """
         await self.refresh_gcp_token()
 
@@ -186,15 +245,19 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 class AutoRefreshConfiguration(Configuration):
     """
     Extends kubernetes_async Configuration to support automatic token refresh.
-    Lets us keep track of the loader object
+    Lets us keep track of the original loader object, which can be used
+    to regenerate the authentication token.
     """
-    def __init__(self, loader, *args, **kwargs):
+
+    def __init__(self, loader, refresh_frequency=None, *args, **kwargs):
         super(AutoRefreshConfiguration, self).__init__(*args, **kwargs)
+
+        # Set refresh api callback
         self.refresh_api_key_hook = self.refresh_api_key
         self.last_refreshed = datetime.datetime.now(tz=tzUTC)
         self.loader = loader
 
-    # Adapted from kubernetes_asyncio/client/configuration.py#L169
+    # Adapted from kubernetes_asyncio/client/configuration.py:__deepcopy__
     def __deepcopy__(self, memo):
         """
         Modified so that we don't try to deep copy the loader off the config
@@ -203,7 +266,7 @@ class AutoRefreshConfiguration(Configuration):
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if k not in ('logger', 'logger_file_handler', 'loader'):
+            if k not in ("logger", "logger_file_handler", "loader"):
                 setattr(result, k, copy.deepcopy(v, memo))
 
         # shallow copy loader object
@@ -224,9 +287,11 @@ class AutoRefreshConfiguration(Configuration):
         This function is assigned to Configuration.refresh_api_key_hook, and will
         fire when entering get_api_key_with_prefix, before the api_key is retrieved.
         """
-        if (self.last_refreshed < self.loader.last_refreshed):
+        if self.last_refreshed < self.loader.last_refreshed:
             logger.debug("Entering refresh_api_key_hook")
-            client_configuration.api_key['authorization'] = client_configuration.loader.token
+            client_configuration.api_key[
+                "authorization"
+            ] = client_configuration.loader.token
             self.last_refreshed = datetime.datetime.now(tz=tzUTC)
 
 
@@ -345,23 +410,25 @@ class KubeConfig(ClusterAuth):
         with contextlib.suppress(KeyError):
             if self.config_file is None:
                 self.config_file = os.path.abspath(
-                    os.path.expanduser(os.environ.get("KUBECONFIG", '~/.kube/config'))
+                    os.path.expanduser(os.environ.get("KUBECONFIG", "~/.kube/config"))
                 )
 
         await self.load_kube_config()
 
-    # Adapted from from kubernetes_asyncio/config/kube_config.py#L515
+    # Adapted from from kubernetes_asyncio/config/kube_config.py:get_kube_config_loader_for_yaml_file
     def get_kube_config_loader_for_yaml_file(self):
         kcfg = KubeConfigMerger(self.config_file)
         config_persister = None
-        if (self.persist_config):
+        if self.persist_config:
             config_persister = kcfg.save_changes()
 
-        return AutoRefreshKubeConfigLoader(config_dict=kcfg.config,
-                                           config_base_path=None,
-                                           config_persister=config_persister)
+        return AutoRefreshKubeConfigLoader(
+            config_dict=kcfg.config,
+            config_base_path=None,
+            config_persister=config_persister,
+        )
 
-    # Adapted from kubernetes_asyncio/config/kube_config.py#L537
+    # Adapted from kubernetes_asyncio/config/kube_config.py:load_kube_config
     async def load_kube_config(self):
         # Create a config loader, this will automatically refresh our credentials before they expire
         loader = self.get_kube_config_loader_for_yaml_file()
