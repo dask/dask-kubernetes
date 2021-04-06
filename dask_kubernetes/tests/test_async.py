@@ -1,11 +1,9 @@
 import asyncio
-import datetime
 import base64
 import getpass
 import os
 import random
 from time import time
-from types import SimpleNamespace
 import yaml
 
 import kubernetes_asyncio as kubernetes
@@ -20,7 +18,7 @@ from dask_kubernetes import (
     clean_pod_template,
     ClusterAuth,
     KubeConfig,
-    KubeAuth
+    KubeAuth,
 )
 from distributed.utils import tmpfile
 from distributed.utils_test import captured_logger
@@ -815,46 +813,43 @@ async def test_adapt_delete(cluster, ns):
 @pytest.mark.asyncio
 async def test_auto_refresh(cluster):
     config = {
-        'apiVersion': 'v1',
-        'clusters': [
+        "apiVersion": "v1",
+        "clusters": [
             {
-                'cluster': {
-                    'certificate-authority-data': '',
-                    'server': ''
-                },
-                'name': 'mock_gcp_config'
+                "cluster": {"certificate-authority-data": "", "server": ""},
+                "name": "mock_gcp_config",
             }
         ],
-        'contexts': [
+        "contexts": [
             {
-                'context': {
-                    'cluster': 'mock_gcp_config',
-                    'user': 'mock_gcp_config',
+                "context": {
+                    "cluster": "mock_gcp_config",
+                    "user": "mock_gcp_config",
                 },
-                'name': 'mock_gcp_config'
+                "name": "mock_gcp_config",
             }
         ],
-        'current-context': 'mock_gcp_config',
-        'kind': 'config',
-        'preferences': {},
-        'users': [
+        "current-context": "mock_gcp_config",
+        "kind": "config",
+        "preferences": {},
+        "users": [
             {
-                'name': 'mock_gcp_config',
-                'user': {
-                    'auth-provider': {
-                        'config': {
-                            'access-token': '',
-                            'cmd-args': '--fake-arg arg',
-                            'cmd-path': f"python {TEST_DIR}/fake_gcp_auth.py",
-                            'expiry': '',
-                            'expiry-key': '{.credential.token_expiry}',
-                            'toekn-key': '{.credential.access_token}'
+                "name": "mock_gcp_config",
+                "user": {
+                    "auth-provider": {
+                        "config": {
+                            "access-token": "",
+                            "cmd-args": "--fake-arg arg",
+                            "cmd-path": f"python {TEST_DIR}/fake_gcp_auth.py",
+                            "expiry": "",
+                            "expiry-key": "{.credential.token_expiry}",
+                            "toekn-key": "{.credential.access_token}",
                         },
-                        'name': 'gcp'
+                        "name": "gcp",
                     }
-                }
+                },
             }
-        ]
+        ],
     }
     config_persister = False
 
@@ -866,24 +861,21 @@ async def test_auto_refresh(cluster):
 
     await loader.load_gcp_token()
     # Check that we get back a token
-    assert(loader.token ==
-           "Bearer 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-           "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+    assert loader.token == f"Bearer {'0' * 137}"
 
     next_expire = loader.token_expire_ts
     for task in asyncio.all_tasks():
-        if (task.get_name() == "dask_auth_auto_refresh"):
+        if task.get_name() == "dask_auth_auto_refresh":
             await asyncio.wait_for(task, 10)
 
     # Ensure that our token expiration timer was refreshed
-    assert(loader.token_expire_ts > next_expire)
+    assert loader.token_expire_ts > next_expire
 
     # Ensure refresh task was re-created
     for task in asyncio.all_tasks():
-        if (task.get_name() == "dask_auth_auto_refresh"):
+        if task.get_name() == "dask_auth_auto_refresh":
             loader.auto_refresh = False
             await asyncio.wait_for(task, 10)
             break
     else:
-        assert(False)
-
+        assert False

@@ -92,7 +92,7 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             self.refresh_after(
                 when=scaled_expiry_delta.total_seconds(), reschedule_on_failure=True
             ),
-            name="dask_auth_auto_refresh"
+            name="dask_auth_auto_refresh",
         )
 
         self.last_refreshed = datetime.datetime.now(tz=tzUTC)
