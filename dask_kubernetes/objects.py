@@ -125,22 +125,25 @@ def make_pod_spec(
     memory_request=None,
     cpu_limit=None,
     cpu_request=None,
-    type=None
+    type=None,
 ):
     """
     Create generic pod template from input parameters
 
+
     type : str
-        Type of a dask pod. Can be "scheduler" or "worker". Defaults to "worker"
+        Type of a dask pod. Can be "scheduler" or "worker". Defaults to "worker".
+
 
     Examples
     --------
     >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
     """
-
     pod_type = type
     args = None
-    if pod_type is None or pod_type == "worker":
+    if pod_type is None:
+        pod_type = "worker"
+    if pod_type == "worker":
         args = [
             "dask-worker",
             "$(DASK_SCHEDULER_ADDRESS)",
@@ -329,4 +332,3 @@ def clean_pdb_template(pdb_template):
         pdb_template.spec.selector = client.V1LabelSelector()
 
     return pdb_template
-
