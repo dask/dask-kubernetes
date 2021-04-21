@@ -125,47 +125,31 @@ def make_pod_spec(
     memory_request=None,
     cpu_limit=None,
     cpu_request=None,
-    type=None,
 ):
     """
     Create generic pod template from input parameters
-
-
-    type : str
-        Type of a dask pod. Can be "scheduler" or "worker". Defaults to "worker".
-
 
     Examples
     --------
     >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
     """
-    pod_type = type
-    args = None
-    if pod_type is None:
-        pod_type = "worker"
-    if pod_type == "worker":
-        args = [
-            "dask-worker",
-            "$(DASK_SCHEDULER_ADDRESS)",
-            "--nthreads",
-            str(threads_per_worker),
-            "--death-timeout",
-            "60",
-        ]
-        if memory_limit:
-            args.extend(["--memory-limit", str(memory_limit)])
-    elif pod_type == "scheduler":
-        args = ["dask-scheduler"]
-    else:
-        raise RuntimeError("Unknown pod type %s" % pod_type)
-
+    args = [
+        "dask-worker",
+        "$(DASK_SCHEDULER_ADDRESS)",
+        "--nthreads",
+        str(threads_per_worker),
+        "--death-timeout",
+        "60",
+    ]
+    if memory_limit:
+        args.extend(["--memory-limit", str(memory_limit)])
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(labels=labels),
         spec=client.V1PodSpec(
             restart_policy="Never",
             containers=[
                 client.V1Container(
-                    name="dask-%s" % pod_type,
+                    name="dask-worker",
                     image=image,
                     args=args,
                     env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],
