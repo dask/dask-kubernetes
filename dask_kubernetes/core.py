@@ -525,7 +525,7 @@ class KubeCluster(SpecCluster):
 
         if not self.scheduler_pod_template:
             self.scheduler_pod_template = base_pod_template
-            self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
+        self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
 
         self.scheduler_pod_template = clean_pod_template(
             self.scheduler_pod_template, pod_type="scheduler"
