@@ -87,8 +87,8 @@ class Pod(ProcessInterface):
                     raise e
 
     async def close(self, **kwargs):
-        name, namespace = self._pod.metadata.name, self.namespace
         if self._pod:
+            name, namespace = self._pod.metadata.name, self.namespace
             try:
                 await self.core_api.delete_namespaced_pod(name, namespace)
             except ApiException as e:
