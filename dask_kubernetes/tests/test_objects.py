@@ -69,33 +69,6 @@ def test_extra_container_config_merge(docker_image, loop):
     with KubeCluster(
         make_pod_spec(
             docker_image,
-            extra_container_config={
-                "env": [{"name": "BOO", "value": "FOO"}],
-                "args": ["last-item"],
-            },
-        ),
-        loop=loop,
-        n_workers=0,
-        env={"TEST": "HI"},
-    ) as cluster:
-
-        pod = cluster.pod_template
-
-        assert pod.spec.containers[0].env == [
-            {"name": "TEST", "value": "HI"},
-            {"name": "BOO", "value": "FOO"},
-        ]
-
-        assert pod.spec.containers[0].args[-1] == "last-item"
-
-
-def test_extra_container_config_merge(docker_image, loop):
-    """
-    Test that our container config merging process works recursively fine
-    """
-    with KubeCluster(
-        make_pod_spec(
-            docker_image,
             env={"TEST": "HI"},
             extra_container_config={
                 "env": [{"name": "BOO", "value": "FOO"}],
