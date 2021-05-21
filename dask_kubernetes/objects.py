@@ -8,11 +8,6 @@ import json
 
 from kubernetes.client.configuration import Configuration
 
-try:
-    import yaml
-except ImportError:
-    yaml = False
-
 _FakeResponse = namedtuple("_FakeResponse", ["data"])
 
 
@@ -98,7 +93,7 @@ def merge_dictionaries(a, b, path=None, update=True):
             elif a[key] == b[key]:
                 pass  # same leaf value
             elif isinstance(a[key], list) and isinstance(b[key], list):
-                for idx, val in enumerate(b[key]):
+                for idx, _ in enumerate(b[key]):
                     a[key][idx] = merge_dictionaries(
                         a[key][idx],
                         b[key][idx],
