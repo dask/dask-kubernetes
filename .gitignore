@@ -4,9 +4,15 @@ __pycache__/
 *$py.class
 
 # C extensions
+*.a
+*.dll
+*.dylib
+*.exe
+*.o
 *.so
 
 # Distribution / packaging
+*.7z
 .Python
 env/
 build/
@@ -19,8 +25,13 @@ lib/
 lib64/
 parts/
 sdist/
+*.tar
+*.tar.gz
+*.tgz
 var/
 wheels/
+*.whl
+*.zip
 *.egg-info/
 .installed.cfg
 *.egg
@@ -69,6 +80,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+Untitled*.ipynb
 
 # pyenv
 .python-version
@@ -102,3 +114,27 @@ ENV/
 
 .pytest-kind/
 .kube/
+
+# data files
+*.csv
+*.db
+*.json
+*.ndjson
+*.npy
+*.parquet
+*.pkl
+*.pq
+*.sqlite
+*.tsv
+*.xls
+*.xlsm
+*.xlsx
+
+# credentials and key material
+credentials
+credentials.csv
+*.env
+*.pem
+*.pub
+*.rdp
+*_rsa
