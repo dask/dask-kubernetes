@@ -106,7 +106,6 @@ class HelmCluster(Cluster):
         if status.returncode != 0:
             raise RuntimeError(f"No such helm release {self.release_name}.")
         self.auth = auth
-        self.namespace
         self.core_api = None
         self.scheduler_comm = None
         self.port_forward_cluster_ip = port_forward_cluster_ip
