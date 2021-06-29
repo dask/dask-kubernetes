@@ -120,6 +120,7 @@ def make_pod_spec(
     memory_request=None,
     cpu_limit=None,
     cpu_request=None,
+    annotations={},
 ):
     """
     Create generic pod template from input parameters
@@ -139,7 +140,7 @@ def make_pod_spec(
     if memory_limit:
         args.extend(["--memory-limit", str(memory_limit)])
     pod = client.V1Pod(
-        metadata=client.V1ObjectMeta(labels=labels),
+        metadata=client.V1ObjectMeta(labels=labels, annotations=annotations),
         spec=client.V1PodSpec(
             restart_policy="Never",
             containers=[
