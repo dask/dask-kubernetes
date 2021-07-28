@@ -41,7 +41,7 @@ def namespace_default():
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None
+    core_api, service, port_forward_cluster_ip=None, host=None
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -53,8 +53,9 @@ async def get_external_address_for_scheduler_service(
         lb = service.status.load_balancer.ingress[0]
         host = lb.hostname or lb.ip
     elif service.spec.type == "NodePort":
-        nodes = await core_api.list_node()
-        host = nodes.items[0].status.addresses[0].address
+        if host is None:
+            nodes = await core_api.list_node()
+            host = nodes.items[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
         try:
             # Try to resolve the service name. If we are inside the cluster this should succeeed.

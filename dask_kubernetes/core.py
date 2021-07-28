@@ -152,7 +152,7 @@ class Worker(Pod):
 
 
 class Scheduler(Pod):
-    """A Remote Dask Scheduler controled by Kubernetes
+    """A Remote Dask Scheduler controlled by Kubernetes
     Parameters
     ----------
     idle_timeout: str, optional
@@ -198,7 +198,7 @@ class Scheduler(Pod):
             port=SCHEDULER_PORT,
         )
         self.external_address = await get_external_address_for_scheduler_service(
-            self.core_api, self.service
+            self.core_api, self.service, host=self.kwargs["host"]
         )
 
         self.pdb = await self._create_pdb()
@@ -578,6 +578,7 @@ class KubeCluster(SpecCluster):
                     "idle_timeout": self._idle_timeout,
                     "service_wait_timeout_s": self._scheduler_service_wait_timeout,
                     "pod_template": self.scheduler_pod_template,
+                    "host": self.host,
                     **common_options,
                 },
             }

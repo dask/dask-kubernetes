@@ -23,7 +23,6 @@ from dask_kubernetes import (
 from distributed.utils import tmpfile
 from distributed.utils_test import captured_logger
 
-
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
 FAKE_CERT = os.path.join(TEST_DIR, "fake-cert-file")
@@ -388,6 +387,15 @@ async def test_constructor_parameters(k8s_cluster, pod_spec):
         assert var and var[0].value == "1"
 
         assert pod.metadata.generate_name == "myname"
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="Can't communicate with kind nodes")
+async def test_passing_host_to_nodeport_service(k8s_cluster, pod_spec):
+    with dask.config.set({"kubernetes.scheduler-service-type": "NodePort"}):
+        async with KubeCluster(pod_spec, host="127.0.0.1", **cluster_kwargs) as cluster:
+            assert cluster.scheduler.service_template.spec.type == "NodePort"
+            assert cluster.scheduler.external_address == "127.0.0.1"
 
 
 @pytest.mark.asyncio
