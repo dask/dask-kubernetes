@@ -4,6 +4,11 @@ Testing
 Running the test suite for ``dask-kubernetes`` doesn't require an existing Kubernetes cluster but does require
 `Docker <https://docs.docker.com/get-docker/>`_, `kubectl <https://kubernetes.io/docs/tasks/tools/#kubectl>`_ and `helm <https://helm.sh/docs/intro/install/>`_.
 
+Start by installing dask-kubernetes in editable mode - this will ensure that pytest can import dask-kubernetes:
+
+    $ pip install -e .
+
+
 You will also need to install the test dependencies::
 
     $ pip install -r requirements-test.txt
@@ -33,6 +38,7 @@ appear in your ``docker ps`` output.
 By default we set the ``--keep-cluster`` flag in ``setup.cfg`` which means the Kubernetes container will persist between ``pytest`` runs
 to avoid creation/teardown time. Therefore you may want to manually remove the container when you are done working on ``dask-kubernetes``::
 
+    $ docker stop pytest-kind-control-plane
     $ docker rm pytest-kind-control-plane
 
 When you run the tests for the first time a config file will be created called ``.pytest-kind/pytest-kind/kubeconfig`` which is used for authenticating
