@@ -4,7 +4,7 @@ Testing
 Running the test suite for ``dask-kubernetes`` doesn't require an existing Kubernetes cluster but does require
 `Docker <https://docs.docker.com/get-docker/>`_, `kubectl <https://kubernetes.io/docs/tasks/tools/#kubectl>`_ and `helm <https://helm.sh/docs/intro/install/>`_.
 
-Start by installing dask-kubernetes in editable mode - this will ensure that pytest can import dask-kubernetes:
+Start by installing dask-kubernetes in editable mode - this will ensure that pytest can import dask-kubernetes::
 
     $ pip install -e .
 
