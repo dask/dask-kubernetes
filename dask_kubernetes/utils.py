@@ -41,7 +41,7 @@ def namespace_default():
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None, host=None
+    core_api, service, port_forward_cluster_ip=None, nodeport_host=None
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -53,6 +53,7 @@ async def get_external_address_for_scheduler_service(
         lb = service.status.load_balancer.ingress[0]
         host = lb.hostname or lb.ip
     elif service.spec.type == "NodePort":
+        host = nodeport_host
         if host is None:
             nodes = await core_api.list_node()
             host = nodes.items[0].status.addresses[0].address

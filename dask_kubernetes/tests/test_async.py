@@ -4,13 +4,15 @@ import getpass
 import os
 import random
 from time import time
-import yaml
-
-import kubernetes_asyncio as kubernetes
-import pytest
 
 import dask
+import kubernetes_asyncio as kubernetes
+import pytest
+import yaml
 from dask.distributed import Client, wait
+from distributed.utils import tmpfile
+from distributed.utils_test import captured_logger
+
 import dask_kubernetes
 from dask_kubernetes import (
     KubeCluster,
@@ -20,8 +22,8 @@ from dask_kubernetes import (
     KubeConfig,
     KubeAuth,
 )
-from distributed.utils import tmpfile
-from distributed.utils_test import captured_logger
+from dask_kubernetes.core import Scheduler
+from dask_kubernetes.utils import get_external_address_for_scheduler_service
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -390,12 +392,48 @@ async def test_constructor_parameters(k8s_cluster, pod_spec):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Can't communicate with kind nodes")
-async def test_passing_host_to_nodeport_service(k8s_cluster, pod_spec):
-    with dask.config.set({"kubernetes.scheduler-service-type": "NodePort"}):
-        async with KubeCluster(pod_spec, host="127.0.0.1", **cluster_kwargs) as cluster:
-            assert cluster.scheduler.service_template.spec.type == "NodePort"
-            assert cluster.scheduler.external_address == "127.0.0.1"
+async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
+    k8s_cluster, pod_spec
+):
+    cluster = KubeCluster(
+        pod_template=pod_spec,
+        namespace="default",
+        nodeport_host="10.10.10.10",
+        scheduler_service_type="NodePort",
+        **cluster_kwargs,
+    )
+
+    scheduler_pod_template = cluster._get_pod_template(
+        cluster.pod_template, pod_type="scheduler"
+    )
+    scheduler_pod_template = clean_pod_template(
+        pod_template=scheduler_pod_template, pod_type="scheduler"
+    )
+    scheduler_pod_template = cluster._fill_pod_templates(
+        scheduler_pod_template, pod_type="scheduler"
+    )
+
+    scheduler = Scheduler(
+        idle_timeout=cluster._idle_timeout,
+        service_wait_timeout_s=cluster._scheduler_service_wait_timeout,
+        pod_template=scheduler_pod_template,
+        nodeport_host=cluster.nodeport_host,
+        scheduler_service_type=cluster._scheduler_service_type,
+        cluster=cluster,
+        core_api=kubernetes.client.CoreV1Api(),
+        policy_api=kubernetes.client.PolicyV1beta1Api(),
+        namespace=cluster.namespace,
+        loop=cluster.loop,
+    )
+
+    await scheduler._create_service(scheduler.kwargs["scheduler_service_type"])
+
+    external_address = await get_external_address_for_scheduler_service(
+        scheduler.core_api,
+        scheduler.service,
+        nodeport_host=scheduler.kwargs["nodeport_host"],
+    )
+    assert external_address == "10.10.10.10"
 
 
 @pytest.mark.asyncio

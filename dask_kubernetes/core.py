@@ -191,14 +191,16 @@ class Scheduler(Pod):
                     self.address = line.split("Scheduler at:")[1].strip()
             await asyncio.sleep(0.1)
 
-        self.service = await self._create_service()
+        self.service = await self._create_service(
+            scheduler_service_type=self.kwargs.get("scheduler_service_type")
+        )
         self.address = "tcp://{name}.{namespace}:{port}".format(
             name=self.service.metadata.name,
             namespace=self.namespace,
             port=SCHEDULER_PORT,
         )
         self.external_address = await get_external_address_for_scheduler_service(
-            self.core_api, self.service, host=self.kwargs["host"]
+            self.core_api, self.service, nodeport_host=self.kwargs["nodeport_host"]
         )
 
         self.pdb = await self._create_pdb()
@@ -214,7 +216,7 @@ class Scheduler(Pod):
             )
         await super().close(**kwargs)
 
-    async def _create_service(self):
+    async def _create_service(self, scheduler_service_type=None):
         service_template_dict = dask.config.get("kubernetes.scheduler-service-template")
         self.service_template = clean_service_template(
             make_service_from_dict(service_template_dict)
@@ -225,7 +227,8 @@ class Scheduler(Pod):
         self.service_template.spec.selector["dask.org/cluster-name"] = self.cluster_name
         if self.service_template.spec.type is None:
             self.service_template.spec.type = dask.config.get(
-                "kubernetes.scheduler-service-type"
+                "kubernetes.scheduler-service-type",
+                override_with=scheduler_service_type,
             )
         await self.core_api.create_namespaced_service(
             self.namespace, self.service_template
@@ -315,7 +318,11 @@ class KubeCluster(SpecCluster):
     env: Dict[str, str]
         Dictionary of environment variables to pass to worker pod
     host: str
-        Listen address for local scheduler.  Defaults to 0.0.0.0
+        Listen address for local scheduler. Only used when deploy_mode == "local". Defaults to
+        0.0.0.0
+    nodeport_host: str
+        When scheduler_service_type == ``"NodePort"``, override KubeCluster's default behaviour
+        of listing nodes by specifying a nodeport_host.
     port: int
         Port of local scheduler
     auth: List[ClusterAuth] (optional)
@@ -329,6 +336,9 @@ class KubeCluster(SpecCluster):
         Timeout, in seconds, to wait for the remote scheduler service to be ready.
         Defaults to 30 seconds.
         Set to 0 to disable the timeout (not recommended).
+    scheduler_service_type: str
+        The Service type used to expose the scheduler. Can be one of ``"ClusterIP"``,
+        ``"NodePort"`` or ``"LoadBalancer"``. Defaults to ``"ClusterIP"``
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
@@ -341,7 +351,8 @@ class KubeCluster(SpecCluster):
     >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
     ...                          memory_limit='4G', memory_request='4G',
     ...                          cpu_limit=1, cpu_request=1,
-    ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
+    ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet
+    git+https://github.com/dask/distributed'})
     >>> cluster = KubeCluster(pod_spec)
     >>> cluster.scale(10)
 
@@ -415,6 +426,8 @@ class KubeCluster(SpecCluster):
         security=None,
         scheduler_service_wait_timeout=None,
         scheduler_pod_template=None,
+        scheduler_service_type="ClusterIP",
+        nodeport_host=None,
         **kwargs
     ):
         if isinstance(pod_template, str):
@@ -451,6 +464,9 @@ class KubeCluster(SpecCluster):
             "kubernetes.scheduler-service-wait-timeout",
             override_with=scheduler_service_wait_timeout,
         )
+        self._scheduler_service_type = dask.config.get(
+            "kubernetes.scheduler-service-type", override_with=scheduler_service_type
+        )
         self.security = security
         if self.security and not isinstance(
             self.security, distributed.security.Security
@@ -461,6 +477,10 @@ class KubeCluster(SpecCluster):
         self.host = dask.config.get("kubernetes.host", override_with=host)
         self.port = dask.config.get("kubernetes.port", override_with=port)
         self.env = dask.config.get("kubernetes.env", override_with=env)
+
+        self.nodeport_host = dask.config.get(
+            "kubernetes.scheduler-nodeport-host", override_with=nodeport_host
+        )
         self.auth = auth
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
@@ -578,7 +598,8 @@ class KubeCluster(SpecCluster):
                     "idle_timeout": self._idle_timeout,
                     "service_wait_timeout_s": self._scheduler_service_wait_timeout,
                     "pod_template": self.scheduler_pod_template,
-                    "host": self.host,
+                    "nodeport_host": self.nodeport_host,
+                    "scheduler_service_type": self._scheduler_service_type,
                     **common_options,
                 },
             }
