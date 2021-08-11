@@ -129,9 +129,9 @@ async def test_logs(remote_cluster):
     assert len(logs) == 4
     for _, log in logs.items():
         assert (
-                "distributed.scheduler" in log
-                or "distributed.worker" in log
-                or "Creating scheduler pod" in log
+            "distributed.scheduler" in log
+            or "distributed.worker" in log
+            or "Creating scheduler pod" in log
         )
 
 
@@ -150,7 +150,7 @@ async def test_diagnostics_link_env_variable(k8s_cluster, pod_spec, user_env):
             port = cluster.scheduler_info["services"]["dashboard"]
 
             assert (
-                    "foo-" + getpass.getuser() + "-" + str(port) in cluster.dashboard_link
+                "foo-" + getpass.getuser() + "-" + str(port) in cluster.dashboard_link
             )
 
 
@@ -378,7 +378,7 @@ async def test_pod_template_from_conf(docker_image):
 async def test_constructor_parameters(k8s_cluster, pod_spec):
     env = {"FOO": "BAR", "A": 1}
     async with KubeCluster(
-            pod_spec, name="myname", env=env, **cluster_kwargs
+        pod_spec, name="myname", env=env, **cluster_kwargs
     ) as cluster:
         pod = cluster.pod_template
         assert pod.metadata.namespace == "default"
@@ -394,7 +394,7 @@ async def test_constructor_parameters(k8s_cluster, pod_spec):
 
 @pytest.mark.asyncio
 async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
-        k8s_cluster, pod_spec
+    k8s_cluster, pod_spec
 ):
     cluster = KubeCluster(
         pod_template=pod_spec,
@@ -412,8 +412,11 @@ async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
         pod_template=cluster.scheduler_pod_template, pod_type="scheduler"
     )
     await ClusterAuth.load_first(cluster.auth)
-    cluster._generate_name = escape(cluster._generate_name.format(user=getpass.getuser(),
-                                                                  uuid=str(uuid.uuid4())[:10]))
+    cluster._generate_name = escape(
+        cluster._generate_name.format(
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10]
+        )
+    )
     cluster.scheduler_pod_template = cluster._fill_pod_templates(
         cluster.scheduler_pod_template, pod_type="scheduler"
     )
@@ -431,7 +434,9 @@ async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
         loop=cluster.loop,
     )
 
-    scheduler.service = await scheduler._create_service(scheduler.kwargs["scheduler_service_type"])
+    scheduler.service = await scheduler._create_service(
+        scheduler.kwargs["scheduler_service_type"]
+    )
 
     external_address = await get_external_address_for_scheduler_service(
         scheduler.core_api,
@@ -644,8 +649,8 @@ async def test_repr(cluster):
     for text in [repr(cluster), str(cluster)]:
         assert "Box" not in text
         assert (
-                cluster.scheduler.address in text
-                or cluster.scheduler.external_address in text
+            cluster.scheduler.address in text
+            or cluster.scheduler.external_address in text
         )
 
 
@@ -688,19 +693,19 @@ async def test_maximum(cluster):
 def test_default_toleration(pod_spec):
     tolerations = pod_spec.to_dict()["spec"]["tolerations"]
     assert {
-               "key": "k8s.dask.org/dedicated",
-               "operator": "Equal",
-               "value": "worker",
-               "effect": "NoSchedule",
-               "toleration_seconds": None,
-           } in tolerations
+        "key": "k8s.dask.org/dedicated",
+        "operator": "Equal",
+        "value": "worker",
+        "effect": "NoSchedule",
+        "toleration_seconds": None,
+    } in tolerations
     assert {
-               "key": "k8s.dask.org_dedicated",
-               "operator": "Equal",
-               "value": "worker",
-               "effect": "NoSchedule",
-               "toleration_seconds": None,
-           } in tolerations
+        "key": "k8s.dask.org_dedicated",
+        "operator": "Equal",
+        "value": "worker",
+        "effect": "NoSchedule",
+        "toleration_seconds": None,
+    } in tolerations
 
 
 def test_default_toleration_preserved(docker_image):
@@ -720,24 +725,24 @@ def test_default_toleration_preserved(docker_image):
     )
     tolerations = pod_spec.to_dict()["spec"]["tolerations"]
     assert {
-               "key": "k8s.dask.org/dedicated",
-               "operator": "Equal",
-               "value": "worker",
-               "effect": "NoSchedule",
-               "toleration_seconds": None,
-           } in tolerations
+        "key": "k8s.dask.org/dedicated",
+        "operator": "Equal",
+        "value": "worker",
+        "effect": "NoSchedule",
+        "toleration_seconds": None,
+    } in tolerations
     assert {
-               "key": "k8s.dask.org_dedicated",
-               "operator": "Equal",
-               "value": "worker",
-               "effect": "NoSchedule",
-               "toleration_seconds": None,
-           } in tolerations
+        "key": "k8s.dask.org_dedicated",
+        "operator": "Equal",
+        "value": "worker",
+        "effect": "NoSchedule",
+        "toleration_seconds": None,
+    } in tolerations
     assert {
-               "key": "example.org/toleration",
-               "operator": "Exists",
-               "effect": "NoSchedule",
-           } in tolerations
+        "key": "example.org/toleration",
+        "operator": "Exists",
+        "effect": "NoSchedule",
+    } in tolerations
 
 
 @pytest.mark.asyncio
