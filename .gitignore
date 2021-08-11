@@ -138,6 +138,3 @@ credentials.csv
 *.pub
 *.rdp
 *_rsa
-
-# IDE settings
-.idea
