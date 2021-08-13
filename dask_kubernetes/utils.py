@@ -53,8 +53,9 @@ async def get_external_address_for_scheduler_service(
         lb = service.status.load_balancer.ingress[0]
         host = lb.hostname or lb.ip
     elif service.spec.type == "NodePort":
-        host = nodeport_host
-        if host is None:
+        if nodeport_host is not None:
+            host = nodeport_host
+        else:
             nodes = await core_api.list_node()
             host = nodes.items[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
