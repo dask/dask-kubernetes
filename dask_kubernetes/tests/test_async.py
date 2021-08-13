@@ -396,55 +396,14 @@ async def test_constructor_parameters(k8s_cluster, pod_spec):
 async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
     k8s_cluster, pod_spec
 ):
-    cluster = KubeCluster(
-        pod_template=pod_spec,
-        namespace="default",
-        nodeport_host="10.10.10.10",
-        scheduler_service_type="NodePort",
-        **cluster_kwargs,
-    )
-
-    cluster.scheduler_pod_template = cluster._get_pod_template(
-        cluster.pod_template, pod_type="scheduler"
-    )
-    cluster.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
-    cluster.scheduler_pod_template = clean_pod_template(
-        pod_template=cluster.scheduler_pod_template, pod_type="scheduler"
-    )
-    await ClusterAuth.load_first(cluster.auth)
-    cluster._generate_name = escape(
-        cluster._generate_name.format(
-            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10]
-        )
-    )
-    cluster.scheduler_pod_template = cluster._fill_pod_templates(
-        cluster.scheduler_pod_template, pod_type="scheduler"
-    )
-
-    scheduler = Scheduler(
-        idle_timeout=cluster._idle_timeout,
-        service_wait_timeout_s=cluster._scheduler_service_wait_timeout,
-        pod_template=cluster.scheduler_pod_template,
-        nodeport_host=cluster.nodeport_host,
-        scheduler_service_type=cluster._scheduler_service_type,
-        cluster=cluster,
-        core_api=kubernetes.client.CoreV1Api(),
-        policy_api=kubernetes.client.PolicyV1beta1Api(),
-        namespace=cluster.namespace,
-        loop=cluster.loop,
-    )
-
-    scheduler.service = await scheduler._create_service(
-        scheduler.kwargs["scheduler_service_type"]
-    )
-
+    from dask_kubernetes.objects import make_service_from_dict
+    
+    service = make_service_from_dict({"spec": {"ports": [{"port": 8786, "name": "comm"}], "type": "NodePort"}})
+    
     external_address = await get_external_address_for_scheduler_service(
-        scheduler.core_api,
-        scheduler.service,
-        nodeport_host=scheduler.kwargs["nodeport_host"],
+        None, service, nodeport_host="10.10.10.10",
     )
     assert external_address == "tcp://10.10.10.10:8786"
-    assert scheduler.service.spec.type == "NodePort"
 
 
 @pytest.mark.asyncio
