@@ -3,7 +3,6 @@ import base64
 import getpass
 import os
 import random
-import uuid
 from time import time
 
 import dask
@@ -23,8 +22,7 @@ from dask_kubernetes import (
     KubeConfig,
     KubeAuth,
 )
-from dask_kubernetes.core import Scheduler
-from dask_kubernetes.utils import get_external_address_for_scheduler_service, escape
+from dask_kubernetes.utils import get_external_address_for_scheduler_service
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -397,11 +395,15 @@ async def test_passing_nodeport_host_to_scheduler_will_set_correct_host(
     k8s_cluster, pod_spec
 ):
     from dask_kubernetes.objects import make_service_from_dict
-    
-    service = make_service_from_dict({"spec": {"ports": [{"port": 8786, "name": "comm"}], "type": "NodePort"}})
-    
+
+    service = make_service_from_dict(
+        {"spec": {"ports": [{"port": 8786, "name": "comm"}], "type": "NodePort"}}
+    )
+
     external_address = await get_external_address_for_scheduler_service(
-        None, service, nodeport_host="10.10.10.10",
+        None,
+        service,
+        nodeport_host="10.10.10.10",
     )
     assert external_address == "tcp://10.10.10.10:8786"
 
