@@ -321,8 +321,8 @@ class KubeCluster(SpecCluster):
         Listen address for local scheduler. Only used when deploy_mode == "local". Defaults to
         0.0.0.0
     nodeport_host: str
-        When scheduler_service_type == ``"NodePort"``, override KubeCluster's default behaviour
-        of listing nodes by specifying a nodeport_host.
+        When scheduler_service_type == ``"NodePort"``, select a specific node IP to connect to.
+        When this is not set the node IP will be autodetected.
     port: int
         Port of local scheduler
     auth: List[ClusterAuth] (optional)
