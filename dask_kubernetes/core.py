@@ -425,7 +425,7 @@ class KubeCluster(SpecCluster):
         security=None,
         scheduler_service_wait_timeout=None,
         scheduler_pod_template=None,
-        scheduler_service_type="ClusterIP",
+        scheduler_service_type=None,
         nodeport_host=None,
         **kwargs
     ):
