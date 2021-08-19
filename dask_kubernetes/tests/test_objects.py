@@ -138,13 +138,8 @@ def test_make_pod_from_dict_default_container_name():
                         "privileged": True,
                     },
                 },
-                {
-                    "image": "image-name2",
-                    "name": "sidecar"
-                },
-                {
-                    "image": "image-name3",
-                },
+                {"image": "image-name2", "name": "sidecar"},
+                {"image": "image-name3"},
             ],
             "restartPolicy": "Never",
         },
