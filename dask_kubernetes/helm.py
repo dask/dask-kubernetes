@@ -280,7 +280,7 @@ class HelmCluster(Cluster):
 
     async def _close(self, *args, **kwargs):
         """Close the cluster."""
-        warnings.warn(
+        raise NotImplementedError(
             "It is not possible to close a HelmCluster object. \n"
             "Please delete the cluster via the helm CLI: \n\n"
             f"  $ helm delete --namespace {self.namespace} {self.release_name}"
