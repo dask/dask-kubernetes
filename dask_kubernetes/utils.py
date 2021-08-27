@@ -104,10 +104,10 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
     raise ConnectionError("kubectl port forward failed")
 
 
-async def is_comm_open(ip, port, retries=30):
+async def is_comm_open(ip, port, retries=10):
     while retries > 0:
         try:
-            async with Client(f"tcp://{ip}:{port}", asynchronous=True, timeout=0.5):
+            async with Client(f"tcp://{ip}:{port}", asynchronous=True, timeout=2):
                 return True
         except Exception:
             time.sleep(0.5)
