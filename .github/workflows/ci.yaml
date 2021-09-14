@@ -30,4 +30,4 @@ jobs:
           pip install git+https://github.com/dask/dask@main
 
       - name: Run tests
-        run: pytest
+        run: pytest dask_kubernetes/tests/test_async.py::test_versions
