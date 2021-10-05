@@ -96,10 +96,7 @@ todo_include_todos = False
 # a list of builtin themes.
 #
 # html_theme = 'alabaster'
-import dask_sphinx_theme
-
 html_theme = "dask_sphinx_theme"
-html_theme_path = [dask_sphinx_theme.get_html_theme_path()]
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
