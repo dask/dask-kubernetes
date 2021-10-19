@@ -288,7 +288,10 @@ class AutoRefreshConfiguration(Configuration):
         fire when entering get_api_key_with_prefix, before the api_key is retrieved.
         """
         if self.loader.last_refreshed is not None:
-            if self.last_refreshed is None or self.last_refreshed < self.loader.last_refreshed:
+            if (
+                self.last_refreshed is None
+                or self.last_refreshed < self.loader.last_refreshed
+            ):
                 logger.debug("Entering refresh_api_key_hook")
                 client_configuration.api_key[
                     "authorization"
