@@ -94,7 +94,9 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
             f"{namespace}",
             f"service/{service_name}",
             f"{local_port}:{remote_port}",
-        ]
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     time.sleep(1)
     finalize(kproc, kproc.kill)
