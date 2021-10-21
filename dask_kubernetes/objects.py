@@ -177,6 +177,9 @@ def make_pod_spec(
 
 
 def make_pod_from_dict(dict_):
+    containers = dict_.get("spec", {}).get("containers", [])
+    for i, container in enumerate(containers):
+        container.setdefault("name", f"dask-{i}")
     return SERIALIZATION_API_CLIENT.deserialize(dict_, client.V1Pod)
 
 
