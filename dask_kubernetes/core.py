@@ -424,7 +424,7 @@ class KubeCluster(SpecCluster):
                 )
         if isinstance(pod_template, dict):
             pod_template = make_pod_from_dict(pod_template)
-            
+
         if isinstance(scheduler_pod_template, str):
             with open(scheduler_pod_template) as f:
                 scheduler_pod_template = dask.config.expand_environment_variables(
