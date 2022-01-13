@@ -100,7 +100,7 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
     )
     finalize(kproc, kproc.kill)
 
-    if await is_comm_open("localhost", local_port, retries=50):
+    if await is_comm_open("localhost", local_port, retries=100):
         return local_port
     raise ConnectionError("kubectl port forward failed")
 
