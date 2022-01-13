@@ -1,5 +1,4 @@
 """Utility functions."""
-from asyncio import sleep
 import os
 import random
 import shutil
@@ -100,15 +99,10 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
         stderr=subprocess.DEVNULL,
     )
     finalize(kproc, kproc.kill)
-    tries = 30
-    while not (await is_comm_open("localhost", local_port)):
-        if tries > 0:
-            await sleep(0.1)
-            tries -= 1
-        else:
-            raise ConnectionError("kubectl port forward failed")
 
-    return local_port
+    if await is_comm_open("localhost", local_port, retries=50):
+        return local_port
+    raise ConnectionError("kubectl port forward failed")
 
 
 async def is_comm_open(ip, port, retries=10):
