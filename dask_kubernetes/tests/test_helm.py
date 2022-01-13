@@ -109,7 +109,6 @@ def test_raises_on_non_existant_release(k8s_cluster):
 
 
 @pytest.mark.asyncio
-@pytest.mark.flaky(reruns=2)
 async def test_create_helm_cluster(cluster, release_name):
     assert cluster.status == Status.running
     assert cluster.release_name == release_name
