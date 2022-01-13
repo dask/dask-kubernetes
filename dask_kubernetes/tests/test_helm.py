@@ -3,6 +3,7 @@ import pytest
 import subprocess
 import os.path
 
+import dask.config
 from distributed.core import Status
 from dask_ctl.discovery import (
     list_discovery_methods,
@@ -157,8 +158,12 @@ async def test_adaptivity_warning(cluster):
 @pytest.mark.asyncio
 async def test_discovery(release, release_name):
     discovery = "helmcluster"
+    methods = list_discovery_methods()
 
-    assert discovery in list_discovery_methods()
+    assert discovery in methods
+
+    methods.pop(discovery)
+    dask.config.set({"ctl.disable-discovery": methods})
 
     clusters_names = [
         cluster async for cluster in discover_cluster_names(discovery=discovery)
@@ -172,5 +177,3 @@ async def test_discovery(release, release_name):
     assert cluster.status == Status.running
     assert cluster.release_name == release_name
     assert "id" in cluster.scheduler_info
-
-    assert b"testrelease" in subprocess.check_output(["daskctl", "cluster", "list"])
