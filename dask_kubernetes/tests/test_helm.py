@@ -108,15 +108,15 @@ def test_raises_on_non_existant_release(k8s_cluster):
         HelmCluster(release_name="nosuchrelease", namespace="default")
 
 
-@pytest.mark.asyncio
-async def test_create_helm_cluster(cluster, release_name):
+def test_create_sync_helm_cluster(sync_cluster, release_name):
+    cluster = sync_cluster
     assert cluster.status == Status.running
     assert cluster.release_name == release_name
     assert "id" in cluster.scheduler_info
 
 
-def test_create_sync_helm_cluster(sync_cluster, release_name):
-    cluster = sync_cluster
+@pytest.mark.asyncio
+async def test_create_helm_cluster(cluster, release_name):
     assert cluster.status == Status.running
     assert cluster.release_name == release_name
     assert "id" in cluster.scheduler_info
