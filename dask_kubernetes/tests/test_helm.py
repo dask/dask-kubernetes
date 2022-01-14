@@ -166,6 +166,7 @@ async def test_adaptivity_warning(cluster):
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="Has asyncio issues on CI")
 async def test_discovery(release, release_name):
     discovery = "helmcluster"
     methods = list_discovery_methods()
