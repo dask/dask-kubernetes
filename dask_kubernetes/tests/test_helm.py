@@ -72,11 +72,21 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
 async def cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
-    async with HelmCluster(
-        release_name=release, namespace=test_namespace, asynchronous=True
-    ) as cluster:
-        await cluster
-        yield cluster
+    tries = 5
+    while True:
+        try:
+            cluster = await HelmCluster(
+                release_name=release, namespace=test_namespace, asynchronous=True
+            )
+            break
+        except ConnectionError as e:
+            if tries > 0:
+                tries -= 1
+            else:
+                raise e
+
+    yield cluster
+    await cluster.close()
 
 
 @pytest.fixture
