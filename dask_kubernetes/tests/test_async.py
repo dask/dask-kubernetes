@@ -20,7 +20,7 @@ from dask_kubernetes import (
     KubeConfig,
     KubeAuth,
 )
-from distributed.utils import tmpfile
+from dask.utils import tmpfile
 from distributed.utils_test import captured_logger
 
 
@@ -123,7 +123,7 @@ async def test_logs(remote_cluster):
         await asyncio.sleep(0.1)
         assert time() < start + 20
 
-    logs = await cluster.logs()
+    logs = await cluster.get_logs()
     assert len(logs) == 4
     for _, log in logs.items():
         assert (
