@@ -236,7 +236,7 @@ class HelmCluster(Cluster):
 
         return _().__await__()
 
-    def scale(self, n_workers):
+    def scale(self, n_workers, worker_name=None):
         """Scale cluster to n workers.
 
         This sets the Dask worker deployment size to the requested number.
@@ -253,9 +253,11 @@ class HelmCluster(Cluster):
         HelmCluster('tcp://localhost:8786', workers=4, threads=24, memory=24.96 GB)
 
         """
-        return self.sync(self._scale, n_workers)
+        return self.sync(self._scale, n_workers, worker_name=worker_name)
 
-    async def _scale(self, n_workers):
+    async def _scale(self, n_workers, worker_name=None):
+        if worker_name:
+            self.worker_name = worker_name
         await self.apps_api.patch_namespaced_deployment(
             name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
             namespace=self.namespace,
