@@ -248,13 +248,13 @@ class HelmCluster(Cluster):
         --------
 
         >>> cluster
-        HelmCluster('tcp://localhost:8786', workers=3, threads=18, memory=18.72 GB)
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=4, threads=241, memory=2.95 TiB)
         >>> cluster.scale(4)
         >>> cluster
-        HelmCluster('tcp://localhost:8786', workers=4, threads=24, memory=24.96 GB)
-        >>> cluster.scale(5, worker_group = "high-mem-worker")
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=5, threads=321, memory=3.94 TiB)
+        >>> cluster.scale(5, worker_group="high-mem-workers")
         >>> cluster
-        # TODO: Finish scaling example
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=9, threads=325, memory=3.94 TiB)
         """
         return self.sync(self._scale, n_workers, worker_group=worker_group)
 
@@ -272,11 +272,10 @@ class HelmCluster(Cluster):
                     }
                 },
             )
-        except kubernetes.client.exceptions.ApiException:
+        except kubernetes.client.exceptions.ApiException as e:
             if worker_group:
-                raise ValueError(f"No such worker group {worker_group}")
-            else:
-                raise kubernetes.client.exceptions.ApiException
+                raise ValueError(f"No such worker group {worker_group}") from e
+            raise e
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended)."""
