@@ -236,10 +236,11 @@ class HelmCluster(Cluster):
 
         return _().__await__()
 
-    def scale(self, n_workers, worker_name=None):
+    def scale(self, n_workers, worker_group=None):
         """Scale cluster to n workers.
 
         This sets the Dask worker deployment size to the requested number.
+        It also allows you to set the worker deployment size of another worker group.
         Workers will not be terminated gracefull so be sure to only scale down
         when all futures have been retrieved by the client and the cluster is idle.
 
@@ -251,22 +252,28 @@ class HelmCluster(Cluster):
         >>> cluster.scale(4)
         >>> cluster
         HelmCluster('tcp://localhost:8786', workers=4, threads=24, memory=24.96 GB)
-
+        >>> cluster.scale(5, worker_group = "high-mem-worker")
+        >>> cluster
+        # TODO: Finish scaling example
         """
-        return self.sync(self._scale, n_workers, worker_name=worker_name)
+        return self.sync(self._scale, n_workers, worker_group=worker_group)
 
-    async def _scale(self, n_workers, worker_name=None):
-        if worker_name:
-            self.worker_name = worker_name
-        await self.apps_api.patch_namespaced_deployment(
-            name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
-            namespace=self.namespace,
-            body={
-                "spec": {
-                    "replicas": n_workers,
-                }
-            },
-        )
+    async def _scale(self, n_workers, worker_group=None):
+        deployment = f"{self.release_name}-{self.chart_name}{self.worker_name}"
+        if worker_group:
+            deployment += f"-{worker_group}"
+        try:
+            await self.apps_api.patch_namespaced_deployment(
+                name=deployment,
+                namespace=self.namespace,
+                body={
+                    "spec": {
+                        "replicas": n_workers,
+                    }
+                },
+            )
+        except kubernetes.client.exceptions.ApiValueError:
+            raise ValueError(f"No such worker group {worker_group}")
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended)."""
