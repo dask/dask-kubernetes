@@ -144,6 +144,20 @@ async def test_scale_cluster(cluster):
     await cluster  # Wait for workers
     assert len(cluster.scheduler_info["workers"]) == 3
 
+    # Scale up an additional worker group 'foo'
+    await cluster.scale(2, worker_group="foo")
+    await cluster  # Wait for workers
+    assert len(cluster.scheduler_info["workers"]) == 5
+
+    # Scale down an additional worker group 'foo'
+    await cluster.scale(0, worker_group="foo")
+    await cluster  # Wait for workers
+    assert len(cluster.scheduler_info["workers"]) == 3
+
+    # Scaling a non-existent eorker group 'bar' raises a ValueError
+    with pytest.raises(ValueError):
+        await cluster.scale(2, worker_group="bar")
+
 
 @pytest.mark.asyncio
 async def test_logs(cluster):

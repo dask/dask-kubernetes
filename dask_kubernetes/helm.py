@@ -272,8 +272,11 @@ class HelmCluster(Cluster):
                     }
                 },
             )
-        except kubernetes.client.exceptions.ApiValueError:
-            raise ValueError(f"No such worker group {worker_group}")
+        except kubernetes.client.exceptions.ApiException:
+            if worker_group:
+                raise ValueError(f"No such worker group {worker_group}")
+            else:
+                raise kubernetes.client.exceptions.ApiException
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended)."""
