@@ -12,11 +12,12 @@ import os
 
 import kubernetes
 import kubernetes_asyncio
-
 from kubernetes_asyncio.client import Configuration
-from kubernetes_asyncio.config.kube_config import KubeConfigLoader, KubeConfigMerger
-from kubernetes_asyncio.config.google_auth import google_auth_credentials
 from kubernetes_asyncio.config.dateutil import parse_rfc3339
+from kubernetes_asyncio.config.exec_provider import ExecProvider
+from kubernetes_asyncio.config.google_auth import google_auth_credentials
+from kubernetes_asyncio.config.kube_config import (KubeConfigLoader,
+                                                   KubeConfigMerger)
 
 logger = logging.getLogger(__name__)
 
@@ -126,14 +127,20 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
                 await self.refresh_oid_token()
                 return
             elif "exec" in self._user:
-                logger.warning(msg="Auto-refresh doesn't support generic ExecProvider")
+                await self.refresh_token_from_exec_plugin()
                 return
 
         except Exception as e:
-            logger.warning(
-                msg=f"Authentication refresh failed for provider '{self.provider}.'",
-                exc_info=e,
-            )
+            if self.provider in ["gcp", "oidc"]:
+                logger.warning(
+                    msg=f"Authentication refresh failed for provider '{self.provider}.'",
+                    exc_info=e,
+                )
+            elif "exec" in self._user:
+                logger.warning(
+                    msg=f"Authentication refresh failed for exec '{self._user['exec']}'.",
+                    exc_info=e,
+                )
             if not reschedule_on_failure or self._retry_count > self._max_retries:
                 raise
 
@@ -217,6 +224,38 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
 
             self.token = "Bearer %s" % config["access-token"]
 
+    async def refresh_token_from_exec_plugin(self):
+        """
+        Adapted from kubernetes_asyncio/config/kube_config:_load_from_exec_plugin
+
+        Refreshes the existing token, if necessary, and creates a refresh task
+        that will keep the token from expiring.
+
+        Returns
+        -------
+        """
+        executable = self._user["exec"]
+
+        if (not self.token_expire_ts) or (
+            self.token_expire_ts <= datetime.datetime.now(tz=tzUTC)
+        ):
+            logger.debug("Refreshing token with executable.")
+            try:
+                status = await ExecProvider(executable).run()
+                if "token" not in status:
+                    logger.error("exec: missing token field in plugin output")
+                    return
+                if "expirationTimestamp" not in status:
+                    logger.warning("exec: no expiration timestamp for the token")
+                expires = status.get("expirationTimestamp")
+
+                await self.create_refresh_task_from_expiration_timestamp(expiration_timestamp=expires)
+                self.token = "Bearer %s" % status["token"]
+            except Exception as e:
+                logger.error(str(e))
+
+
+
     async def _load_oid_token(self):
         """
         Overrides KubeConfigLoader implementation.
@@ -240,6 +279,16 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         await self.refresh_gcp_token()
 
         return self.token
+
+    async def _load_from_exec_plugin(self):
+        """
+        Override KubeConfigLoader implementation.
+
+        Returns
+        -------
+        Auth token
+        """
+        return self
 
 
 class AutoRefreshConfiguration(Configuration):
