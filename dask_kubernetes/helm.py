@@ -166,11 +166,16 @@ class HelmCluster(Cluster):
     async def _wait_for_workers(self):
         while True:
             n_workers = len(self.scheduler_info["workers"])
-            deployment = await self.apps_api.read_namespaced_deployment(
-                name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
-                namespace=self.namespace,
+            deployments = await self.apps_api.list_namespaced_deployment(
+                namespace=self.namespace
             )
-            deployment_replicas = deployment.spec.replicas
+            deployment_replicas = 0
+            for deployment in deployments.items:
+                if (
+                    f"{self.release_name}-{self.chart_name}{self.worker_name}"
+                    in deployment.metadata.name
+                ):
+                    deployment_replicas += deployment.spec.replicas
             if n_workers == deployment_replicas:
                 return
             else:

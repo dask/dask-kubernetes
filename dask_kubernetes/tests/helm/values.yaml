@@ -15,6 +15,6 @@ worker:
     repository: "dask-kubernetes"  # Container image repository.
     tag: "dev"  # Container image tag.
 
-    #additional_worker_groups:
-    #- name: foo
-    #  replicas: 0
+additional_worker_groups:
+  - name: foo
+    replicas: 1
