@@ -166,11 +166,16 @@ class HelmCluster(Cluster):
     async def _wait_for_workers(self):
         while True:
             n_workers = len(self.scheduler_info["workers"])
-            deployment = await self.apps_api.read_namespaced_deployment(
-                name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
-                namespace=self.namespace,
+            deployments = await self.apps_api.list_namespaced_deployment(
+                namespace=self.namespace
             )
-            deployment_replicas = deployment.spec.replicas
+            deployment_replicas = 0
+            for deployment in deployments.items:
+                if (
+                    f"{self.release_name}-{self.chart_name}{self.worker_name}"
+                    in deployment.metadata.name
+                ):
+                    deployment_replicas += deployment.spec.replicas
             if n_workers == deployment_replicas:
                 return
             else:
@@ -236,10 +241,11 @@ class HelmCluster(Cluster):
 
         return _().__await__()
 
-    def scale(self, n_workers):
+    def scale(self, n_workers, worker_group=None):
         """Scale cluster to n workers.
 
         This sets the Dask worker deployment size to the requested number.
+        It also allows you to set the worker deployment size of another worker group.
         Workers will not be terminated gracefull so be sure to only scale down
         when all futures have been retrieved by the client and the cluster is idle.
 
@@ -247,24 +253,34 @@ class HelmCluster(Cluster):
         --------
 
         >>> cluster
-        HelmCluster('tcp://localhost:8786', workers=3, threads=18, memory=18.72 GB)
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=4, threads=241, memory=2.95 TiB)
         >>> cluster.scale(4)
         >>> cluster
-        HelmCluster('tcp://localhost:8786', workers=4, threads=24, memory=24.96 GB)
-
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=5, threads=321, memory=3.94 TiB)
+        >>> cluster.scale(5, worker_group="high-mem-workers")
+        >>> cluster
+        HelmCluster(my-dask.default, 'tcp://localhost:51481', workers=9, threads=325, memory=3.94 TiB)
         """
-        return self.sync(self._scale, n_workers)
+        return self.sync(self._scale, n_workers, worker_group=worker_group)
 
-    async def _scale(self, n_workers):
-        await self.apps_api.patch_namespaced_deployment(
-            name=f"{self.release_name}-{self.chart_name}{self.worker_name}",
-            namespace=self.namespace,
-            body={
-                "spec": {
-                    "replicas": n_workers,
-                }
-            },
-        )
+    async def _scale(self, n_workers, worker_group=None):
+        deployment = f"{self.release_name}-{self.chart_name}{self.worker_name}"
+        if worker_group:
+            deployment += f"-{worker_group}"
+        try:
+            await self.apps_api.patch_namespaced_deployment(
+                name=deployment,
+                namespace=self.namespace,
+                body={
+                    "spec": {
+                        "replicas": n_workers,
+                    }
+                },
+            )
+        except kubernetes.client.exceptions.ApiException as e:
+            if worker_group:
+                raise ValueError(f"No such worker group {worker_group}") from e
+            raise e
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity (Not recommended)."""

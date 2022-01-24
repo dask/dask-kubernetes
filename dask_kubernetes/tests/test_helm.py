@@ -63,7 +63,18 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
             config_path,
         ]
     )
-    # time.sleep(10)  # Wait for scheduler to start. TODO Replace with more robust check.
+    # Scale back the additional workers group for now
+    subprocess.check_output(
+        [
+            "kubectl",
+            "scale",
+            "-n",
+            test_namespace,
+            "deployment",
+            f"{release_name}-dask-worker-foo",
+            "--replicas=0",
+        ]
+    )
     yield release_name
     subprocess.check_output(["helm", "delete", "-n", test_namespace, release_name])
 
@@ -143,6 +154,22 @@ async def test_scale_cluster(cluster):
     await cluster.scale(3)
     await cluster  # Wait for workers
     assert len(cluster.scheduler_info["workers"]) == 3
+
+    # Scale up an additional worker group 'foo'
+    await cluster.scale(2, worker_group="foo")
+    await cluster  # Wait for workers
+    assert len(cluster.scheduler_info["workers"]) == 5
+
+    # Scale down an additional worker group 'foo'
+    await cluster.scale(0, worker_group="foo")
+    await cluster  # Wait for workers
+    assert len(cluster.scheduler_info["workers"]) == 3
+
+    # Scaling a non-existent eorker group 'bar' raises a ValueError
+    import kubernetes_asyncio as kubernetes
+
+    with pytest.raises((ValueError, kubernetes.client.exceptions.ApiException)):
+        await cluster.scale(2, worker_group="bar")
 
 
 @pytest.mark.asyncio
