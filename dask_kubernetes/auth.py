@@ -16,8 +16,7 @@ from kubernetes_asyncio.client import Configuration
 from kubernetes_asyncio.config.dateutil import parse_rfc3339
 from kubernetes_asyncio.config.exec_provider import ExecProvider
 from kubernetes_asyncio.config.google_auth import google_auth_credentials
-from kubernetes_asyncio.config.kube_config import (KubeConfigLoader,
-                                                   KubeConfigMerger)
+from kubernetes_asyncio.config.kube_config import KubeConfigLoader, KubeConfigMerger
 
 logger = logging.getLogger(__name__)
 
@@ -249,12 +248,12 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
                     logger.warning("exec: no expiration timestamp for the token")
                 expires = status.get("expirationTimestamp")
 
-                await self.create_refresh_task_from_expiration_timestamp(expiration_timestamp=expires)
+                await self.create_refresh_task_from_expiration_timestamp(
+                    expiration_timestamp=expires
+                )
                 self.token = "Bearer %s" % status["token"]
             except Exception as e:
                 logger.error(str(e))
-
-
 
     async def _load_oid_token(self):
         """
@@ -288,7 +287,9 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
         -------
         Auth token
         """
-        return self
+        await self.refresh_token_from_exec_plugin()
+
+        return self.token
 
 
 class AutoRefreshConfiguration(Configuration):
