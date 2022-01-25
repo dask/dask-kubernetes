@@ -3,58 +3,80 @@
 KubeCluster
 ===========
 
+:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using native
+Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
+
 Quickstart
 ----------
 
 .. currentmodule:: dask_kubernetes
+
+To launch a Dask cluster on Kubernetes with :class:`KubeCluster` you need to first configure your worker
+pod specification. Then create a cluster with that spec.
+
+.. code-block:: python
+
+    from dask_kubernetes import KubeCluster, make_pod_spec
+
+    pod_spec = make_pod_spec(image='daskdev/dask:latest',
+                             memory_limit='4G', memory_request='4G',
+                             cpu_limit=1, cpu_request=1)
+
+    cluster = KubeCluster(pod_spec)
+
+    cluster.scale(10)  # specify number of workers explicitly
+    cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
+
+You can then connect a Dask :class:`dask.distributed.Client` object to the cluster and perform your work.
+
+.. code-block:: python
+
+    # Example usage
+    from dask.distributed import Client
+    import dask.array as da
+
+    # Connect Dask to the cluster
+    client = Client(cluster)
+
+    # Create a large array and calculate the mean
+    array = da.ones((1000, 1000, 1000))
+    print(array.mean().compute())  # Should print 1.0
+
+You can alternatively define your worker specification via YAML by creating a `pod manifest <https://kubernetes.io/docs/concepts/workloads/pods/>`_
+that will be used as a template.
+
+.. code-block:: yaml
+
+    # worker-spec.yml
+
+    kind: Pod
+    metadata:
+      labels:
+        foo: bar
+    spec:
+      restartPolicy: Never
+      containers:
+      - image: daskdev/dask:latest
+        imagePullPolicy: IfNotPresent
+        args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
+        name: dask
+        env:
+          - name: EXTRA_PIP_PACKAGES
+            value: git+https://github.com/dask/distributed
+        resources:
+          limits:
+            cpu: "2"
+            memory: 6G
+          requests:
+            cpu: "2"
+            memory: 6G
 
 .. code-block:: python
 
    from dask_kubernetes import KubeCluster
 
    cluster = KubeCluster('worker-spec.yml')
-   cluster.scale(10)  # specify number of workers explicitly
-
-   cluster.adapt(minimum=1, maximum=100)  # or dynamically scale based on current workload
-
-.. code-block:: yaml
-
-      # worker-spec.yml
-
-      kind: Pod
-      metadata:
-        labels:
-          foo: bar
-      spec:
-        restartPolicy: Never
-        containers:
-        - image: daskdev/dask:latest
-          imagePullPolicy: IfNotPresent
-          args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
-          name: dask
-          env:
-            - name: EXTRA_PIP_PACKAGES
-              value: git+https://github.com/dask/distributed
-          resources:
-            limits:
-              cpu: "2"
-              memory: 6G
-            requests:
-              cpu: "2"
-              memory: 6G
-
-.. code-block:: python
-
-        # Example usage
-        from dask.distributed import Client
-        import dask.array as da
-
-        # Connect Dask to the cluster
-        client = Client(cluster)
-
-        # Create a large array and calculate the mean
-        array = da.ones((1000, 1000, 1000))
-        print(array.mean().compute())  # Should print 1.0
+   cluster.scale(10)
 
 For more information see the :class:`KubeCluster` API reference.
 
@@ -90,26 +112,26 @@ Additionally, we can also use tools like `dask-cuda
 
 .. code-block:: yaml
 
-      kind: Pod
-      metadata:
-        labels:
-          foo: bar
-      spec:
-        restartPolicy: Never
-        containers:
-        - image: rapidsai/rapidsai:cuda11.0-runtime-ubuntu18.04-py3.8
-          imagePullPolicy: IfNotPresent
-          args: [dask-cuda-worker, $(DASK_SCHEDULER_ADDRESS), --rmm-pool-size, 10GB]
-          name: dask-cuda
-          resources:
-            limits:
-              cpu: "2"
-              memory: 6G
-              nvidia.com/gpu: 1 # requesting 1 GPU
-            requests:
-              cpu: "2"
-              memory: 6G
-              nvidia.com/gpu: 1 # requesting 1 GPU
+    kind: Pod
+    metadata:
+      labels:
+        foo: bar
+    spec:
+      restartPolicy: Never
+      containers:
+      - image: rapidsai/rapidsai:cuda11.0-runtime-ubuntu18.04-py3.8
+        imagePullPolicy: IfNotPresent
+        args: [dask-cuda-worker, $(DASK_SCHEDULER_ADDRESS), --rmm-pool-size, 10GB]
+        name: dask-cuda
+        resources:
+          limits:
+            cpu: "2"
+            memory: 6G
+            nvidia.com/gpu: 1 # requesting 1 GPU
+          requests:
+            cpu: "2"
+            memory: 6G
+            nvidia.com/gpu: 1 # requesting 1 GPU
 
 .. _configuration:
 Configuration
