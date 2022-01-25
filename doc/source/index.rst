@@ -13,6 +13,9 @@ Welcome to the documentation for ``dask-kubernetes``.
 
 The package ``dask-kubernetes`` provides cluster managers for Kubernetes.
 
+KubeCluster
+-----------
+
 :doc:`kubecluster` deploys Dask clusters on Kubernetes clusters using native
 Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
 
@@ -23,6 +26,9 @@ Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
     pod_spec = make_pod_spec(image='daskdev/dask:latest')
     cluster = KubeCluster(pod_spec)
     cluster.scale(10)
+
+HelmCluster
+-----------
 
 :doc:`helmcluster` is for managing an existing Dask cluster which has been deployed using
 `Helm <https://helm.sh>`_. You must have already installed the `Dask Helm chart <https://helm.dask.org/>`_
