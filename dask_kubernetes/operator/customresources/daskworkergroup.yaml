@@ -20,7 +20,8 @@ spec:
           type: object
           properties:
             spec:
-              replicas:
-                type: integer
-              image:
-                type: string
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
