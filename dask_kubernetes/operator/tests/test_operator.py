@@ -19,13 +19,8 @@ async def operator(k8s_cluster):
     assert runner.exception is None
 
 
-def test_customresources(k8s_cluster):
-    assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
-
-
-@pytest.mark.timeout(60)
-@pytest.mark.asyncio
-async def test_operator(k8s_cluster, operator):
+@pytest.fixture()
+async def simplecluster(k8s_cluster, operator):
     cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
     cluster_name = "simple-cluster"
 
@@ -34,7 +29,23 @@ async def test_operator(k8s_cluster, operator):
     while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
         await asyncio.sleep(1)
 
+    yield cluster_name
+
     # Delete cluster resource
     k8s_cluster.kubectl("delete", "-f", cluster_path)
     while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
         await asyncio.sleep(1)
+
+    # FIXME stdout may not have triggered or flushed by this point but we should check that this was successful
+    # assert "A DaskCluster has been created" in operator.stdout
+
+
+def test_customresources(k8s_cluster):
+    assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+
+
+@pytest.mark.timeout(60)
+@pytest.mark.asyncio
+async def test_simplecluster(simplecluster):
+    # If we get to this point then all fixtures worked ok and we can actually test some things
+    assert simplecluster
