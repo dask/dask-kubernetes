@@ -1,0 +1,8 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskWorkerGroup
+metadata:
+  name: simple-worker-group
+spec:
+  imagePullSecrets: null
+  image: "daskdev/dask:latest"
+  imagePullPolicy: "IfNotPresent"
