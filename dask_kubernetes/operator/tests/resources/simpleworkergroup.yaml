@@ -6,3 +6,12 @@ spec:
   imagePullSecrets: null
   image: "daskdev/dask:latest"
   imagePullPolicy: "IfNotPresent"
+  workers:
+    replicas: 2
+    resources: {}
+    env: {}
+    # nodeSelector: null
+    # securityContext: null
+    # affinity: null
+    # tolerations: null
+    # serviceAccountName: null

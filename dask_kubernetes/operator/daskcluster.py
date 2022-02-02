@@ -1,3 +1,5 @@
+import asyncio
+
 import kopf
 import kubernetes
 
@@ -80,6 +82,43 @@ def build_scheduler_service_spec(name):
     }
 
 
+def build_worker_pod_spec(name, namespace, image, n):
+    return {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+            "name": f"{name}-worker-{n}",
+            "labels": {
+                "dask.org/cluster-name": name,
+                "dask.org/component": "worker",
+            },
+        },
+        "spec": {
+            "containers": [
+                {
+                    "name": "scheduler",
+                    "image": image,
+                    "args": ["dask-worker", f"tcp://{name}.{namespace}:8786"],
+                }
+            ]
+        },
+    }
+
+
+async def wait_for_scheduler(cluster_name, namespace):
+    api = kubernetes.client.CoreV1Api()
+    watch = kubernetes.watch.Watch()
+    for event in watch.stream(
+        func=api.list_namespaced_pod,
+        namespace=namespace,
+        label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
+        timeout_seconds=60,
+    ):
+        if event["object"].status.phase == "Running":
+            watch.stop()
+        await asyncio.sleep(0.1)
+
+
 @kopf.on.create("daskcluster")
 async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     logger.info(
@@ -111,4 +150,3 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
         with the following config: {data['spec']}"
     )
-#
