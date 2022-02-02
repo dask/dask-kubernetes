@@ -320,6 +320,7 @@ API
    InCluster
    KubeConfig
    KubeAuth
+   make_pod_spec
 
 .. autoclass:: KubeCluster
    :members:
@@ -332,3 +333,5 @@ API
 .. autoclass:: KubeConfig
 
 .. autoclass:: KubeAuth
+
+.. autofunction:: make_pod_spec

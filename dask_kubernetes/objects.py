@@ -125,6 +125,38 @@ def make_pod_spec(
     """
     Create generic pod template from input parameters
 
+    Parameters
+    ----------
+    image : str
+        Docker image name
+    labels : dict
+        Dict of labels to pass to ``V1ObjectMeta``
+    threads_per_worker : int
+        Number of threads per each worker
+    env : dict
+        Dict of environment variables to pass to ``V1Container``
+    extra_container_config : dict
+        Extra config attributes to set on the container object
+    extra_pod_config : dict
+        Extra config attributes to set on the pod object
+    memory_limit : int, float, or str
+        Bytes of memory per process that the worker can use.
+        This can be:
+            - an integer (bytes), note 0 is a special case for no memory management.
+            - a float (fraction of total system memory).
+            - a string (like 5GB or 5000M).
+            - 'auto' for automatically computing the memory limit.  [default: auto]
+    cpu_limit : float or str
+        CPU resource limits (applied to ``spec.containers[].resources.limits.cpu``)
+    cpu_requests : float or str
+        CPU resource requests (applied to ``spec.containers[].resources.requests.cpu``)
+    annotations : dict
+        Dict of annotations passed to ``V1ObjectMeta``
+
+    Returns
+    -------
+    pod : V1PodSpec
+
     Examples
     --------
     >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
