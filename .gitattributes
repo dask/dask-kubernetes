@@ -1,1 +1,2 @@
 dask_kubernetes/_version.py export-subst
+* text=auto
