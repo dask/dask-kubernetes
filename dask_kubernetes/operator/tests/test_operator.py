@@ -42,6 +42,7 @@ async def simplecluster(k8s_cluster, operator):
 
 def test_customresources(k8s_cluster):
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+    assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
 
 @pytest.mark.timeout(60)
