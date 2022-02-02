@@ -103,8 +103,7 @@ def test_worker_args(docker_image, loop):
 
         pod = cluster.pod_template
 
-        assert "--memory-limit" in pod.spec.containers[0].args
-        for arg in ["--memory-limit", "500M", "--resources", "FOO=1 BAR=2"]:
+        for arg in ["--memory-limit", "5000M", "--resources", "FOO=1 BAR=2"]:
             assert arg in pod.spec.containers[0].args
 
 
