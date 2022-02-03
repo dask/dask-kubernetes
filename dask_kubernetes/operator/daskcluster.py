@@ -111,4 +111,3 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
         with the following config: {data['spec']}"
     )
-#
