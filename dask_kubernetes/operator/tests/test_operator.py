@@ -11,25 +11,14 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 
 @pytest.fixture()
-<<<<<<< HEAD
 async def kopf_runner(k8s_cluster):
     yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
-=======
-async def operator(k8s_cluster):
-    with KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"]) as runner:
-        yield runner
-
-    # Check operator completed successfully
-    assert runner.exit_code == 0
-    assert runner.exception is None
->>>>>>> Revert "Add tests for creating scheduler pod and service"
 
 
 @pytest.fixture()
 async def gen_cluster(k8s_cluster):
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
-<<<<<<< HEAD
     @asynccontextmanager
     async def cm():
         cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
@@ -47,12 +36,6 @@ async def gen_cluster(k8s_cluster):
             k8s_cluster.kubectl("delete", "-f", cluster_path)
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
-=======
-    # Delete cluster resource
-    k8s_cluster.kubectl("delete", "-f", cluster_path)
-    while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-        await asyncio.sleep(1)
->>>>>>> Revert "Add tests for creating scheduler pod and service"
 
     yield cm
 
