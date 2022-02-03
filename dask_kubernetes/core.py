@@ -254,7 +254,7 @@ class Scheduler(Pod):
         pdb_template_dict = dask.config.get("kubernetes.scheduler-pdb-template")
         self.pdb_template = clean_pdb_template(make_pdb_from_dict(pdb_template_dict))
         self.pdb_template.metadata.name = self.cluster_name
-        self.pdb_template.spec.labels = copy.deepcopy(self.base_labels)
+        self.pdb_template.metadata.labels = copy.deepcopy(self.base_labels)
         self.pdb_template.spec.selector.match_labels[
             "dask.org/cluster-name"
         ] = self.cluster_name
