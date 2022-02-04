@@ -95,7 +95,10 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         body=data,
     )
     # await wait_for_scheduler(name, namespace)
-    logger.info(f"Scheduler pod  in {namespace} is created")
+    logger.info(
+        f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
+        with the following config: {data['spec']}"
+    )
 
     # TODO Check for existing scheduler service
     data = build_scheduler_service_spec(name)
@@ -104,4 +107,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
-    logger.info(f"Scheduler service in {namespace} is created")
+    logger.info(
+        f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
+        with the following config: {data['spec']}"
+    )
