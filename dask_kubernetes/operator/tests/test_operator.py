@@ -55,14 +55,14 @@ def test_operator_runs(kopf_runner):
 
 @pytest.mark.timeout(60)
 @pytest.mark.asyncio
-async def test_simplecluster(kopf_runner, gen_cluster):
+async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             # TODO test our cluster here
-            # scheduler_pod_name = "simple-cluster-scheduler"
+            scheduler_pod_name = "simple-cluster-scheduler"
             # scheduler_service_name = "simple-cluster"
-            # while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
+            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
             assert cluster_name
 
     assert "A DaskCluster has been created" in runner.stdout
