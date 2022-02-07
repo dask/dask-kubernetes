@@ -41,7 +41,7 @@ def namespace_default():
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None
+    core_api, service, port_forward_cluster_ip=None, service_name_resolution_retries = 20
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -56,17 +56,29 @@ async def get_external_address_for_scheduler_service(
         nodes = await core_api.list_node()
         host = nodes.items[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
-        try:
-            # Try to resolve the service name. If we are inside the cluster this should succeeed.
-            host = f"{service.metadata.name}.{service.metadata.namespace}"
-            socket.getaddrinfo(host, port)
-        except socket.gaierror:
-            # If we are outside it will fail and we need to port forward the service.
+        # Try to resolve the service name. If we are inside the cluster this should succeed.
+        host = f"{service.metadata.name}.{service.metadata.namespace}"
+        success = _is_service_available(host=host, port=port, retries=service_name_resolution_retries)
+
+        # If we are outside it will fail and we need to port forward the service.
+        if not success:
             host = "localhost"
             port = await port_forward_service(
                 service.metadata.name, service.metadata.namespace, port
             )
     return f"tcp://{host}:{port}"
+
+def _is_service_available(host, port, retries=20):
+    success = False
+    while retries > 0:
+        try:
+            socket.getaddrinfo(host, port)
+            success = True
+        except socket.gaierror:
+            time.sleep(0.5)
+            retries -= 1
+
+    return success
 
 
 def _random_free_port(low, high, retries=20):
