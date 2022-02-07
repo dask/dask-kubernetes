@@ -41,7 +41,7 @@ def namespace_default():
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None, service_name_resolution_retries = 20
+    core_api, service, port_forward_cluster_ip=None, service_name_resolution_retries=20
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -58,7 +58,9 @@ async def get_external_address_for_scheduler_service(
     elif service.spec.type == "ClusterIP":
         # Try to resolve the service name. If we are inside the cluster this should succeed.
         host = f"{service.metadata.name}.{service.metadata.namespace}"
-        success = _is_service_available(host=host, port=port, retries=service_name_resolution_retries)
+        success = _is_service_available(
+            host=host, port=port, retries=service_name_resolution_retries
+        )
 
         # If we are outside it will fail and we need to port forward the service.
         if not success:
@@ -67,6 +69,7 @@ async def get_external_address_for_scheduler_service(
                 service.metadata.name, service.metadata.namespace, port
             )
     return f"tcp://{host}:{port}"
+
 
 def _is_service_available(host, port, retries=20):
     success = False
