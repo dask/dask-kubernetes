@@ -105,6 +105,22 @@ def build_worker_pod_spec(name, namespace, image, n):
     }
 
 
+def build_worker_group_spec(name, image, workers):
+    return {
+        "apiVersion": "kubernetes.dask.org/v1",
+        "kind": "DaskWorkerGroup",
+        "metadata": {"name": f"{name}-worker-group"},
+        "spec": {
+            "image": image,
+            "workers": {
+                "replicas": workers["replicas"],
+                "resources": workers["resources"],
+                "env": workers["env"],
+            },
+        },
+    }
+
+
 async def wait_for_scheduler(cluster_name, namespace):
     api = kubernetes.client.CoreV1Api()
     watch = kubernetes.watch.Watch()
@@ -146,7 +162,41 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
+    logger.info(f"Scheduler service in {namespace} is created")
+
+    data = build_worker_group_spec("default", spec.get("image"), spec.get("workers"))
+    kopf.adopt(data)
+    api = kubernetes.client.CustomObjectsApi()
+    worker_pods = api.create_namespaced_custom_object(
+        group="kubernetes.dask.org",
+        version="v1",
+        plural="daskworkergroups",
+        namespace=namespace,
+        body=data,
+    )
+    logger.info(f"Worker group  in {namespace} is created")
+
+
+@kopf.on.create("daskworkergroup")
+async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     logger.info(
         f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
         with the following config: {data['spec']}"
     )
+    api = kubernetes.client.CoreV1Api()
+
+    scheduler = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
+        group="kubernetes.dask.org", version="v1", plural="daskclusters"
+    )
+    scheduler_name = scheduler["items"][0]["metadata"]["name"]
+
+    num_workers = spec["workers"]["replicas"]
+    for i in range(1, num_workers + 1):
+        data = build_worker_pod_spec(scheduler_name, namespace, spec.get("image"), i)
+        kopf.adopt(data)
+        worker_pod = api.create_namespaced_pod(
+            namespace=namespace,
+            body=data,
+        )
+    # await wait_for_scheduler(name, namespace)
+    logger.info(f"{num_workers} Worker pods in created in {namespace}")
