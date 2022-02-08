@@ -162,7 +162,10 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
-    logger.info(f"Scheduler service in {namespace} is created")
+    logger.info(
+        f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
+        with the following config: {data['spec']}"
+    )
 
     data = build_worker_group_spec("default", spec.get("image"), spec.get("workers"))
     kopf.adopt(data)
@@ -179,10 +182,6 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
 
 @kopf.on.create("daskworkergroup")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
-    logger.info(
-        f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
-        with the following config: {data['spec']}"
-    )
     api = kubernetes.client.CoreV1Api()
 
     scheduler = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
