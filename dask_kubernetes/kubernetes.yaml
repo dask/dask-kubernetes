@@ -17,6 +17,10 @@ kubernetes:
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
   scheduler-service-wait-timeout: 30
+  # Number of retries to resolve scheduler service name when running
+  # from within the Kubernetes cluster.
+  # Must be set to 1 or greater.
+  scheduler-service-name-resolution-retries: 20
 
   scheduler-service-template:
     apiVersion: v1
