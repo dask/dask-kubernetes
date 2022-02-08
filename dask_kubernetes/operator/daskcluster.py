@@ -162,7 +162,10 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
-    logger.info(f"Scheduler service in {namespace} is created")
+    logger.info(
+        f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
+        with the following config: {data['spec']}"
+    )
 
     data = build_worker_group_spec("default", spec.get("image"), spec.get("workers"))
     kopf.adopt(data)
