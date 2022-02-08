@@ -177,7 +177,10 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
-    logger.info(f"Worker group  in {namespace} is created")
+    logger.info(
+        f"A worker group has been created called {data['metadata']['name']} in {namespace} \
+        with the following config: {data['spec']}"
+    )
 
 
 @kopf.on.create("daskworkergroup")
