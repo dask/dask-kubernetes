@@ -6,3 +6,13 @@ spec:
   imagePullSecrets: null
   image: "daskdev/dask:latest"
   imagePullPolicy: "IfNotPresent"
+  protocol: "tcp"
+  scheduler:
+    resources: {}
+    env: {}
+    serviceType: "ClusterIP"
+    # nodeSelector: null
+    # securityContext: null
+    # affinity: null
+    # tolerations: null
+    # serviceAccountName: null
