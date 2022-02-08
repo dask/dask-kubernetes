@@ -165,12 +165,19 @@ class Scheduler(Pod):
         Set to 0 to disable the timeout (not recommended).
     """
 
-    def __init__(self, idle_timeout: str, service_wait_timeout_s: int = None, **kwargs):
+    def __init__(
+        self,
+        idle_timeout: str,
+        service_wait_timeout_s: int = None,
+        service_name_retries: int = None,
+        **kwargs
+    ):
         super().__init__(**kwargs)
         self.cluster._log("Creating scheduler pod on cluster. This may take some time.")
         self.service = None
         self._idle_timeout = idle_timeout
         self._service_wait_timeout_s = service_wait_timeout_s
+        self._service_name_retries = service_name_retries
         if self._idle_timeout is not None:
             self.pod_template.spec.containers[0].args += [
                 "--idle-timeout",
@@ -198,7 +205,9 @@ class Scheduler(Pod):
             port=SCHEDULER_PORT,
         )
         self.external_address = await get_external_address_for_scheduler_service(
-            self.core_api, self.service
+            self.core_api,
+            self.service,
+            service_name_resolution_retries=self._service_name_retries,
         )
 
         self.pdb = await self._create_pdb()
@@ -329,6 +338,11 @@ class KubeCluster(SpecCluster):
         Timeout, in seconds, to wait for the remote scheduler service to be ready.
         Defaults to 30 seconds.
         Set to 0 to disable the timeout (not recommended).
+    scheduler_service_name_resolution_retries: int (optional)
+        Number of retries to resolve scheduler service name when running
+        from within the Kubernetes cluster.
+        Defaults to 20.
+        Must be set to 1 or greater.
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
@@ -414,6 +428,7 @@ class KubeCluster(SpecCluster):
         dashboard_address=None,
         security=None,
         scheduler_service_wait_timeout=None,
+        scheduler_service_name_resolution_retries=None,
         scheduler_pod_template=None,
         **kwargs
     ):
@@ -458,6 +473,10 @@ class KubeCluster(SpecCluster):
         self._scheduler_service_wait_timeout = dask.config.get(
             "kubernetes.scheduler-service-wait-timeout",
             override_with=scheduler_service_wait_timeout,
+        )
+        self._scheduler_service_name_resolution_retries = dask.config.get(
+            "kubernetes.scheduler-service-name-resolution-retries",
+            override_with=scheduler_service_name_resolution_retries,
         )
         self.security = security
         if self.security and not isinstance(
@@ -585,6 +604,7 @@ class KubeCluster(SpecCluster):
                 "options": {
                     "idle_timeout": self._idle_timeout,
                     "service_wait_timeout_s": self._scheduler_service_wait_timeout,
+                    "service_name_retries": self._scheduler_service_name_resolution_retries,
                     "pod_template": self.scheduler_pod_template,
                     **common_options,
                 },
