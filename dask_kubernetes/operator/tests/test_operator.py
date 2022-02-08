@@ -60,14 +60,13 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
         async with gen_cluster() as cluster_name:
             # TODO test our cluster here
             scheduler_pod_name = "simple-cluster-scheduler"
-            scheduler_service_name = "simple-cluster"
             worker_pod_name = "simple-cluster-worker-1"
-            # while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
-            # while scheduler_service_name not in k8s_cluster.kubectl("get", "svc"):
-            #     await asyncio.sleep(0.1)
-            # while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
+            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
+            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
 
             from dask.distributed import Client
 
