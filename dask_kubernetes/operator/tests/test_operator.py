@@ -69,7 +69,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             #     await asyncio.sleep(0.1)
             # while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
             #     await asyncio.sleep(0.1)
-
+            await asyncio.sleep(60)
             while "Scheduler at:" not in k8s_cluster.kubectl(
                 "logs", scheduler_pod_name
             ):
