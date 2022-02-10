@@ -61,15 +61,15 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             # TODO test our cluster here
+            await asyncio.sleep(60)
             scheduler_pod_name = "simple-cluster-scheduler"
             worker_pod_name = "simple-cluster-worker-1"
-            # while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
-            # while cluster_name not in k8s_cluster.kubectl("get", "svc"):
-            #     await asyncio.sleep(0.1)
-            # while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
-            await asyncio.sleep(60)
+            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
+            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
             while "Scheduler at:" not in k8s_cluster.kubectl(
                 "logs", scheduler_pod_name
             ):
