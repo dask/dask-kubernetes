@@ -7,6 +7,8 @@ import os.path
 
 from kopf.testing import KopfRunner
 
+from dask.distributed import Client
+
 DIR = pathlib.Path(__file__).parent.absolute()
 
 
@@ -53,7 +55,7 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
@@ -61,15 +63,14 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             # TODO test our cluster here
             scheduler_pod_name = "simple-cluster-scheduler"
             worker_pod_name = "simple-cluster-worker-1"
-            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
-            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
-                await asyncio.sleep(0.1)
-            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
+            # while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            #     await asyncio.sleep(0.1)
+            # while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+            #     await asyncio.sleep(0.1)
+            # while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            #     await asyncio.sleep(0.1)
 
-            from dask.distributed import Client
-
+            await asyncio.sleep(60)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
