@@ -74,7 +74,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
-                    f"tcp://localhost:{port}", asynchronous=True
+                    f"{cluster_name}:{port}", asynchronous=True
                 ) as client:
                     await client.wait_for_workers(2)
                     # Ensure that inter-worker communication works well
