@@ -82,14 +82,15 @@ def build_scheduler_service_spec(name):
     }
 
 
-def build_worker_pod_spec(name, namespace, image, n):
+def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": f"{name}-worker-{n}",
             "labels": {
-                "dask.org/cluster-name": name,
+                "dask.org/cluster-name": scheduler_name,
+                "dask.org/workergroup-name": name,
                 "dask.org/component": "worker",
             },
         },
@@ -98,7 +99,7 @@ def build_worker_pod_spec(name, namespace, image, n):
                 {
                     "name": "scheduler",
                     "image": image,
-                    "args": ["dask-worker", f"tcp://{name}.{namespace}:8786"],
+                    "args": ["dask-worker", f"tcp://{scheduler_name}.{namespace}:8786"],
                 }
             ]
         },
@@ -183,6 +184,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     )
 
 
+@kopf.timer("daskworkergroup", interval=5.0)
 @kopf.on.create("daskworkergroup")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     logger.info(
@@ -214,14 +216,52 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
         group="kubernetes.dask.org", version="v1", plural="daskclusters"
     )
     scheduler_name = scheduler["items"][0]["metadata"]["name"]
+    scheduler_spec = scheduler["items"][0]["spec"]
+    scheduler_data = build_scheduler_pod_spec(
+        name=scheduler_name, image=scheduler_spec.get("image")
+    )
+    kopf.adopt(scheduler_data)
+    workers = api.list_namespaced_pod(
+        namespace=namespace,
+        label_selector=f"dask.org/workergroup-name={name}",
+    )
+    current_workers = len(workers.items)
+    desired_workers = spec["workers"]["replicas"]
+    workers_needed = desired_workers - current_workers
+    if workers_needed > 0:
+        for i in range(current_workers + 1, desired_workers + 1):
+            data = build_worker_pod_spec(
+                name, namespace, spec.get("image"), i, scheduler_name
+            )
+            kopf.adopt(data)
+            worker_pod = api.create_namespaced_pod(
+                namespace=namespace,
+                body=data,
+            )
+        logger.info(f"{workers_needed} Worker pods in created in {namespace}")
+    if workers_needed < 0:
+        pass
 
-    num_workers = spec["workers"]["replicas"]
-    for i in range(1, num_workers + 1):
-        data = build_worker_pod_spec(scheduler_name, namespace, spec.get("image"), i)
-        kopf.adopt(data)
-        worker_pod = api.create_namespaced_pod(
+
+@kopf.timer("daskworkergroup", interval=5.0)
+async def scale_workers(spec, name, namespace, logger, **kwargs):
+    workergroups = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
+        group="kubernetes.dask.org", version="v1", plural="daskworkergroups"
+    )
+    num_workergroups = len(workergroups["items"])
+    if num_workergroups > 0:
+        api = kubernetes.client.CustomObjectsApi()
+        data = build_worker_group_spec(
+            name.split("-")[0], spec.get("image"), spec.get("workers")
+        )
+        scaled_worker_pods = api.patch_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
             namespace=namespace,
+            plural="daskworkergroups",
+            name=name,
             body=data,
         )
-    # await wait_for_scheduler(name, namespace)
-    logger.info(f"{num_workers} Worker pods in created in {namespace}")
+        logger.info(
+            f"Scaled worker group {name} to {spec['workers']['replicas']} workers."
+        )

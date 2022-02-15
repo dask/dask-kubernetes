@@ -15,3 +15,5 @@ spec:
     # affinity: null
     # tolerations: null
     # serviceAccountName: null
+status:
+  replicas: 2

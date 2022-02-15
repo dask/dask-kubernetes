@@ -20,3 +20,5 @@ spec:
     replicas: 3
     resources: {}
     env: {}
+status:
+  replicas: 3

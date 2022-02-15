@@ -7,8 +7,6 @@ import os.path
 
 from kopf.testing import KopfRunner
 
-from dask.distributed import Client
-
 DIR = pathlib.Path(__file__).parent.absolute()
 
 
@@ -55,13 +53,13 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-@pytest.mark.timeout(180)
+@pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
-            worker_pod_name = "simple-cluster-worker-1"
+            # scheduler_service_name = "simple-cluster"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             while "Running" not in k8s_cluster.kubectl(
@@ -85,5 +83,5 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
-    assert "A worker group has been created" in runner.stdout
+    assert "A scheduler service has been created" in runner.stdout
     # TODO test that the cluster has been cleaned up
