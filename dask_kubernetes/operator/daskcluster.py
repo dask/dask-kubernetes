@@ -106,18 +106,16 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
     }
 
 
-def build_worker_group_spec(name, image, workers):
+def build_worker_group_spec(name, image, replicas, resources, env):
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
         "metadata": {"name": f"{name}-worker-group"},
         "spec": {
             "image": image,
-            "workers": {
-                "replicas": workers["replicas"],
-                "resources": workers["resources"],
-                "env": workers["env"],
-            },
+            "replicas": replicas,
+            "resources": resources,
+            "env": env,
         },
     }
 
@@ -168,7 +166,13 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         with the following config: {data['spec']}"
     )
 
-    data = build_worker_group_spec("default", spec.get("image"), spec.get("workers"))
+    data = build_worker_group_spec(
+        "default",
+        spec.get("image"),
+        spec.get("replicas"),
+        spec.get("resources"),
+        spec.get("env"),
+    )
     kopf.adopt(data)
     api = kubernetes.client.CustomObjectsApi()
     worker_pods = api.create_namespaced_custom_object(
@@ -197,9 +201,15 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
         name=scheduler_name, image=scheduler_spec.get("image")
     )
     kopf.adopt(scheduler)
-    data = build_worker_group_spec(name, spec.get("image"), spec.get("workers"))
+    data = build_worker_group_spec(
+        name,
+        spec.get("image"),
+        spec.get("replicas"),
+        spec.get("resources"),
+        spec.get("env"),
+    )
     kopf.adopt(data)
-    num_workers = spec["workers"]["replicas"]
+    num_workers = spec["replicas"]
     for i in range(1, num_workers + 1):
         data = build_worker_pod_spec(
             name, namespace, spec.get("image"), i, scheduler_name
@@ -237,18 +247,14 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 body=data,
             )
-        logger.info(
-            f"Scaled worker group {name} up to {spec['workers']['replicas']} workers."
-        )
+        logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
     if workers_needed < 0:
         for i in range(current_workers, desired_workers, -1):
             worker_pod = api.delete_namespaced_pod(
                 name=f"{name}-worker-{i}",
                 namespace=namespace,
             )
-        logger.info(
-            f"Scaled worker group {name} down to {spec['workers']['replicas']} workers."
-        )
+        logger.info(f"Scaled worker group {name} down to {spec['replicas']} workers.")
 
 
 @kopf.on.delete("daskcluster")

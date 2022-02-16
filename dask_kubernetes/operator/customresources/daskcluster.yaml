@@ -28,5 +28,5 @@ spec:
               x-kubernetes-preserve-unknown-fields: true
       subresources:
         scale:
-          specReplicasPath: .spec.workers.replicas
+          specReplicasPath: .spec.replicas
           statusReplicasPath: .status.replicas
