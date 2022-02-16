@@ -55,7 +55,7 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-@pytest.mark.timeout(60)
+# @pytest.mark.timeout(60)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
@@ -70,10 +70,10 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            # while "Scheduler at:" not in k8s_cluster.kubectl(
-            #     "logs", scheduler_pod_name
-            # ):
-            #     await asyncio.sleep(0.1)
+            while "Scheduler at:" not in k8s_cluster.kubectl(
+                "logs", scheduler_pod_name
+            ):
+                await asyncio.sleep(0.1)
             # await asyncio.sleep(60)
             # with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
             #     async with Client(
