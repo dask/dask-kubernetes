@@ -55,13 +55,13 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-@pytest.mark.timeout(120)
+# @pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             # TODO test our cluster here
-            # await asyncio.sleep(60)
+            await asyncio.sleep(60)
             scheduler_pod_name = "simple-cluster-scheduler"
             worker_pod_name = "simple-cluster-worker-1"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
