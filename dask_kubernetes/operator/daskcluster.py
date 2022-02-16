@@ -184,30 +184,6 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     )
 
 
-@kopf.timer("daskworkergroup", interval=5.0)
-@kopf.on.create("daskworkergroup")
-async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
-    logger.info(
-        f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
-        with the following config: {data['spec']}"
-    )
-
-    data = build_worker_group_spec("default", spec.get("image"), spec.get("workers"))
-    kopf.adopt(data)
-    api = kubernetes.client.CustomObjectsApi()
-    worker_pods = api.create_namespaced_custom_object(
-        group="kubernetes.dask.org",
-        version="v1",
-        plural="daskworkergroups",
-        namespace=namespace,
-        body=data,
-    )
-    logger.info(
-        f"A worker group has been created called {data['metadata']['name']} in {namespace} \
-        with the following config: {data['spec']}"
-    )
-
-
 @kopf.on.create("daskworkergroup")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     api = kubernetes.client.CoreV1Api()
@@ -220,7 +196,30 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     scheduler_data = build_scheduler_pod_spec(
         name=scheduler_name, image=scheduler_spec.get("image")
     )
-    kopf.adopt(scheduler_data)
+    kopf.adopt(scheduler)
+    data = build_worker_group_spec(name, spec.get("image"), spec.get("workers"))
+    kopf.adopt(data)
+    num_workers = spec["workers"]["replicas"]
+    for i in range(1, num_workers + 1):
+        data = build_worker_pod_spec(
+            name, namespace, spec.get("image"), i, scheduler_name
+        )
+        kopf.adopt(data)
+        worker_pod = api.create_namespaced_pod(
+            namespace=namespace,
+            body=data,
+        )
+    logger.info(f"{num_workers} Worker pods in created in {namespace}")
+
+
+@kopf.on.update("daskworkergroup")
+async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
+    api = kubernetes.client.CoreV1Api()
+
+    scheduler = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
+        group="kubernetes.dask.org", version="v1", plural="daskclusters"
+    )
+    scheduler_name = scheduler["items"][0]["metadata"]["name"]
     workers = api.list_namespaced_pod(
         namespace=namespace,
         label_selector=f"dask.org/workergroup-name={name}",
@@ -238,30 +237,38 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 body=data,
             )
-        logger.info(f"{workers_needed} Worker pods in created in {namespace}")
+        logger.info(
+            f"Scaled worker group {name} up to {spec['workers']['replicas']} workers."
+        )
     if workers_needed < 0:
-        pass
+        for i in range(current_workers, desired_workers, -1):
+            worker_pod = api.delete_namespaced_pod(
+                name=f"{name}-worker-{i}",
+                namespace=namespace,
+            )
+        logger.info(
+            f"Scaled worker group {name} down to {spec['workers']['replicas']} workers."
+        )
 
 
-@kopf.timer("daskworkergroup", interval=5.0)
-async def scale_workers(spec, name, namespace, logger, **kwargs):
-    workergroups = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
+@kopf.on.delete("daskcluster")
+async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
+    api = kubernetes.client.CustomObjectsApi()
+    workergroups = api.list_cluster_custom_object(
         group="kubernetes.dask.org", version="v1", plural="daskworkergroups"
     )
-    num_workergroups = len(workergroups["items"])
-    if num_workergroups > 0:
-        api = kubernetes.client.CustomObjectsApi()
-        data = build_worker_group_spec(
-            name.split("-")[0], spec.get("image"), spec.get("workers")
-        )
-        scaled_worker_pods = api.patch_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            namespace=namespace,
-            plural="daskworkergroups",
-            name=name,
-            body=data,
-        )
-        logger.info(
-            f"Scaled worker group {name} to {spec['workers']['replicas']} workers."
-        )
+    workergroups = api.delete_collection_namespaced_custom_object(
+        group="kubernetes.dask.org",
+        version="v1",
+        plural="daskworkergroups",
+        namespace=namespace,
+    )
+
+
+@kopf.on.delete("daskworkergroup")
+async def daskworkergroup_delete(spec, name, namespace, logger, **kwargs):
+    api = kubernetes.client.CoreV1Api()
+    workers = api.delete_collection_namespaced_pod(
+        namespace=namespace,
+        label_selector=f"dask.org/workergroup-name={name}",
+    )
