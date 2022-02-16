@@ -74,7 +74,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             #     "logs", scheduler_pod_name
             # ):
             #     await asyncio.sleep(0.1)
-            await asyncio.sleep(50)
+            await asyncio.sleep(40)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
