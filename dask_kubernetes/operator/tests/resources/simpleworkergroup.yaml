@@ -1,8 +1,17 @@
 apiVersion: kubernetes.dask.org/v1
 kind: DaskWorkerGroup
 metadata:
-  name: simple-worker-group
+  name: additional-worker-group
 spec:
   imagePullSecrets: null
   image: "daskdev/dask:latest"
   imagePullPolicy: "IfNotPresent"
+  workers:
+    replicas: 2
+    resources: {}
+    env: {}
+    # nodeSelector: null
+    # securityContext: null
+    # affinity: null
+    # tolerations: null
+    # serviceAccountName: null
