@@ -77,7 +77,13 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
-                    await client.wait_for_workers(2)
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "--replicas=6",
+                        "daskworkergroup",
+                        "default-worker-group",
+                    )
+                    await client.wait_for_workers(5)
                     # Ensure that inter-worker communication works well
                     futures = client.map(lambda x: x + 1, range(10))
                     total = client.submit(sum, futures)
