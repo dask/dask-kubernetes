@@ -55,7 +55,7 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-# @pytest.mark.timeout(120)
+@pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
