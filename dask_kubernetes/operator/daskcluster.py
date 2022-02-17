@@ -235,7 +235,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         label_selector=f"dask.org/workergroup-name={name}",
     )
     current_workers = len(workers.items)
-    desired_workers = spec["workers"]["replicas"]
+    desired_workers = spec["replicas"]
     workers_needed = desired_workers - current_workers
     if workers_needed > 0:
         for i in range(current_workers + 1, desired_workers + 1):
