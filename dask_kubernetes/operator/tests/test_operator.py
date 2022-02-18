@@ -79,9 +79,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 ) as client:
                     k8s_cluster.port_forward(
                         "scale",
-                        "--replicas=5",
-                        "daskworkergroup",
-                        "default-worker-group",
+                        "--replicas=5 daskworkergroup default-worker-group",
                     )
                     await client.wait_for_workers(5)
                     # Ensure that inter-worker communication works well
@@ -90,9 +88,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
                     # k8s_cluster.port_forward(
                     #     "scale",
-                    #     "--replicas=3",
-                    #     "daskworkergroup",
-                    #     "default-worker-group",
+                    #     "--replicas=3 daskworkergroup default-worker-group"
                     # )
                     # await client.wait_for_workers(3)
             assert cluster_name
