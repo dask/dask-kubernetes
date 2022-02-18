@@ -83,11 +83,18 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "daskworkergroup",
                         "default-worker-group",
                     )
-                    await client.wait_for_workers(2)
+                    await client.wait_for_workers(5)
                     # Ensure that inter-worker communication works well
                     futures = client.map(lambda x: x + 1, range(10))
                     total = client.submit(sum, futures)
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
+                    # k8s_cluster.port_forward(
+                    #     "scale",
+                    #     "--replicas=3",
+                    #     "daskworkergroup",
+                    #     "default-worker-group",
+                    # )
+                    # await client.wait_for_workers(3)
             assert cluster_name
 
     assert "A DaskCluster has been created" in runner.stdout
