@@ -104,20 +104,25 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.asyncio
-async def test_scale(kopf_runner, k8s_cluster):
+async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
-        async with Client(asynchronous=True) as client:
-            k8s_cluster.kubectl(
-                "scale",
-                "--replicas=5",
-                "daskworkergroup",
-                "default-worker-group",
-            )
-            await client.wait_for_workers(5)
-            k8s_cluster.kubectl(
-                "scale",
-                "--replicas=3",
-                "daskworkergroup",
-                "default-worker-group",
-            )
-            await client.wait_for_workers(3)
+        async with gen_cluster() as cluster_name:
+            asyncio.sleep(60)
+            with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
+                async with Client(
+                    f"tcp://localhost:{port}", asynchronous=True
+                ) as client:
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "--replicas=5",
+                        "daskworkergroup",
+                        "default-worker-group",
+                    )
+                    await client.wait_for_workers(5)
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "--replicas=3",
+                        "daskworkergroup",
+                        "default-worker-group",
+                    )
+                    await client.wait_for_workers(3)
