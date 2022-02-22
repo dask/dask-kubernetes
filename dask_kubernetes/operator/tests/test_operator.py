@@ -103,7 +103,44 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     # TODO test that the cluster has been cleaned up
 
 
-# @pytest.mark.timeout(120)
+# # @pytest.mark.timeout(120)
+# @pytest.mark.asyncio
+# async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
+#     with kopf_runner as runner:
+#         async with gen_cluster() as cluster_name:
+#             scheduler_pod_name = "simple-cluster-scheduler"
+#             worker_pod_name = "default-worker-group-worker-1"
+#             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+#                 await asyncio.sleep(0.1)
+#             while "Running" not in k8s_cluster.kubectl(
+#                 "get", "pods", scheduler_pod_name
+#             ):
+#                 await asyncio.sleep(0.1)
+#             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+#                 await asyncio.sleep(0.1)
+#             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+#                 await asyncio.sleep(0.1)
+#             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
+#                 async with Client(
+#                     f"tcp://localhost:{port}", asynchronous=True
+#                 ) as client:
+#                     k8s_cluster.kubectl(
+#                         "scale",
+#                         "--replicas=5",
+#                         "daskworkergroup",
+#                         "default-worker-group",
+#                     )
+#                     await client.wait_for_workers(5)
+#                     k8s_cluster.kubectl(
+#                         "scale",
+#                         "--replicas=3",
+#                         "daskworkergroup",
+#                         "default-worker-group",
+#                     )
+#                     await client.wait_for_workers(3)
+
+
+@pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
@@ -120,6 +157,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
+
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
@@ -131,6 +169,10 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "default-worker-group",
                     )
                     await client.wait_for_workers(5)
+                    # Ensure that inter-worker communication works well
+                    futures = client.map(lambda x: x + 1, range(10))
+                    total = client.submit(sum, futures)
+                    assert (await total) == sum(map(lambda x: x + 1, range(10)))
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=3",
@@ -138,3 +180,9 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "default-worker-group",
                     )
                     await client.wait_for_workers(3)
+            assert cluster_name
+
+    assert "A DaskCluster has been created" in runner.stdout
+    assert "A scheduler pod has been created" in runner.stdout
+    assert "A worker group has been created" in runner.stdout
+    # TODO test that the cluster has been cleaned up
