@@ -32,5 +32,6 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest
+        # run: pytest
         # run: pytest dask_kubernetes/operator/tests/test_operator.py::test_scalesimplecluster
+        run: pytest dask_kubernetes/operator/tests/test_operator.py::test_simplecluster
