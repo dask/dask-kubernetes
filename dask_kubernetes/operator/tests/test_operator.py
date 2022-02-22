@@ -42,6 +42,10 @@ async def gen_cluster(k8s_cluster):
             scheduler_pod_name = "simple-cluster-scheduler"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
+            while "Running" in k8s_cluster.kubectl("get", "pods", scheduler_pod_name):
+                await asyncio.sleep(0.1)
+            while cluster_name in k8s_cluster.kubectl("get", "svc"):
+                await asyncio.sleep(0.1)
 
     yield cm
 
