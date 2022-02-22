@@ -105,7 +105,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.asyncio
 async def test_scale(k8s_cluster):
-    async with Client("simple-cluster-scheduler") as client:
+    async with Client("simple-cluster-scheduler", asynchronous=True) as client:
         k8s_cluster.kubectl(
             "scale",
             "--replicas=5",
