@@ -103,20 +103,20 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     # TODO test that the cluster has been cleaned up
 
 
-# @pytest.mark.asyncio
-# async def test_scale(k8s_cluster):
-#     async with Client() as client:
-#         k8s_cluster.kubectl(
-#             "scale",
-#             "--replicas=5",
-#             "daskworkergroup",
-#             "default-worker-group",
-#         )
-#         await client.wait_for_workers(5)
-#         k8s_cluster.kubectl(
-#             "scale",
-#             "--replicas=3",
-#             "daskworkergroup",
-#             "default-worker-group",
-#         )
-#         await client.wait_for_workers(3)
+@pytest.mark.asyncio
+async def test_scale(k8s_cluster):
+    async with Client("simple-cluster-scheduler") as client:
+        k8s_cluster.kubectl(
+            "scale",
+            "--replicas=5",
+            "daskworkergroup",
+            "default-worker-group",
+        )
+        await client.wait_for_workers(5)
+        k8s_cluster.kubectl(
+            "scale",
+            "--replicas=3",
+            "daskworkergroup",
+            "default-worker-group",
+        )
+        await client.wait_for_workers(3)
