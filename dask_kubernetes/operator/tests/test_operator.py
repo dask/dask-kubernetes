@@ -55,7 +55,7 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-@pytest.mark.timeout(120)
+# @pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
@@ -101,7 +101,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
     # TODO test that the cluster has been cleaned up
-    asyncio.sleep(60)
+    while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+        await asyncio.sleep(0.1)
 
 
 # @pytest.mark.timeout(120)
