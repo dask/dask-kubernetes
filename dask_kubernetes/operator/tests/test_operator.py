@@ -103,11 +103,11 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     # TODO test that the cluster has been cleaned up
 
 
+@pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
-            asyncio.sleep(120)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
