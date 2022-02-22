@@ -39,13 +39,6 @@ async def gen_cluster(k8s_cluster):
             # k8s_cluster.kubectl("delete", "dsk", "--all")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
-            scheduler_pod_name = "simple-cluster-scheduler"
-            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
-            while "Running" in k8s_cluster.kubectl("get", "pods", scheduler_pod_name):
-                await asyncio.sleep(0.1)
-            while cluster_name in k8s_cluster.kubectl("get", "svc"):
-                await asyncio.sleep(0.1)
 
     yield cm
 
@@ -114,6 +107,11 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 # @pytest.mark.timeout(120)
 @pytest.mark.asyncio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
+    scheduler_pod_name = "simple-cluster-scheduler"
+    while scheduler_pod_name in k8s_cluster.kubectl("get", "pods"):
+        await asyncio.sleep(0.1)
+    while "Running" in k8s_cluster.kubectl("get", "pods", scheduler_pod_name):
+        await asyncio.sleep(0.1)
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
