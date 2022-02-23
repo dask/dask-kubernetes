@@ -36,11 +36,11 @@ async def gen_cluster(k8s_cluster):
         finally:
             # Delete cluster resource
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            # while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-            #     await asyncio.sleep(0.1)
-            while "No resources found in default namespace." not in k8s_cluster.kubectl(
-                "get", "daskclusters"
-            ):
+            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+                # while "No resources found in default namespace." not in k8s_cluster.kubectl(
+                #     "get", "daskclusters"
+                # ):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -71,7 +71,10 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-
+            while "Running" not in k8s_cluster.kubectl(
+                "get", "pods", scheduler_pod_name
+            ):
+                await asyncio.sleep(0.1)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
