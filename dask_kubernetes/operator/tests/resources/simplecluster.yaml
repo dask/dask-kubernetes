@@ -16,3 +16,6 @@ spec:
     # affinity: null
     # tolerations: null
     # serviceAccountName: null
+  replicas: 3
+  resources: {}
+  env: {}

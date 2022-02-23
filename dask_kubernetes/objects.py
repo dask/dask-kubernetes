@@ -117,6 +117,7 @@ def make_pod_spec(
     extra_container_config={},
     extra_pod_config={},
     memory_limit=None,
+    resources=None,
     memory_request=None,
     cpu_limit=None,
     cpu_request=None,
@@ -124,6 +125,42 @@ def make_pod_spec(
 ):
     """
     Create generic pod template from input parameters
+
+    Parameters
+    ----------
+    image : str
+        Docker image name
+    labels : dict
+        Dict of labels to pass to ``V1ObjectMeta``
+    threads_per_worker : int
+        Number of threads per each worker
+    env : dict
+        Dict of environment variables to pass to ``V1Container``
+    extra_container_config : dict
+        Extra config attributes to set on the container object
+    extra_pod_config : dict
+        Extra config attributes to set on the pod object
+    memory_limit : int, float, or str
+        Bytes of memory per process that the worker can use.
+        This can be:
+            - an integer (bytes), note 0 is a special case for no memory management.
+            - a float (fraction of total system memory).
+            - a string (like 5GB or 5000M).
+            - 'auto' for automatically computing the memory limit.  [default: auto]
+    resources : str
+        Resources for task constraints like "GPU=2 MEM=10e9". Resources are applied
+        separately to each worker process (only relevant when starting multiple
+        worker processes. Passed to the `--resources` option in ``dask-worker``.
+    cpu_limit : float or str
+        CPU resource limits (applied to ``spec.containers[].resources.limits.cpu``)
+    cpu_requests : float or str
+        CPU resource requests (applied to ``spec.containers[].resources.requests.cpu``)
+    annotations : dict
+        Dict of annotations passed to ``V1ObjectMeta``
+
+    Returns
+    -------
+    pod : V1PodSpec
 
     Examples
     --------
@@ -139,6 +176,8 @@ def make_pod_spec(
     ]
     if memory_limit:
         args.extend(["--memory-limit", str(memory_limit)])
+    if resources:
+        args.extend(["--resources", str(resources)])
     pod = client.V1Pod(
         metadata=client.V1ObjectMeta(labels=labels, annotations=annotations),
         spec=client.V1PodSpec(
@@ -194,7 +233,7 @@ def make_pdb_from_dict(dict_):
 
 
 def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
-    """ Normalize pod template """
+    """Normalize pod template"""
     pod_template = copy.deepcopy(pod_template)
 
     # Make sure metadata / labels / env objects exist, so they can be modified
@@ -286,7 +325,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
 
 
 def clean_service_template(service_template):
-    """ Normalize service template and check for type errors """
+    """Normalize service template and check for type errors"""
 
     service_template = copy.deepcopy(service_template)
 
@@ -301,7 +340,7 @@ def clean_service_template(service_template):
 
 
 def clean_pdb_template(pdb_template):
-    """ Normalize pdb template and check for type errors """
+    """Normalize pdb template and check for type errors"""
 
     pdb_template = copy.deepcopy(pdb_template)
 
