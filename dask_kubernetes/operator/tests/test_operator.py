@@ -35,8 +35,8 @@ async def gen_cluster(k8s_cluster):
             yield cluster_name
         finally:
             # Delete cluster resource
-            k8s_cluster.kubectl("delete", "-f", cluster_path)
-            # k8s_cluster.kubectl("delete", "dsk", "--all")
+            # k8s_cluster.kubectl("delete", "-f", cluster_path)
+            k8s_cluster.kubectl("delete", "dsk", "--all")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
