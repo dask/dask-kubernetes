@@ -87,6 +87,26 @@ def test_extra_container_config_merge(docker_image, loop):
         assert pod.spec.containers[0].args[-1] == "last-item"
 
 
+def test_worker_args(docker_image, loop):
+    """
+    Test that dask-worker arguments are added to the container args
+    """
+    with KubeCluster(
+        make_pod_spec(
+            docker_image,
+            memory_limit="5000M",
+            resources="FOO=1 BAR=2",
+        ),
+        loop=loop,
+        n_workers=0,
+    ) as cluster:
+
+        pod = cluster.pod_template
+
+        for arg in ["--memory-limit", "5000M", "--resources", "FOO=1 BAR=2"]:
+            assert arg in pod.spec.containers[0].args
+
+
 def test_make_pod_from_dict():
     d = {
         "kind": "Pod",
