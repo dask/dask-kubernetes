@@ -239,7 +239,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     if workers_needed < 0:
         for i in range(current_workers, desired_workers, -1):
             worker_pod = api.delete_namespaced_pod(
-                name=f"{name}-worker-{i}",
+                name=f"{scheduler_name}-{name}-worker-{i}",
                 namespace=namespace,
             )
         logger.info(f"Scaled worker group {name} down to {spec['replicas']} workers.")
