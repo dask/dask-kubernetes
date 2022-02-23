@@ -89,9 +89,9 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_pod_name = "default-worker-group-worker-1"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            while "Running" not in k8s_cluster.kubectl(
-                "get", "pods", scheduler_pod_name
-            ):
+                # while "Running" not in k8s_cluster.kubectl(
+                #     "get", "pods", scheduler_pod_name
+                # ):
                 await asyncio.sleep(0.1)
             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
