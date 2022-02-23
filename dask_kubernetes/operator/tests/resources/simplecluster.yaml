@@ -16,7 +16,6 @@ spec:
     # affinity: null
     # tolerations: null
     # serviceAccountName: null
-  workers:
-    replicas: 3
-    resources: {}
-    env: {}
+  replicas: 3
+  resources: {}
+  env: {}
