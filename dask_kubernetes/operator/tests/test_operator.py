@@ -36,10 +36,12 @@ async def gen_cluster(k8s_cluster):
         finally:
             # Delete cluster resource
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-                await asyncio.sleep(0.1)
-            # while "No resources found in default namespace." not in k8s_cluster.kubectl("get", "daskclusters"):
+            # while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
             #     await asyncio.sleep(0.1)
+            while "No resources found in default namespace." not in k8s_cluster.kubectl(
+                "get", "daskclusters"
+            ):
+                await asyncio.sleep(0.1)
 
     yield cm
 
