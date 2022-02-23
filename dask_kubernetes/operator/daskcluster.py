@@ -87,7 +87,7 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
-            "name": f"{name}-worker-{n}",
+            "name": f"{scheduler_name}-{name}-worker-{n}",
             "labels": {
                 "dask.org/cluster-name": scheduler_name,
                 "dask.org/workergroup-name": name,
@@ -257,3 +257,4 @@ async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
         plural="daskworkergroups",
         namespace=namespace,
     )
+    # TODO: We would prefer to use adoptions rather than a delete handler
