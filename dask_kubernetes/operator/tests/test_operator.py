@@ -35,7 +35,6 @@ async def gen_cluster(k8s_cluster):
             yield cluster_name
         finally:
             # Delete cluster resource
-            # k8s_cluster.kubectl("delete", "-f", cluster_path)
             k8s_cluster.kubectl("delete", "dsk", "--all")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -89,10 +88,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_pod_name = "default-worker-group-worker-1"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-                # while "Running" not in k8s_cluster.kubectl(
-                #     "get", "pods", scheduler_pod_name
-                # ):
-                # await asyncio.sleep(0.1)
             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
@@ -109,7 +104,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
             assert cluster_name
 
-    # TODO test that the cluster has been cleaned up
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
