@@ -1,4 +1,5 @@
 import asyncio
+from distributed.core import rpc
 
 import kopf
 import kubernetes
@@ -82,14 +83,14 @@ def build_scheduler_service_spec(name):
     }
 
 
-def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
+def build_worker_pod_spec(name, namespace, image, n, cluster_name):
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
-            "name": f"{scheduler_name}-{name}-worker-{n}",
+            "name": f"{cluster_name}-{name}-worker-{n}",
             "labels": {
-                "dask.org/cluster-name": scheduler_name,
+                "dask.org/cluster-name": cluster_name,
                 "dask.org/workergroup-name": name,
                 "dask.org/component": "worker",
             },
@@ -99,7 +100,7 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
                 {
                     "name": "scheduler",
                     "image": image,
-                    "args": ["dask-worker", f"tcp://{scheduler_name}.{namespace}:8786"],
+                    "args": ["dask-worker", f"tcp://{cluster_name}.{namespace}:8786"],
                 }
             ]
         },
@@ -157,7 +158,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     # TODO Check for existing scheduler service
     data = build_scheduler_service_spec(name)
     kopf.adopt(data)
-    scheduler_pod = api.create_namespaced_service(
+    scheduler_service = api.create_namespaced_service(
         namespace=namespace,
         body=data,
     )
@@ -196,11 +197,11 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     cluster = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
         group="kubernetes.dask.org", version="v1", plural="daskclusters"
     )
-    scheduler_name = cluster["items"][0]["metadata"]["name"]
+    cluster_name = cluster["items"][0]["metadata"]["name"]
     num_workers = spec["replicas"]
     for i in range(1, num_workers + 1):
         data = build_worker_pod_spec(
-            name, namespace, spec.get("image"), i, scheduler_name
+            name, namespace, spec.get("image"), i, cluster_name
         )
         kopf.adopt(data)
         worker_pod = api.create_namespaced_pod(
@@ -214,10 +215,10 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     api = kubernetes.client.CoreV1Api()
 
-    scheduler = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
+    cluster = kubernetes.client.CustomObjectsApi().list_cluster_custom_object(
         group="kubernetes.dask.org", version="v1", plural="daskclusters"
     )
-    scheduler_name = scheduler["items"][0]["metadata"]["name"]
+    cluster_name = cluster["items"][0]["metadata"]["name"]
     workers = api.list_namespaced_pod(
         namespace=namespace,
         label_selector=f"dask.org/workergroup-name={name}",
@@ -228,7 +229,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     if workers_needed > 0:
         for i in range(current_workers + 1, desired_workers + 1):
             data = build_worker_pod_spec(
-                name, namespace, spec.get("image"), i, scheduler_name
+                name, namespace, spec.get("image"), i, cluster_name
             )
             kopf.adopt(data)
             worker_pod = api.create_namespaced_pod(
@@ -237,9 +238,12 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
         logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
     if workers_needed < 0:
+        with rpc(f"tcp://{cluster_name}.{namespace}:8786") as scheduler:
+            scheduler_info = scheduler
+        logger.info(f"Scheduler info: {scheduler_info}")
         for i in range(current_workers, desired_workers, -1):
             worker_pod = api.delete_namespaced_pod(
-                name=f"{scheduler_name}-{name}-worker-{i}",
+                name=f"{cluster_name}-{name}-worker-{i}",
                 namespace=namespace,
             )
         logger.info(f"Scaled worker group {name} down to {spec['replicas']} workers.")
