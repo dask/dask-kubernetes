@@ -6,7 +6,17 @@
 version: 2
 
 # Set the version of Python and other tools you might need
-build:
-  os: ubuntu-20.04
-  tools:
-    python: "3.9"
+sphinx:
+  configuration: doc/source/conf.py
+
+formats: all
+
+python:
+  version: 3.9
+  install:
+    - method: pip
+      path: .
+    - requirements: doc/requirements-docs.txt
+
+submodules:
+  include: all
