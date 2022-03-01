@@ -1,9 +1,12 @@
 import asyncio
+import nest_asyncio
 
-# from distributed.core import rpc
+from distributed.core import rpc
 
 import kopf
 import kubernetes
+
+from uuid import uuid4
 
 
 def build_scheduler_pod_spec(name, image):
@@ -101,7 +104,11 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
                 {
                     "name": "scheduler",
                     "image": image,
-                    "args": ["dask-worker", f"tcp://{scheduler_name}.{namespace}:8786"],
+                    "args": [
+                        "dask-worker",
+                        f"tcp://{scheduler_name}.{namespace}:8786",
+                        f"--name={scheduler_name}-{name}-worker-{n}",
+                    ],
                 }
             ]
         },
@@ -150,7 +157,6 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
-    # await wait_for_scheduler(name, namespace)
     logger.info(
         f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
         with the following config: {data['spec']}"
@@ -200,9 +206,9 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     )
     scheduler_name = cluster["items"][0]["metadata"]["name"]
     num_workers = spec["replicas"]
-    for i in range(1, num_workers + 1):
+    for i in range(num_workers):
         data = build_worker_pod_spec(
-            name, namespace, spec.get("image"), i, scheduler_name
+            name, namespace, spec.get("image"), uuid4().hex, scheduler_name
         )
         kopf.adopt(data)
         worker_pod = api.create_namespaced_pod(
@@ -228,9 +234,9 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     desired_workers = spec["replicas"]
     workers_needed = desired_workers - current_workers
     if workers_needed > 0:
-        for i in range(current_workers + 1, desired_workers + 1):
+        for i in range(workers_needed):
             data = build_worker_pod_spec(
-                name, namespace, spec.get("image"), i, scheduler_name
+                name, namespace, spec.get("image"), uuid4().hex, scheduler_name
             )
             kopf.adopt(data)
             worker_pod = api.create_namespaced_pod(
@@ -239,12 +245,15 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
         logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
     if workers_needed < 0:
-        # with rpc(f"tcp://{scheduler_name}.{namespace}:8786") as scheduler:
-        #     scheduler_info = scheduler
-        # logger.info(f"Scheduler info: {scheduler_info}")
-        for i in range(current_workers, desired_workers, -1):
+        nest_asyncio.apply()
+        with rpc("localhost:8786") as scheduler:
+            worker_ids = await scheduler.workers_to_close(
+                n=-workers_needed, attribute="name"
+            )
+        logger.info(f"Workers to close: {worker_ids}")
+        for wid in worker_ids:
             worker_pod = api.delete_namespaced_pod(
-                name=f"{scheduler_name}-{name}-worker-{i}",
+                name=wid,
                 namespace=namespace,
             )
         logger.info(f"Scaled worker group {name} down to {spec['replicas']} workers.")
