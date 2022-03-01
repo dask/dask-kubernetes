@@ -1,5 +1,4 @@
 import asyncio
-import nest_asyncio
 
 from distributed.core import rpc
 
@@ -88,11 +87,12 @@ def build_scheduler_service_spec(name):
 
 
 def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
+    worker_name = f"{scheduler_name}-{name}-worker-{n}"
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
-            "name": f"{scheduler_name}-{name}-worker-{n}",
+            "name": worker_name,
             "labels": {
                 "dask.org/cluster-name": scheduler_name,
                 "dask.org/workergroup-name": name,
@@ -107,7 +107,7 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
                     "args": [
                         "dask-worker",
                         f"tcp://{scheduler_name}.{namespace}:8786",
-                        f"--name={scheduler_name}-{name}-worker-{n}",
+                        f"--name={worker_name}",
                     ],
                 }
             ]
@@ -245,11 +245,10 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
         logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
     if workers_needed < 0:
-        nest_asyncio.apply()
-        with rpc("localhost:8786") as scheduler:
-            worker_ids = await scheduler.workers_to_close(
-                n=-workers_needed, attribute="name"
-            )
+        scheduler = rpc("localhost:8786")
+        worker_ids = await scheduler.workers_to_close(
+            n=-workers_needed, attribute="name"
+        )
         logger.info(f"Workers to close: {worker_ids}")
         for wid in worker_ids:
             worker_pod = api.delete_namespaced_pod(
