@@ -129,13 +129,13 @@ def build_worker_group_spec(name, image, replicas, resources, env):
     }
 
 
-async def wait_for_scheduler(scheduler_name, namespace):
+async def wait_for_scheduler(cluster_name, namespace):
     api = kubernetes.client.CoreV1Api()
     watch = kubernetes.watch.Watch()
     for event in watch.stream(
         func=api.list_namespaced_pod,
         namespace=namespace,
-        label_selector=f"dask.org/cluster-name={scheduler_name},dask.org/component=scheduler",
+        label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
         timeout_seconds=60,
     ):
         if event["object"].status.phase == "Running":
