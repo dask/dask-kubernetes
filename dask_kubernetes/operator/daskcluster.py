@@ -245,7 +245,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
         logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
     if workers_needed < 0:
-        # TODO: Replace localhost with the scheduler service name
+        # TODO: Replace address localhost with the scheduler service name
         scheduler = rpc("localhost:8786")
         worker_ids = await scheduler.workers_to_close(
             n=-workers_needed, attribute="name"
