@@ -66,7 +66,7 @@ def build_scheduler_service_spec(name):
         "spec": {
             "selector": {
                 "dask.org/cluster-name": name,
-                "dask.org/component": "service",
+                "dask.org/component": "scheduler",
             },
             "ports": [
                 {
