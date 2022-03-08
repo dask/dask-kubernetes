@@ -60,7 +60,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
-            worker_pod_name = "simple-cluster-default-worker-group-worker-1"
+            worker_pod_name = "simple-cluster-default-worker-group-worker"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
@@ -91,13 +91,13 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     await client.wait_for_workers(3)
 
 
-@pytest.mark.timeout(120)
+@pytest.mark.timeout(180)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
-            worker_pod_name = "simple-cluster-default-worker-group-worker-1"
+            worker_pod_name = "simple-cluster-default-worker-group-worker"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
