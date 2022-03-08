@@ -63,13 +63,13 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_pod_name = "simple-cluster-default-worker-group-worker"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
-                await asyncio.sleep(0.1)
-            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
             while "Running" not in k8s_cluster.kubectl(
                 "get", "pods", scheduler_pod_name
             ):
+                await asyncio.sleep(0.1)
+            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
@@ -100,11 +100,14 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_pod_name = "simple-cluster-default-worker-group-worker"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
+            while "Running" not in k8s_cluster.kubectl(
+                "get", "pods", scheduler_pod_name
+            ):
+                await asyncio.sleep(0.1)
             while cluster_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-
             with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
