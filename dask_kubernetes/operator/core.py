@@ -1,4 +1,5 @@
-import subprocess
+# import asyncio
+# import subprocess
 
 from distributed.deploy import Cluster
 from distributed.core import rpc
@@ -12,20 +13,35 @@ from dask_kubernetes.utils import (
     #     check_dependency,
 )
 
+from daskcluster import (
+    build_cluster_spec,
+)  # , wait_for_scheduler, build_worker_group_spec
+
 
 class KubeCluster2(Cluster):
     """Launch a Dask Cluster on Kubernetes using the Operator"""
 
-    def __init__(self, name, loop=None, asynchronous=False, **kwargs):
+    def __init__(
+        self,
+        name,
+        namespace="default",
+        image="daskdev/dask:latest",
+        replicas=3,
+        resources={},
+        env={},
+        loop=None,
+        asynchronous=False,
+        **kwargs
+    ):
         self.name = name
+        self.namespace = namespace
         self.core_api = None
-        self.scheduler_comm = None
+        self.custom_api = None
+        self.image = image
+        self.replicas = replicas
+        self.resources = resources
+        self.env = env
 
-        status = subprocess.run(
-            ["kopf", "run", ".daskcluster.py"],
-            capture_output=True,
-            encoding="utf-8",
-        )
         super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
@@ -33,6 +49,17 @@ class KubeCluster2(Cluster):
 
     async def _start(self):
         self.core_api = kubernetes.client.CoreV1Api()
+        self.custom_api = kubernetes.client.CustomObjectsApi()
+        data = build_cluster_spec(
+            self.name, self.image, self.replicas, self.resources, self.env
+        )
+        cluster = self.custom_api.create_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=self.namespace,
+            body=data,
+        )
         self.scheduler_comm = rpc(await self._get_scheduler_address())
         await super()._start()
 
@@ -54,3 +81,8 @@ class KubeCluster2(Cluster):
     @classmethod
     def from_name(cls, name, **kwargs):
         pass
+
+
+if __name__ == "__main__":
+    cluster = KubeCluster2(name="foo")
+    print(cluster.status)

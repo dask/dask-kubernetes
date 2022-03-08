@@ -66,7 +66,7 @@ def build_scheduler_service_spec(name):
         "spec": {
             "selector": {
                 "dask.org/cluster-name": name,
-                "dask.org/component": "scheduler",
+                "dask.org/component": "service",
             },
             "ports": [
                 {
@@ -129,6 +129,21 @@ def build_worker_group_spec(name, image, replicas, resources, env):
     }
 
 
+def build_cluster_spec(name, image, replicas, resources, env):
+    return {
+        "apiVersion": "kubernetes.dask.org/v1",
+        "kind": "DaskCluster",
+        "metadata": {"name": f"{name}-cluster"},
+        "spec": {
+            "image": image,
+            "scheduler": {"serviceType": "ClusterIP"},
+            "replicas": replicas,
+            "resources": resources,
+            "env": env,
+        },
+    }
+
+
 async def wait_for_scheduler(cluster_name, namespace):
     api = kubernetes.client.CoreV1Api()
     watch = kubernetes.watch.Watch()
@@ -157,6 +172,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
         body=data,
     )
+    # await wait_for_scheduler(name, namespace)
     logger.info(
         f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
         with the following config: {data['spec']}"
