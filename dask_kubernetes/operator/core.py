@@ -50,3 +50,7 @@ class KubeCluster2(Cluster):
 
     def get_logs(self):
         pass
+
+    @classmethod
+    def from_name(cls, name, **kwargs):
+        pass
