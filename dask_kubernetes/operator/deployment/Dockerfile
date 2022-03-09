@@ -11,4 +11,4 @@ WORKDIR /src/dask_kubernetes
 RUN pip install .
 
 # Start operator
-CMD kopf run -m dask_kubernetes.operator.daskcluster --verbose --all-namespaces
+CMD kopf run -m dask_kubernetes.operator --verbose --all-namespaces
