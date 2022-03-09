@@ -153,6 +153,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     # TODO Check for existing scheduler pod
     data = build_scheduler_pod_spec(name, spec.get("image"))
     kopf.adopt(data)
+    await wait_for_terminating_pod(api, data["metadata"]["name"], namespace)
     scheduler_pod = api.create_namespaced_pod(
         namespace=namespace,
         body=data,
@@ -211,6 +212,7 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
             name, namespace, spec.get("image"), uuid4().hex, scheduler_name
         )
         kopf.adopt(data)
+        await wait_for_terminating_pod(api, data["metadata"]["name"], namespace)
         worker_pod = api.create_namespaced_pod(
             namespace=namespace,
             body=data,
@@ -272,3 +274,27 @@ async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
         namespace=namespace,
     )
     # TODO: We would prefer to use adoptions rather than a delete handler
+
+
+async def wait_for_terminating_pod(
+    api: kubernetes.client.CoreV1Api, name: str, namespace: str
+):
+    """Wait for terminating pods before continuing.
+
+    If clusters are quickly created and deleted there may still be terminating pods. This function
+    checks for an existing terminating pod and waits for it to finish.
+
+    """
+
+    try:
+        while True:
+            pod = api.read_namespaced_pod(
+                name,
+                namespace,
+            )
+            if pod.status.phase != "Terminating":
+                break
+            await asyncio.sleep(1)
+
+    except:
+        return
