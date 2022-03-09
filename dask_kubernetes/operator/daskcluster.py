@@ -296,5 +296,5 @@ async def wait_for_terminating_pod(
                 break
             await asyncio.sleep(1)
 
-    except:
+    except Exception:
         return
