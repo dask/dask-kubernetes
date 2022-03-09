@@ -39,6 +39,10 @@ async def gen_cluster(k8s_cluster):
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
+            # Give resources some time to clean up
+            # TODO replace with more robust checks when creating pods
+            await asyncio.sleep(5)
+
     yield cm
 
 
