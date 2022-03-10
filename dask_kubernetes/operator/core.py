@@ -1,4 +1,5 @@
 # import asyncio
+
 # import subprocess
 
 from distributed.deploy import Cluster
@@ -12,7 +13,7 @@ from dask_kubernetes.utils import (
     get_external_address_for_scheduler_service,
     #     check_dependency,
 )
-
+from dask_kubernetes.auth import ClusterAuth
 from daskcluster import (
     build_cluster_spec,
 )  # , wait_for_scheduler, build_worker_group_spec
@@ -29,8 +30,8 @@ class KubeCluster2(Cluster):
         replicas=3,
         resources={},
         env={},
-        loop=None,
         asynchronous=False,
+        auth=ClusterAuth.DEFAULT,
         **kwargs
     ):
         self.name = name
@@ -41,6 +42,7 @@ class KubeCluster2(Cluster):
         self.replicas = replicas
         self.resources = resources
         self.env = env
+        self.auth = auth
 
         super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
@@ -48,6 +50,7 @@ class KubeCluster2(Cluster):
             self.sync(self._start)
 
     async def _start(self):
+        await ClusterAuth.load_first(self.auth)
         self.core_api = kubernetes.client.CoreV1Api()
         self.custom_api = kubernetes.client.CustomObjectsApi()
         data = build_cluster_spec(
