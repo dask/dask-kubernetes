@@ -2,10 +2,11 @@ import subprocess
 import json
 
 from distributed.deploy import Cluster
-from distributed.core import rpc
-from distributed.utils import Logs
 
-import kubernetes
+# from distributed.core import rpc
+from distributed.utils import Log, Logs
+
+# import kubernetes
 
 from dask_kubernetes.utils import get_external_address_for_scheduler_service
 
@@ -47,18 +48,9 @@ class KubeCluster2(Cluster):
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
-        self.core_api = kubernetes.client.CoreV1Api()
-        self.custom_api = kubernetes.client.CustomObjectsApi()
         data = build_cluster_spec(
             self.name, self.image, self.replicas, self.resources, self.env
         )
-        # cluster = self.custom_api.create_namespaced_custom_object(
-        #     group="kubernetes.dask.org",
-        #     version="v1",
-        #     plural="daskclusters",
-        #     namespace=self.namespace,
-        #     body=data,
-        # )
         with open("data.json", "w") as jfile:
             json.dump(data, jfile)
         cluster = subprocess.check_output(
@@ -72,7 +64,7 @@ class KubeCluster2(Cluster):
             ],
             encoding="utf-8",
         )
-        self.scheduler_comm = rpc(await self._get_scheduler_address())
+        # self.scheduler_comm = rpc(await self._get_scheduler_address())
         await super()._start()
 
     async def _get_scheduler_address(self):
@@ -93,7 +85,8 @@ class KubeCluster2(Cluster):
             [
                 "kubectl",
                 "get",
-                "pods" "-n",
+                "pods",
+                "-n",
                 self.namespace,
             ],
             encoding="utf-8",
@@ -102,7 +95,18 @@ class KubeCluster2(Cluster):
             lambda s: s.split(" ")[0],
             [s for s in str(pods).split("\\n") if "scheduler" or "worker" in s][1:-1],
         )
-        # TODO: Retrieve the log the output for each pod
+        for name in pod_names:
+            log = Log(
+                subprocess.check_ouput(
+                    "kubectl",
+                    "logs",
+                    f"{name}",
+                    "-n",
+                    self.namespace,
+                )
+            )
+            logs[name] = log
+        return logs
 
     @classmethod
     def from_name(cls, name, **kwargs):
@@ -111,4 +115,3 @@ class KubeCluster2(Cluster):
 
 if __name__ == "__main__":
     cluster = KubeCluster2(name="foo")
-    print(cluster.status)
