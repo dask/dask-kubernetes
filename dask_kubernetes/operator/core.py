@@ -1,18 +1,14 @@
-# import asyncio
-
-# import subprocess
+import subprocess
+import json
 
 from distributed.deploy import Cluster
 from distributed.core import rpc
+from distributed.utils import Logs
 
-# import kopf
 import kubernetes
 
-from dask_kubernetes.utils import (
-    #     namespace_default,
-    get_external_address_for_scheduler_service,
-    #     check_dependency,
-)
+from dask_kubernetes.utils import get_external_address_for_scheduler_service
+
 from dask_kubernetes.auth import ClusterAuth
 from daskcluster import (
     build_cluster_spec,
@@ -32,7 +28,7 @@ class KubeCluster2(Cluster):
         env={},
         asynchronous=False,
         auth=ClusterAuth.DEFAULT,
-        **kwargs
+        **kwargs,
     ):
         self.name = name
         self.namespace = namespace
@@ -56,12 +52,25 @@ class KubeCluster2(Cluster):
         data = build_cluster_spec(
             self.name, self.image, self.replicas, self.resources, self.env
         )
-        cluster = self.custom_api.create_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskclusters",
-            namespace=self.namespace,
-            body=data,
+        # cluster = self.custom_api.create_namespaced_custom_object(
+        #     group="kubernetes.dask.org",
+        #     version="v1",
+        #     plural="daskclusters",
+        #     namespace=self.namespace,
+        #     body=data,
+        # )
+        with open("data.json", "w") as jfile:
+            json.dump(data, jfile)
+        cluster = subprocess.check_output(
+            [
+                "kubectl",
+                "apply",
+                "-f",
+                "data.json",
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
         )
         self.scheduler_comm = rpc(await self._get_scheduler_address())
         await super()._start()
@@ -79,7 +88,21 @@ class KubeCluster2(Cluster):
         return address
 
     def get_logs(self):
-        pass
+        logs = Logs()
+        pods = subprocess.check_output(
+            [
+                "kubectl",
+                "get",
+                "pods" "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
+        pod_names = map(
+            lambda s: s.split(" ")[0],
+            [s for s in str(pods).split("\\n") if "scheduler" or "worker" in s][1:-1],
+        )
+        # TODO: Retrieve the log the output for each pod
 
     @classmethod
     def from_name(cls, name, **kwargs):
