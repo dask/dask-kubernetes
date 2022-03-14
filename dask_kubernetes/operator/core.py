@@ -1,19 +1,15 @@
 import subprocess
 import json
+import re
 
 from distributed.deploy import Cluster
 
-# from distributed.core import rpc
 from distributed.utils import Log, Logs
-
-# import kubernetes
-
-from dask_kubernetes.utils import get_external_address_for_scheduler_service
 
 from dask_kubernetes.auth import ClusterAuth
 from daskcluster import (
     build_cluster_spec,
-)  # , wait_for_scheduler, build_worker_group_spec
+)
 
 
 class KubeCluster2(Cluster):
@@ -64,22 +60,21 @@ class KubeCluster2(Cluster):
             ],
             encoding="utf-8",
         )
-        # self.scheduler_comm = rpc(await self._get_scheduler_address())
-        await super()._start()
 
     async def _get_scheduler_address(self):
-        service_name = self.name
-        service = await self.core_api.read_namespaced_service(
-            service_name, self.namespace
-        )
-        address = await get_external_address_for_scheduler_service(
-            self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
-        )
-        if address is None:
-            raise RuntimeError("Unable to determine scheduler address.")
+        address = str(
+            re.search(
+                r"Scheduler at:   (.*)\\ndistributed.scheduler",
+                self.get_logs()["foo-cluster-scheduler"],
+            )
+        ).split(" ")[-1][:-11]
         return address
 
     def get_logs(self):
+        """Get logs for Dask scheduler and workers."""
+        return self.sync(self._get_logs)
+
+    async def _get_logs(self):
         logs = Logs()
         pods = subprocess.check_output(
             [
@@ -93,24 +88,46 @@ class KubeCluster2(Cluster):
         )
         pod_names = map(
             lambda s: s.split(" ")[0],
-            [s for s in str(pods).split("\\n") if "scheduler" or "worker" in s][1:-1],
+            [s for s in str(pods).split("\n") if "scheduler" or "worker" in s][1:-1],
         )
         for name in pod_names:
             log = Log(
-                subprocess.check_ouput(
-                    "kubectl",
-                    "logs",
-                    f"{name}",
-                    "-n",
-                    self.namespace,
+                subprocess.check_output(
+                    [
+                        "kubectl",
+                        "logs",
+                        f"{name}",
+                        "-n",
+                        self.namespace,
+                    ]
                 )
             )
             logs[name] = log
         return logs
 
+    def scale(self, worker_group, n):
+        scaler = subprocess.check_output(
+            [
+                "kubectl",
+                "scale",
+                f"--replicas={n}",
+                "daskworkergroup",
+                f"{worker_group}-worker-group",
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
+
+    def adapt(self, minimum, maximum):
+        # TODO: Implement when add adaptive kopf handler
+        raise NotImplementedError()
+
     @classmethod
     def from_name(cls, name, **kwargs):
-        pass
+        """Create an instance of this class to represent an existing cluster by name."""
+        # TODO: Implement when switch to k8s python client
+        raise NotImplementedError()
 
 
 if __name__ == "__main__":
