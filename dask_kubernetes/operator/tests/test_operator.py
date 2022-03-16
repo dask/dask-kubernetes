@@ -8,7 +8,7 @@ import os.path
 from kopf.testing import KopfRunner
 
 from dask.distributed import Client
-from ..core import KubeCluster2
+from dask_kubernetes.operator.core import KubeCluster2
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
