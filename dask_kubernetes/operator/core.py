@@ -40,6 +40,7 @@ class KubeCluster2(Cluster):
         self.env = env
         self.auth = auth
 
+        # TODO: Check if cluster already exists
         super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
@@ -164,7 +165,3 @@ class KubeCluster2(Cluster):
         """Create an instance of this class to represent an existing cluster by name."""
         # TODO: Implement when switch to k8s python client
         raise NotImplementedError()
-
-
-if __name__ == "__main__":
-    cluster = KubeCluster2(name="foo")

@@ -8,6 +8,7 @@ import os.path
 from kopf.testing import KopfRunner
 
 from dask.distributed import Client
+from ..core import KubeCluster2
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -119,3 +120,29 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
+
+
+@pytest.mark.timeout(180)
+@pytest.mark.asyncio
+async def test_foocluster(k8s_cluster, kopf_runner):
+    with kopf_runner as runner:
+        cluster = KubeCluster2(name="foo")
+        cluster_name = "foo-cluster"
+        scheduler_pod_name = "foo-cluster-scheduler"
+        worker_pod_name = "foo-cluster-default-worker-group-worker"
+        while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            await asyncio.sleep(0.1)
+        while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+            await asyncio.sleep(0.1)
+        while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            await asyncio.sleep(0.1)
+
+        # async with Client(
+        #     cluster, asynchronous=True
+        # ) as client:
+        #     await client.wait_for_workers(2)
+        #     # Ensure that inter-worker communication works well
+        #     futures = client.map(lambda x: x + 1, range(10))
+        #     total = client.submit(sum, futures)
+        #     assert (await total) == sum(map(lambda x: x + 1, range(10)))
+    assert "A DaskCluster has been created" in runner.stdout
