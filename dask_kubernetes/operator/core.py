@@ -59,7 +59,7 @@ class KubeCluster2(Cluster):
     Examples
     --------
     >>> from dask_kubernetes import KubeCluster2
-    >>> cluster = KubeCluster(name="foo")
+    >>> cluster = KubeCluster2(name="foo")
     You can add another group of workers (default is 3 workers)
     >>> cluster.add_worker_group('additional', n=4)
     You can then resize the cluster with the scale method
@@ -119,7 +119,7 @@ class KubeCluster2(Cluster):
             self.name, self.image, self.n_workers, self.resources, self.env
         )
         temp_file = tempfile.NamedTemporaryFile()
-        config_path = f"{temp_file.name}.json"
+        config_path = temp_file.name
         with open(config_path, "w") as f:
             json.dump(data, f)
         cluster = subprocess.check_output(
@@ -127,7 +127,7 @@ class KubeCluster2(Cluster):
                 "kubectl",
                 "apply",
                 "-f",
-                f"{temp_file.name}.json",
+                temp_file.name,
                 "-n",
                 self.namespace,
             ],
@@ -198,7 +198,7 @@ class KubeCluster2(Cluster):
     def add_worker_group(self, name, n=3):
         data = build_worker_group_spec(name, self.image, n, self.resources, self.env)
         temp_file = tempfile.NamedTemporaryFile()
-        config_path = f"{temp_file.name}.json"
+        config_path = temp_file.name
         with open(config_path, "w") as f:
             json.dump(data, f)
         workers = subprocess.check_output(
@@ -206,7 +206,7 @@ class KubeCluster2(Cluster):
                 "kubectl",
                 "apply",
                 "-f",
-                f"{temp_file.name}.json",
+                temp_file.name,
                 "-n",
                 self.namespace,
             ],
