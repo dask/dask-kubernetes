@@ -20,8 +20,6 @@ from dask_kubernetes.utils import (
     check_dependency,
 )
 
-SCHEDULER_PORT = 8786
-
 
 class KubeCluster2(Cluster):
     """Launch a Dask Cluster on Kubernetes using the Operator
