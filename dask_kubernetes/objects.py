@@ -163,8 +163,6 @@ def make_pod_spec(
         CPU resource requests (applied to ``spec.containers[].resources.requests.cpu``).
     gpu_limit : int
         GPU resource limits (applied to ``spec.containers[].resources.limits."nvidia.com/gpu"``).
-    gpu_request : int
-        GPU resource requests (applied to ``spec.containers[].resources.requests."nvidia.com/gpu"``).
     annotations : dict
         Dict of annotations passed to ``V1ObjectMeta``
 
@@ -207,8 +205,6 @@ def make_pod_spec(
 
     if cpu_request:
         resources.requests["cpu"] = cpu_request
-    if gpu_request:
-        resources.requests["nvidia.com/gpu"] = gpu_request
     if memory_request:
         resources.requests["memory"] = memory_request
 
