@@ -1,4 +1,5 @@
 from dask_kubernetes import KubeCluster
+from dask_kubernetes.constants import DASK_CONTAINER_NAME
 from dask_kubernetes.objects import make_pod_spec, make_pod_from_dict
 from distributed.utils_test import loop  # noqa: F401
 
@@ -121,7 +122,7 @@ def test_make_pod_from_dict():
                         "1",
                     ],
                     "image": "image-name",
-                    "name": "dask-worker",
+                    "name": DASK_CONTAINER_NAME,
                     "securityContext": {
                         "capabilities": {"add": ["SYS_ADMIN"]},
                         "privileged": True,

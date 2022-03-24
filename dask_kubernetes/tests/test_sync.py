@@ -12,6 +12,8 @@ from dask.distributed import Client, wait
 from distributed.utils_test import loop, captured_logger  # noqa: F401
 from dask.utils import tmpfile
 
+from dask_kubernetes.constants import DASK_CONTAINER_NAME
+
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
 FAKE_CERT = os.path.join(TEST_DIR, "fake-cert-file")
@@ -101,7 +103,7 @@ def dont_test_pod_template_yaml(docker_image, loop):
                     ],
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": "dask-worker",
+                    "name": DASK_CONTAINER_NAME,
                 }
             ]
         },
@@ -147,7 +149,7 @@ def test_pod_template_yaml_expand_env_vars(docker_image, loop):
                         ],
                         "image": "${FOO_IMAGE}",
                         "imagePullPolicy": "IfNotPresent",
-                        "name": "dask-worker",
+                        "name": DASK_CONTAINER_NAME,
                     }
                 ]
             },
@@ -180,7 +182,7 @@ def test_pod_template_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": "dask-worker",
+                    "name": DASK_CONTAINER_NAME,
                 }
             ]
         },
@@ -219,7 +221,7 @@ def test_pod_template_minimal_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": "worker",
+                    "name": DASK_CONTAINER_NAME,
                 }
             ]
         }
@@ -234,11 +236,13 @@ def test_pod_template_minimal_dict(docker_image, loop):
 
 
 def test_pod_template_from_conf(docker_image):
-    spec = {"spec": {"containers": [{"name": "some-name", "image": docker_image}]}}
+    spec = {
+        "spec": {"containers": [{"name": DASK_CONTAINER_NAME, "image": docker_image}]}
+    }
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         with KubeCluster() as cluster:
-            assert cluster.pod_template.spec.containers[0].name == "some-name"
+            assert cluster.pod_template.spec.containers[0].name == DASK_CONTAINER_NAME
 
 
 def test_bad_args():
@@ -310,7 +314,7 @@ def test_automatic_startup(docker_image):
                         "1",
                     ],
                     "image": docker_image,
-                    "name": "dask-worker",
+                    "name": DASK_CONTAINER_NAME,
                 }
             ]
         },
