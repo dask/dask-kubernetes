@@ -128,9 +128,9 @@ async def cluster(kopf_runner):
     with kopf_runner as runner:
         with KubeCluster2(name="bar") as cluster:
             yield cluster
-    # assert "A DaskCluster has been created" in runner.stdout
-    # assert "A scheduler pod has been created" in runner.stdout
-    # assert "A worker group has been created" in runner.stdout
+    assert "A DaskCluster has been created" in runner.stdout
+    assert "A scheduler pod has been created" in runner.stdout
+    assert "A worker group has been created" in runner.stdout
 
 
 @pytest.mark.asyncio
