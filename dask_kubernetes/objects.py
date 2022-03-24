@@ -116,11 +116,12 @@ def make_pod_spec(
     env={},
     extra_container_config={},
     extra_pod_config={},
-    memory_limit=None,
     resources=None,
+    memory_limit=None,
     memory_request=None,
     cpu_limit=None,
     cpu_request=None,
+    gpu_limit=None,
     annotations={},
 ):
     """
@@ -140,21 +141,27 @@ def make_pod_spec(
         Extra config attributes to set on the container object
     extra_pod_config : dict
         Extra config attributes to set on the pod object
-    memory_limit : int, float, or str
-        Bytes of memory per process that the worker can use.
-        This can be:
-            - an integer (bytes), note 0 is a special case for no memory management.
-            - a float (fraction of total system memory).
-            - a string (like 5GB or 5000M).
-            - 'auto' for automatically computing the memory limit.  [default: auto]
     resources : str
         Resources for task constraints like "GPU=2 MEM=10e9". Resources are applied
         separately to each worker process (only relevant when starting multiple
         worker processes. Passed to the `--resources` option in ``dask-worker``.
+    memory_limit : int, float, or str
+        Bytes of memory per process that the worker can use (applied to both
+        ``dask-worker --memory-limit`` and ``spec.containers[].resources.limits.memory``).
+        This can be:
+            - an integer (bytes), note 0 is a special case for no memory management.
+            - a float (bytes). Note: fraction of total system memory is not supported by k8s.
+            - a string (like 5GiB or 5000M). Note: 'GB' is not supported by k8s.
+            - 'auto' for automatically computing the memory limit.  [default: auto]
+    memory_request : int, float, or str
+        Like ``memory_limit`` (applied only to ``spec.containers[].resources.requests.memory``
+        and ignored by ``dask-worker``).
     cpu_limit : float or str
-        CPU resource limits (applied to ``spec.containers[].resources.limits.cpu``)
-    cpu_requests : float or str
-        CPU resource requests (applied to ``spec.containers[].resources.requests.cpu``)
+        CPU resource limits (applied to ``spec.containers[].resources.limits.cpu``).
+    cpu_request : float or str
+        CPU resource requests (applied to ``spec.containers[].resources.requests.cpu``).
+    gpu_limit : int
+        GPU resource limits (applied to ``spec.containers[].resources.limits."nvidia.com/gpu"``).
     annotations : dict
         Dict of annotations passed to ``V1ObjectMeta``
 
@@ -202,6 +209,8 @@ def make_pod_spec(
 
     if cpu_limit:
         resources.limits["cpu"] = cpu_limit
+    if gpu_limit:
+        resources.limits["nvidia.com/gpu"] = gpu_limit
     if memory_limit:
         resources.limits["memory"] = memory_limit
 
