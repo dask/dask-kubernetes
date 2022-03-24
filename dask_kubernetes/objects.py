@@ -122,7 +122,6 @@ def make_pod_spec(
     cpu_limit=None,
     cpu_request=None,
     gpu_limit=None,
-    gpu_request=None,
     annotations={},
 ):
     """
