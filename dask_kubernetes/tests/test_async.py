@@ -23,7 +23,7 @@ from dask_kubernetes import (
 from dask.utils import tmpfile
 from distributed.utils_test import captured_logger
 
-from dask_kubernetes.constants import DASK_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -227,7 +227,7 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
                     ],
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": DASK_CONTAINER_NAME,
+                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
                 }
             ]
         },
@@ -275,7 +275,7 @@ async def test_pod_expand_env_vars(k8s_cluster, docker_image):
                         ],
                         "image": "${FOO_IMAGE}",
                         "imagePullPolicy": "IfNotPresent",
-                        "name": DASK_CONTAINER_NAME,
+                        "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
                     }
                 ]
             },
@@ -309,7 +309,7 @@ async def test_pod_template_dict(docker_image):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": DASK_CONTAINER_NAME,
+                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
                 }
             ]
         },
@@ -350,7 +350,7 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": DASK_CONTAINER_NAME,
+                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
                 }
             ]
         }
@@ -367,12 +367,19 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
 @pytest.mark.asyncio
 async def test_pod_template_from_conf(docker_image):
     spec = {
-        "spec": {"containers": [{"name": DASK_CONTAINER_NAME, "image": docker_image}]}
+        "spec": {
+            "containers": [
+                {"name": KUBECLUSTER_WORKER_CONTAINER_NAME, "image": docker_image}
+            ]
+        }
     }
 
     with dask.config.set({"kubernetes.worker-template": spec}):
         async with KubeCluster(**cluster_kwargs) as cluster:
-            assert cluster.pod_template.spec.containers[0].name == DASK_CONTAINER_NAME
+            assert (
+                cluster.pod_template.spec.containers[0].name
+                == KUBECLUSTER_WORKER_CONTAINER_NAME
+            )
 
 
 @pytest.mark.asyncio
@@ -576,7 +583,7 @@ async def test_automatic_startup(k8s_cluster, docker_image):
                         "1",
                     ],
                     "image": docker_image,
-                    "name": DASK_CONTAINER_NAME,
+                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
                 }
             ]
         },

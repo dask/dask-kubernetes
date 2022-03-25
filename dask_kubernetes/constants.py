@@ -1,1 +1,1 @@
-DASK_CONTAINER_NAME = "dask-worker"
+KUBECLUSTER_WORKER_CONTAINER_NAME = "dask-worker"
