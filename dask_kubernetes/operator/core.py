@@ -1,7 +1,7 @@
 import subprocess
 import json
 import tempfile
-import kubernetes
+import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
 from distributed.deploy import Cluster
@@ -99,7 +99,6 @@ class KubeCluster2(Cluster):
         self.resources = resources
         self.env = env
         self.auth = auth
-        self.core_api = None
         self.port_forward_cluster_ip = port_forward_cluster_ip
         check_dependency("kubectl")
 
@@ -111,33 +110,36 @@ class KubeCluster2(Cluster):
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
-        kubernetes.config.load_kube_config()
-        self.core_api = kubernetes.client.CoreV1Api()
-        data = build_cluster_spec(
-            self.name, self.image, self.n_workers, self.resources, self.env
-        )
-        temp_file = tempfile.NamedTemporaryFile()
-        config_path = temp_file.name
-        with open(config_path, "w") as f:
-            json.dump(data, f)
-        cluster = subprocess.check_output(
-            [
-                "kubectl",
-                "apply",
-                "-f",
-                temp_file.name,
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
-        await wait_for_scheduler(f"{self.name}-cluster", self.namespace)
-        self.scheduler_comm = rpc(await self._get_scheduler_address())
-        await super()._start()
+        await kubernetes.config.load_kube_config()
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            self.core_api = kubernetes.client.CoreV1Api(api_client)
+            data = build_cluster_spec(
+                self.name, self.image, self.n_workers, self.resources, self.env
+            )
+            temp_file = tempfile.NamedTemporaryFile()
+            config_path = temp_file.name
+            with open(config_path, "w") as f:
+                json.dump(data, f)
+            cluster = subprocess.check_output(
+                [
+                    "kubectl",
+                    "apply",
+                    "-f",
+                    temp_file.name,
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
+            await wait_for_scheduler(f"{self.name}-cluster", self.namespace)
+            self.scheduler_comm = rpc(await self._get_scheduler_address())
+            await super()._start()
 
     async def _get_scheduler_address(self):
         service_name = f"{self.name}-cluster"
-        service = self.core_api.read_namespaced_service(service_name, self.namespace)
+        service = await self.core_api.read_namespaced_service(
+            service_name, self.namespace
+        )
         address = await get_external_address_for_scheduler_service(
             self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
         )
@@ -170,7 +172,7 @@ class KubeCluster2(Cluster):
     async def _get_logs(self):
         logs = Logs()
 
-        pods = self.core_api.list_namespaced_pod(
+        pods = await self.core_api.list_namespaced_pod(
             namespace=self.namespace,
             label_selector=f"dask.org/cluster-name={self.name}-cluster",
         )
@@ -183,7 +185,7 @@ class KubeCluster2(Cluster):
                             f"Cannot get logs for pod with status {pod.status.phase}.",
                         )
                     log = Log(
-                        self.core_api.read_namespaced_pod_log(
+                        await self.core_api.read_namespaced_pod_log(
                             pod.metadata.name, pod.metadata.namespace
                         )
                     )
