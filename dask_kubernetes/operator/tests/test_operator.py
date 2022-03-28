@@ -1,23 +1,23 @@
-import pytest
+# import pytest
 
-import asyncio
-from contextlib import asynccontextmanager
-import pathlib
+# import asyncio
+# from contextlib import asynccontextmanager
+# import pathlib
 
-import os.path
+# import os.path
 
-from kopf.testing import KopfRunner
+# from kopf.testing import KopfRunner
 
-from dask.distributed import Client
-from dask_kubernetes.operator.core import KubeCluster2
+# from dask.distributed import Client
+# from dask_kubernetes.operator.core import KubeCluster2
 
-DIR = pathlib.Path(__file__).parent.absolute()
+# DIR = pathlib.Path(__file__).parent.absolute()
 
 
-@pytest.fixture()
-async def kopf_runner(k8s_cluster):
-    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
-    # yield KopfRunner(["run", "dask_kubernetes.operator.daskcluster.py", "--verbose"])
+# @pytest.fixture()
+# async def kopf_runner(k8s_cluster):
+#     yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+#     yield KopfRunner(["run", "dask_kubernetes.operator.daskcluster.py", "--verbose"])
 
 
 # @pytest.fixture()
@@ -45,36 +45,36 @@ async def kopf_runner(k8s_cluster):
 #     yield cm
 
 
-@pytest.fixture()
-async def gen_cluster(k8s_cluster):
-    """Yields an instantiated context manager for creating/deleting a simple cluster."""
+# @pytest.fixture()
+# async def gen_cluster(k8s_cluster):
+#     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
-    @asynccontextmanager
-    async def cm():
-        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
-        cluster_name = "simple-cluster"
+#     @asynccontextmanager
+#     async def cm():
+#         cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
+#         cluster_name = "simple-cluster"
 
-        # Create cluster resource
-        # k8s_cluster.kubectl("apply", "-f", cluster_path)
-        cluster = KubeCluster2(name="foo")
-        while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
-            await asyncio.sleep(0.1)
+#         # Create cluster resource
+#         # k8s_cluster.kubectl("apply", "-f", cluster_path)
+#         cluster = KubeCluster2(name="foo")
+#         while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+#             await asyncio.sleep(0.1)
 
-        try:
-            yield cluster
-        finally:
-            # Delete cluster resource
-            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-                await asyncio.sleep(0.1)
-            del cluster
+#         try:
+#             yield cluster
+#         finally:
+#             # Delete cluster resource
+#             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
+#             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+#                 await asyncio.sleep(0.1)
+#             del cluster
 
-    yield cm
+#     yield cm
 
 
-def test_customresources(k8s_cluster):
-    assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
-    assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+# def test_customresources(k8s_cluster):
+#     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+#     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
 
 # def test_operator_runs(kopf_runner):
@@ -173,13 +173,13 @@ def test_customresources(k8s_cluster):
 #     assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-@pytest.mark.asyncio
-async def test_scalesimplecluster(kopf_runner, gen_cluster):
-    with kopf_runner as runner:
-        async with gen_cluster() as cluster:
-            async with Client(cluster) as client:
-                cluster.scale(5)
-                await client.wait_for_workers(5)
-                cluster.scale(3)
-                await client.wait_for_workers(3)
-            assert cluster
+# @pytest.mark.asyncio
+# async def test_scalesimplecluster(kopf_runner, gen_cluster):
+#     with kopf_runner as runner:
+#         async with gen_cluster() as cluster:
+#             async with Client(cluster) as client:
+#                 cluster.scale(5)
+#                 await client.wait_for_workers(5)
+#                 cluster.scale(3)
+#                 await client.wait_for_workers(3)
+#             assert cluster
