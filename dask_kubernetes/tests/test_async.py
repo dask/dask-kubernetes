@@ -405,7 +405,7 @@ async def test_reject_evicted_workers(cluster):
     await cluster.core_api.create_namespaced_pod_eviction(
         (await worker.describe_pod()).metadata.name,
         (await worker.describe_pod()).metadata.namespace,
-        kubernetes.client.V1beta1Eviction(
+        kubernetes.client.V1Eviction(
             delete_options=kubernetes.client.V1DeleteOptions(grace_period_seconds=300),
             metadata=(await worker.describe_pod()).metadata,
         ),
