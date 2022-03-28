@@ -1,9 +1,10 @@
 import pytest
 
-import asyncio
-from contextlib import asynccontextmanager
+# import asyncio
+# from contextlib import asynccontextmanager
 import pathlib
-import os.path
+
+# import os.path
 
 from kopf.testing import KopfRunner
 
@@ -14,36 +15,36 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 @pytest.fixture()
 async def kopf_runner(k8s_cluster):
-    # yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
-    yield KopfRunner(["run", "dask_kubernetes.operator.daskcluster.py", "--verbose"])
+    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+    # yield KopfRunner(["run", "dask_kubernetes.operator.daskcluster.py", "--verbose"])
 
 
-@pytest.fixture()
-async def gen_cluster(k8s_cluster):
-    """Yields an instantiated context manager for creating/deleting a simple cluster."""
+# @pytest.fixture()
+# async def gen_cluster(k8s_cluster):
+#     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
-    @asynccontextmanager
-    async def cm():
-        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
-        cluster_name = "simple-cluster"
+#     @asynccontextmanager
+#     async def cm():
+#         cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
+#         cluster_name = "simple-cluster"
 
-        # Create cluster resource
-        k8s_cluster.kubectl("apply", "-f", cluster_path)
-        while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
-            await asyncio.sleep(0.1)
+#         # Create cluster resource
+#         k8s_cluster.kubectl("apply", "-f", cluster_path)
+#         while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+#             await asyncio.sleep(0.1)
 
-        try:
-            yield cluster_name
-        finally:
-            # Delete cluster resource
-            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-                await asyncio.sleep(0.1)
+#         try:
+#             yield cluster_name
+#         finally:
+#             # Delete cluster resource
+#             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
+#             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+#                 await asyncio.sleep(0.1)
 
-    yield cm
+#     yield cm
 
 
-def test_customresources(k8s_cluster, gen_cluster):
+def test_customresources(k8s_cluster):
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
