@@ -150,8 +150,8 @@ async def gen_cluster(k8s_cluster):
 
 
 @pytest.fixture
-async def cluster(kopf_runner):
-    async with kopf_runner as runner:
+def cluster():
+    with KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"]) as runner:
         with KubeCluster2(name="foo") as cluster:
             yield cluster
 
@@ -163,8 +163,8 @@ def client(cluster):
 
 
 def test_fixtures_kubecluster2(client, cluster):
-    client.scheduler_info()
-    cluster.scale(1)
+    # client.scheduler_info()
+    # cluster.scale(1)
     assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
