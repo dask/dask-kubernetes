@@ -67,6 +67,7 @@ async def gen_cluster(k8s_cluster):
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
+            del cluster
 
     yield cm
 
@@ -173,24 +174,12 @@ def test_customresources(k8s_cluster):
 
 
 @pytest.mark.asyncio
-async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
+async def test_scalesimplecluster(kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster:
-            # scheduler_pod_name = "simple-cluster-scheduler"
-            # worker_pod_name = "simple-cluster-default-worker-group-worker"
-            # while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
-            # while cluster_name not in k8s_cluster.kubectl("get", "svc"):
-            #     await asyncio.sleep(0.1)
-            # while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-            #     await asyncio.sleep(0.1)
-            # while "Running" not in k8s_cluster.kubectl(
-            #     "get", "pods", scheduler_pod_name
-            # ):
-            #     await asyncio.sleep(0.1)
-            # with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
             async with Client(cluster) as client:
                 cluster.scale(5)
                 await client.wait_for_workers(5)
                 cluster.scale(3)
                 await client.wait_for_workers(3)
+            assert cluster
