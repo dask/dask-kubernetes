@@ -126,17 +126,20 @@ from dask_kubernetes.operator.core import KubeCluster2
 @pytest.fixture
 async def cluster(kopf_runner):
     with kopf_runner as runner:
-        async with KubeCluster2(name="bar") as cluster:
+        with KubeCluster2(name="bar") as cluster:
             yield cluster
-    assert "A DaskCluster has been created" in runner.stdout
-    assert "A scheduler pod has been created" in runner.stdout
-    assert "A worker group has been created" in runner.stdout
+    # assert "A DaskCluster has been created" in runner.stdout
+    # assert "A scheduler pod has been created" in runner.stdout
+    # assert "A worker group has been created" in runner.stdout
 
 
-@pytest.mark.asyncio
-async def test_cluster_create(cluster):
+@pytest.fixture
+def client(cluster):
+    with Client(cluster) as client:
+        yield client
+
+
+def test_fixtures(client, cluster):
+    client.scheduler_info()
     cluster.scale(1)
-    await cluster
-    async with Client(cluster, asynchronous=True) as client:
-        result = await client.submit(lambda x: x + 1, 10)
-        assert result == 11
+    assert client.submit(lambda x: x + 1, 10).result() == 11
