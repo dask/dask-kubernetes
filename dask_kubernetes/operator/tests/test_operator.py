@@ -14,7 +14,8 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 @pytest.fixture()
 async def kopf_runner(k8s_cluster):
-    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+    # yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+    yield KopfRunner(["run", "dask_kubernetes.operator.daskcluster.py", "--verbose"])
 
 
 @pytest.fixture()
