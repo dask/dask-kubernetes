@@ -125,9 +125,9 @@ from dask_kubernetes.operator.core import KubeCluster2
 
 
 @pytest.fixture
-async def cluster(kopf_runner):
+def cluster(kopf_runner):
     with kopf_runner as runner:
-        with KubeCluster2(name="bar") as cluster:
+        with KubeCluster2(name="foo") as cluster:
             yield cluster
     # assert "A DaskCluster has been created" in runner.stdout
     # assert "A scheduler pod has been created" in runner.stdout
