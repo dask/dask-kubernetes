@@ -157,7 +157,7 @@ from dask_kubernetes.operator.core import KubeCluster2
 #         yield client
 
 
-def test_fixtures_kubecluster2():
+def test_fixtures_kubecluster2(kopf_runner, gen_cluster2):
     with kopf_runner as runner:
         with gen_cluster2 as cluster_name:
             cluster = KubeCluster2(name=cluster_name)
