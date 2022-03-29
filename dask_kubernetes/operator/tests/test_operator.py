@@ -8,7 +8,7 @@ import os.path
 
 from kopf.testing import KopfRunner
 
-# from dask.distributed import Client
+from dask.distributed import Client
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
