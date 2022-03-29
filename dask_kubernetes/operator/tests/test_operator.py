@@ -122,24 +122,46 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A worker group has been created" in runner.stdout
 
 
+@pytest.fixture()
+async def gen_cluster2(k8s_cluster):
+    """Yields an instantiated context manager for creating/deleting a simple cluster."""
+
+    @asynccontextmanager
+    async def cm():
+        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
+        cluster_name = "foo"
+        try:
+            yield cluster_name
+        finally:
+            # Delete cluster resource
+            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
+            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+    yield cm
+
+
 from dask_kubernetes.operator.core import KubeCluster2
 
 
-@pytest.fixture
-def cluster(kopf_runner):
+# @pytest.fixture
+# def cluster(kopf_runner):
+#     with kopf_runner as runner:
+#         with KubeCluster2(name="foo") as cluster:
+#             yield cluster
+
+
+# @pytest.fixture
+# def client(cluster):
+#     with Client(cluster) as client:
+#         yield client
+
+
+def test_fixtures_kubecluster2():
     with kopf_runner as runner:
-        with KubeCluster2(name="foo") as cluster:
-            yield cluster
-
-
-@pytest.fixture
-def client(cluster):
-    with Client(cluster) as client:
-        yield client
-
-
-def test_fixtures_kubecluster2(client, cluster):
-    client.scheduler_info()
-    cluster.scale(1)
-    assert client.submit(lambda x: x + 1, 10).result() == 11
-    cluster.delete()
+        with gen_cluster2 as cluster_name:
+            cluster = KubeCluster2(name=cluster_name)
+            client = Client(cluster)
+            client.scheduler_info()
+            cluster.scale(1)
+            assert client.submit(lambda x: x + 1, 10).result() == 11
