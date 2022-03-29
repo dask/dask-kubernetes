@@ -120,3 +120,26 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
+
+
+from dask_kubernetes.operator.core import KubeCluster2
+
+
+@pytest.fixture
+def cluster(kopf_runner):
+    with kopf_runner as runner:
+        with KubeCluster2(name="foo") as cluster:
+            yield cluster
+
+
+@pytest.fixture
+def client(cluster):
+    with Client(cluster) as client:
+        yield client
+
+
+def test_fixtures_kubecluster2(client, cluster):
+    client.scheduler_info()
+    cluster.scale(1)
+    assert client.submit(lambda x: x + 1, 10).result() == 11
+    cluster.delete()
