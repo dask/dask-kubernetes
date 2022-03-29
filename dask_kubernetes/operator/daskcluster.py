@@ -213,9 +213,6 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             f"A worker group has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
         )
-        logger.info(
-            "______________________________________________________________________"
-        )
 
 
 @kopf.on.create("daskworkergroup")
@@ -290,15 +287,18 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 
 @kopf.on.delete("daskcluster")
 async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
+    await kubernetes.config.load_kube_config()
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CustomObjectsApi(api_client)
         workergroups = await api.list_cluster_custom_object(
             group="kubernetes.dask.org", version="v1", plural="daskworkergroups"
         )
-        workergroups = await api.delete_collection_namespaced_custom_object(
+        workergroups = api.delete_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
             plural="daskworkergroups",
             namespace=namespace,
+            name=name,
+            async_req=True,
         )
         # TODO: We would prefer to use adoptions rather than a delete handler

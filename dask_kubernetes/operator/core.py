@@ -116,7 +116,7 @@ class KubeCluster2(Cluster):
             data = build_cluster_spec(
                 self.name, self.image, self.n_workers, self.resources, self.env
             )
-            temp_file = tempfile.NamedTemporaryFile()
+            temp_file = tempfile.NamedTemporaryFile(delete=False)
             config_path = temp_file.name
             with open(config_path, "w") as f:
                 json.dump(data, f)
@@ -197,7 +197,7 @@ class KubeCluster2(Cluster):
 
     def add_worker_group(self, name, n=3):
         data = build_worker_group_spec(name, self.image, n, self.resources, self.env)
-        temp_file = tempfile.NamedTemporaryFile()
+        temp_file = tempfile.NamedTemporaryFile(delete=False)
         config_path = temp_file.name
         with open(config_path, "w") as f:
             json.dump(data, f)
@@ -207,6 +207,19 @@ class KubeCluster2(Cluster):
                 "apply",
                 "-f",
                 temp_file.name,
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
+
+    def delete(self):
+        subprocess.check_output(
+            [
+                "kubectl",
+                "delete",
+                "daskcluster",
+                f"{self.name}-cluster",
                 "-n",
                 self.namespace,
             ],
