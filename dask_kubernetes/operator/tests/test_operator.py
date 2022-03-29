@@ -135,7 +135,7 @@ async def gen_cluster2(k8s_cluster):
         finally:
             # Delete cluster resource
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+            while "foo-cluster" in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -165,3 +165,4 @@ async def test_fixtures_kubecluster2(kopf_runner, gen_cluster2):
             client.scheduler_info()
             cluster.scale(1)
             assert client.submit(lambda x: x + 1, 10).result() == 11
+            assert cluster_name
