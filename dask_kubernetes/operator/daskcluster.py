@@ -1,4 +1,6 @@
 import asyncio
+import subprocess
+import json
 
 from distributed.core import rpc
 
@@ -287,12 +289,27 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 
 @kopf.on.delete("daskcluster")
 async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
+    patch = {"metadata": {"finalizers": []}}
+    json_patch = json.dumps(patch)
+    subprocess.check_output(
+        [
+            "kubectl",
+            "patch",
+            "daskcluster",
+            f"{name}",
+            "--patch",
+            str(json_patch),
+            "--type=merge",
+        ],
+        encoding="utf-8",
+    )
     await kubernetes.config.load_kube_config()
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CustomObjectsApi(api_client)
         workergroups = await api.list_cluster_custom_object(
             group="kubernetes.dask.org", version="v1", plural="daskworkergroups"
         )
+        # TODO: Delete worker groups in workergroups
         workergroups = api.delete_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
