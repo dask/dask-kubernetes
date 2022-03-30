@@ -45,6 +45,7 @@ async def gen_cluster(k8s_cluster):
 def test_customresources(k8s_cluster, gen_cluster):
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+    assert "daskjobs.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
 
 def test_operator_runs(kopf_runner):

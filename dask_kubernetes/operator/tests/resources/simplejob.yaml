@@ -1,0 +1,35 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskCluster
+metadata:
+  name: simple-cluster
+spec:
+  job:
+    template:
+      spec:
+        containers:
+          - name: job
+            image: daskdev/dask:latest
+            command:
+              [
+                "python",
+                "-c",
+                "'from dask.distributed import Client; import dask.array as da; client = Client(); print(client.cluster); print(da.random.random((10_000, 10_000), chunks=(1000, 1000)).mean().compute())'",
+              ]
+        restartPolicy: Never
+  cluster:
+    imagePullSecrets: null
+    image: "daskdev/dask:latest"
+    imagePullPolicy: "IfNotPresent"
+    protocol: "tcp"
+    scheduler:
+      resources: {}
+      env: {}
+      serviceType: "ClusterIP"
+      # nodeSelector: null
+      # securityContext: null
+      # affinity: null
+      # tolerations: null
+      # serviceAccountName: null
+    replicas: 3
+    resources: {}
+    env: {}
