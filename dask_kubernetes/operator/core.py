@@ -213,7 +213,7 @@ class KubeCluster2(Cluster):
             encoding="utf-8",
         )
 
-    def delete(self):
+    def close(self):
         subprocess.check_output(
             [
                 "kubectl",

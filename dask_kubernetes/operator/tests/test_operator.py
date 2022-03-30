@@ -166,3 +166,5 @@ async def test_fixtures_kubecluster2(kopf_runner, gen_cluster2):
             cluster.scale(1)
             assert client.submit(lambda x: x + 1, 10).result() == 11
             assert cluster_name
+            cluster.close()
+            client.close()
