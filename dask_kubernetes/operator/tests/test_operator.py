@@ -157,11 +157,12 @@ from dask_kubernetes.operator.core import KubeCluster2
 #         yield client
 
 
-async def test_fixtures_kubecluster2(kopf_runner, gen_cluster2):
+async def test_scale_kubecluster2(kopf_runner, gen_cluster2):
     with kopf_runner as runner:
         async with gen_cluster2() as cluster_name:
-            cluster = KubeCluster2(name=cluster_name)
+            cluster = KubeCluster2(name=cluster_name, asynchronous=True)
             client = Client(cluster)
-            client.scheduler_info()
-            cluster.scale(1)
-            assert client.submit(lambda x: x + 1, 10).result() == 11
+            cluster.scale(5)
+            await client.wait_for_workers(5)
+            cluster.scale(2)
+            await client.wait_for_workers(2)

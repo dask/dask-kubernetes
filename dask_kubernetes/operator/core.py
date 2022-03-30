@@ -6,7 +6,7 @@ import kubernetes_asyncio as kubernetes
 from distributed.core import rpc
 from distributed.deploy import Cluster
 
-from distributed.utils import Log, Logs
+from distributed.utils import Log, Logs, LoopRunner
 
 from dask_kubernetes.auth import ClusterAuth
 from .daskcluster import (
@@ -85,6 +85,7 @@ class KubeCluster2(Cluster):
         n_workers=3,
         resources={},
         env={},
+        loop=None,
         asynchronous=False,
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
@@ -100,6 +101,8 @@ class KubeCluster2(Cluster):
         self.env = env
         self.auth = auth
         self.port_forward_cluster_ip = port_forward_cluster_ip
+        self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
+        self.loop = self._loop_runner.loop
         check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
