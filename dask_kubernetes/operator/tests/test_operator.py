@@ -160,13 +160,13 @@ from dask_kubernetes.operator.core import KubeCluster2
 async def test_scale_kubecluster2(kopf_runner, k8s_cluster, gen_cluster2):
     with kopf_runner as runner:
         async with gen_cluster2() as cluster_name:
+            cluster = KubeCluster2(name=cluster_name, asynchronous=True)
             scheduler_pod_name = f"{cluster_name}-cluster-scheduler"
             worker_pod_name = f"{cluster_name}-cluster-default-worker-group-worker"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            cluster = KubeCluster2(name=cluster_name, asynchronous=True)
             client = Client(cluster)
             cluster.scale(5)
             await client.wait_for_workers(5)
