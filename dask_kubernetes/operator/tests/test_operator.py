@@ -40,7 +40,6 @@ async def gen_cluster(k8s_cluster):
             patch = {"metadata": {"finalizers": []}}
             json_patch = json.dumps(patch)
             k8s_cluster.kubectl(
-                "kubectl",
                 "patch",
                 "daskcluster",
                 f"{cluster_name}-cluster",
@@ -149,7 +148,6 @@ async def gen_cluster2(k8s_cluster):
             patch = {"metadata": {"finalizers": []}}
             json_patch = json.dumps(patch)
             k8s_cluster.kubectl(
-                "kubectl",
                 "patch",
                 "daskcluster",
                 f"{cluster_name}-cluster",
