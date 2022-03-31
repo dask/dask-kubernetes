@@ -198,5 +198,5 @@ async def test_scale_kubecluster2(kopf_runner, k8s_cluster):
         #     cluster.scale(2)
         #     await client.wait_for_workers(2)
         # cluster.close()
-        # while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-        #     await asyncio.sleep(0.1)
+        while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+            await asyncio.sleep(0.1)
