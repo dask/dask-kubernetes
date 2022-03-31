@@ -429,6 +429,8 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             logger.info(
                 f"Scaled worker group {name} down to {spec['replicas']} workers."
             )
+            scheduler.close_comms()
+            scheduler.close_rpc()
 
 
 # @kopf.on.delete("daskcluster")

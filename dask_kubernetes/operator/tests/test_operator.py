@@ -3,7 +3,8 @@ import pytest
 import asyncio
 from contextlib import asynccontextmanager
 import pathlib
-import json
+
+# import json
 
 import os.path
 
@@ -37,16 +38,16 @@ async def gen_cluster(k8s_cluster):
             yield cluster_name
         finally:
             # Delete cluster resource
-            patch = {"metadata": {"finalizers": []}}
-            json_patch = json.dumps(patch)
-            k8s_cluster.kubectl(
-                "patch",
-                "daskcluster",
-                f"{cluster_name}-cluster",
-                "--patch",
-                str(json_patch),
-                "--type=merge",
-            )
+            # patch = {"metadata": {"finalizers": []}}
+            # json_patch = json.dumps(patch)
+            # k8s_cluster.kubectl(
+            #     "patch",
+            #     "daskcluster",
+            #     f"{cluster_name}-cluster",
+            #     "--patch",
+            #     str(json_patch),
+            #     "--type=merge",
+            # )
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -145,16 +146,16 @@ async def gen_cluster2(k8s_cluster):
             yield cluster_name
         finally:
             # Delete cluster resource
-            patch = {"metadata": {"finalizers": []}}
-            json_patch = json.dumps(patch)
-            k8s_cluster.kubectl(
-                "patch",
-                "daskcluster",
-                f"{cluster_name}-cluster",
-                "--patch",
-                str(json_patch),
-                "--type=merge",
-            )
+            # patch = {"metadata": {"finalizers": []}}
+            # json_patch = json.dumps(patch)
+            # k8s_cluster.kubectl(
+            #     "patch",
+            #     "daskcluster",
+            #     f"{cluster_name}-cluster",
+            #     "--patch",
+            #     str(json_patch),
+            #     "--type=merge",
+            # )
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while "foo-cluster" in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -188,9 +189,9 @@ async def test_scale_kubecluster2(kopf_runner, k8s_cluster, gen_cluster2):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            client = Client(cluster)
-            cluster.scale(5)
-            await client.wait_for_workers(5)
-            cluster.scale(2)
-            await client.wait_for_workers(2)
-            client.close()
+            with Client(cluster) as client:
+                cluster.scale(5)
+                await client.wait_for_workers(5)
+                cluster.scale(2)
+                await client.wait_for_workers(2)
+            cluster.close()

@@ -217,6 +217,7 @@ class KubeCluster2(Cluster):
         )
 
     def close(self):
+        super().close()
         subprocess.check_output(
             [
                 "kubectl",
