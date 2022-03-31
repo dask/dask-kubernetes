@@ -264,6 +264,10 @@ class KubeCluster2(Cluster):
         # TODO: Implement when add adaptive kopf handler
         raise NotImplementedError()
 
+    def __exit__(self):
+        super().__exit__()
+        self.close()
+
     @classmethod
     def from_name(cls, name, **kwargs):
         """Create an instance of this class to represent an existing cluster by name."""
