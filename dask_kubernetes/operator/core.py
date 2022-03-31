@@ -103,6 +103,7 @@ class KubeCluster2(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
+        self.worker_groups = ["default-worker-group"]
         check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
@@ -215,6 +216,20 @@ class KubeCluster2(Cluster):
             ],
             encoding="utf-8",
         )
+        self.worker_groups.append(data["metadata"]["name"])
+
+    def delete_worker_group(self, name):
+        subprocess.check_output(
+            [
+                "kubectl",
+                "delete",
+                "daskworkergroup",
+                name,
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
 
     def close(self):
         super().close()
@@ -245,6 +260,10 @@ class KubeCluster2(Cluster):
             ],
             encoding="utf-8",
         )
+        # TODO: Remove these lines when kopf adoptons work
+        for name in self.worker_groups:
+            if name != "default-worker-group":
+                self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
         scaler = subprocess.check_output(
