@@ -4,8 +4,6 @@ import asyncio
 from contextlib import asynccontextmanager
 import pathlib
 
-from time import sleep
-
 import os.path
 
 from kopf.testing import KopfRunner
@@ -161,19 +159,3 @@ def test_fixtures_kubecluster2(client, cluster):
     client.scheduler_info()
     cluster.scale(1)
     assert client.submit(lambda x: x + 1, 10).result() == 11
-
-
-def test_basic_kubecluster2(cluster, client):
-    cluster.scale(2)
-    future = client.submit(lambda x: x + 1, 10)
-    result = future.result()
-    assert result == 11
-
-    while len(client.scheduler_info()["workers"]) < 2:
-        sleep(0.1)
-
-    # Ensure that inter-worker communication works well
-    futures = client.map(lambda x: x + 1, range(10))
-    total = client.submit(sum, futures)
-    assert total.result() == sum(map(lambda x: x + 1, range(10)))
-    assert all(client.has_what().values())
