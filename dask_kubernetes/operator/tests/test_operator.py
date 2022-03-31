@@ -193,3 +193,4 @@ async def test_scale_kubecluster2(kopf_runner, k8s_cluster, gen_cluster2):
             await client.wait_for_workers(5)
             cluster.scale(2)
             await client.wait_for_workers(2)
+            client.close()
