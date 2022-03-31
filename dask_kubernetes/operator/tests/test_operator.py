@@ -4,7 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import pathlib
 
-# import json
+from time import sleep
 
 import os.path
 
@@ -37,17 +37,6 @@ async def gen_cluster(k8s_cluster):
         try:
             yield cluster_name
         finally:
-            # Delete cluster resource
-            # patch = {"metadata": {"finalizers": []}}
-            # json_patch = json.dumps(patch)
-            # k8s_cluster.kubectl(
-            #     "patch",
-            #     "daskcluster",
-            #     f"{cluster_name}-cluster",
-            #     "--patch",
-            #     str(json_patch),
-            #     "--type=merge",
-            # )
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -145,17 +134,6 @@ async def gen_cluster2(k8s_cluster):
         try:
             yield cluster_name
         finally:
-            # Delete cluster resource
-            # patch = {"metadata": {"finalizers": []}}
-            # json_patch = json.dumps(patch)
-            # k8s_cluster.kubectl(
-            #     "patch",
-            #     "daskcluster",
-            #     f"{cluster_name}-cluster",
-            #     "--patch",
-            #     str(json_patch),
-            #     "--type=merge",
-            # )
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while "foo-cluster" in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -179,30 +157,23 @@ def client(cluster):
         yield client
 
 
-def test_kubecluster2(client, cluster):
-    # client.scheduler_info()
+def test_fixtures_kubecluster2(client, cluster):
+    client.scheduler_info()
     cluster.scale(1)
     assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-# # @pytest.mark.timeout(180)
-# @pytest.mark.asyncio
-# async def test_scale_kubecluster2(kopf_runner, k8s_cluster):
-#     with kopf_runner as runner:
-#         cluster_name = "foo"
-#         # cluster = KubeCluster2(name=cluster_name)
-#         with KubeCluster2(name=cluster_name) as cluster:
-#             scheduler_pod_name = f"{cluster_name}-cluster-scheduler"
-#             worker_pod_name = f"{cluster_name}-cluster-default-worker-group-worker"
-#             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-#                 await asyncio.sleep(0.1)
-#             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-#                 await asyncio.sleep(0.1)
-#         # with Client(cluster) as client:
-#         #     cluster.scale(5)
-#         #     await client.wait_for_workers(5)
-#         #     cluster.scale(2)
-#         #     await client.wait_for_workers(2)
-#         # cluster.close()
-#         while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
-#             await asyncio.sleep(0.1)
+def test_basic_kubecluster2(cluster, client):
+    cluster.scale(2)
+    future = client.submit(lambda x: x + 1, 10)
+    result = future.result()
+    assert result == 11
+
+    while len(client.scheduler_info()["workers"]) < 2:
+        sleep(0.1)
+
+    # Ensure that inter-worker communication works well
+    futures = client.map(lambda x: x + 1, range(10))
+    total = client.submit(sum, futures)
+    assert total.result() == sum(map(lambda x: x + 1, range(10)))
+    assert all(client.has_what().values())
