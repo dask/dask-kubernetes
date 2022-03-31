@@ -264,8 +264,10 @@ class KubeCluster2(Cluster):
         # TODO: Implement when add adaptive kopf handler
         raise NotImplementedError()
 
-    def __exit__(self):
-        super().__exit__()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, typ, value, traceback):
         self.close()
 
     @classmethod
