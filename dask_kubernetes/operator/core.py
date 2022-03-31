@@ -218,20 +218,22 @@ class KubeCluster2(Cluster):
 
     def close(self):
         super().close()
-        # patch = {"metadata": {"finalizers": []}}
-        # json_patch = json.dumps(patch)
-        # subprocess.check_output(
-        #     [
-        #         "kubectl",
-        #         "patch",
-        #         "daskcluster",
-        #         f"{self.name}-cluster",
-        #         "--patch",
-        #         str(json_patch),
-        #         "--type=merge",
-        #     ],
-        #     encoding="utf-8",
-        # )
+        patch = {"metadata": {"finalizers": []}}
+        json_patch = json.dumps(patch)
+        subprocess.check_output(
+            [
+                "kubectl",
+                "patch",
+                "daskcluster",
+                f"{self.name}-cluster",
+                "--patch",
+                str(json_patch),
+                "--type=merge",
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
         subprocess.check_output(
             [
                 "kubectl",
