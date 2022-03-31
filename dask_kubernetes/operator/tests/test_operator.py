@@ -4,13 +4,13 @@ import asyncio
 from contextlib import asynccontextmanager
 import pathlib
 
-from time import sleep, time
+from time import sleep
 
 import os.path
 
 from kopf.testing import KopfRunner
 
-from dask.distributed import Client, wait
+from dask.distributed import Client
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -177,26 +177,3 @@ def test_basic_kubecluster2(cluster, client):
     total = client.submit(sum, futures)
     assert total.result() == sum(map(lambda x: x + 1, range(10)))
     assert all(client.has_what().values())
-
-
-def test_scale_up_down_kubecluster2(cluster, client):
-    np = pytest.importorskip("numpy")
-    cluster.scale(2)
-
-    start = time()
-    while len(client.scheduler_info()["workers"]) != 2:
-        sleep(0.1)
-        assert time() < start + 30
-
-    a, b = list(client.scheduler_info()["workers"])
-    x = client.submit(np.ones, 1, workers=a)
-    y = client.submit(np.ones, 50_000, workers=b)
-
-    wait([x, y])
-
-    cluster.scale(1)
-
-    start = time()
-    while len(client.scheduler_info()["workers"]) != 1:
-        sleep(0.1)
-        assert time() < start + 30
