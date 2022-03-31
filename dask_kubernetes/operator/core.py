@@ -92,6 +92,7 @@ class KubeCluster2(Cluster):
         **kwargs,
     ):
         self.name = name
+        # TODO: Set namespace to None and get default namespace from user's context
         self.namespace = namespace
         self.core_api = None
         self.custom_api = None
