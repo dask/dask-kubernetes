@@ -150,6 +150,21 @@ def build_cluster_spec(name, image, replicas, resources, env):
     }
 
 
+def build_cluster_spec(name, image, replicas, resources, env):
+    return {
+        "apiVersion": "kubernetes.dask.org/v1",
+        "kind": "DaskCluster",
+        "metadata": {"name": f"{name}-cluster"},
+        "spec": {
+            "image": image,
+            "scheduler": {"serviceType": "ClusterIP"},
+            "replicas": replicas,
+            "resources": resources,
+            "env": env,
+        },
+    }
+
+
 async def wait_for_scheduler(cluster_name, namespace):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
