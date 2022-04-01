@@ -180,8 +180,22 @@ async def wait_for_scheduler(cluster_name, namespace):
             await asyncio.sleep(0.1)
 
 
+async def get_scheduler_address(service_name, namespace):
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        api = kubernetes.client.CoreV1Api(api_client)
+    service_name = "foo-cluster"
+    service = await api.read_namespaced_service(service_name, namespace)
+    port_forward_cluster_ip = None
+    address = await get_external_address_for_scheduler_service(
+        api, service, port_forward_cluster_ip=port_forward_cluster_ip
+    )
+    return address
+
+
 @kopf.on.create("daskcluster")
 async def daskcluster_create(spec, name, namespace, logger, **kwargs):
+    global SCHEDULER_NAME
+    SCHEDULER_NAME = f"{name}-scheduler"
     await kubernetes.config.load_kube_config()
     logger.info(
         f"A DaskCluster has been created called {name} in {namespace} with the following config: {spec}"
@@ -196,6 +210,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
+        await wait_for_scheduler(name, namespace)
         logger.info(
             f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
@@ -208,10 +223,30 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
+        services = subprocess.check_output(
+            [
+                "kubectl",
+                "get",
+                "service",
+                "-n",
+                namespace,
+            ],
+            encoding="utf-8",
+        )
+        while data["metadata"]["name"] not in services:
+            asyncio.sleep(0.1)
         logger.info(
             f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
         )
+        global SCHEDULER
+        service_name = "foo-cluster"
+        service = await api.read_namespaced_service(service_name, namespace)
+        port_forward_cluster_ip = None
+        address = await get_external_address_for_scheduler_service(
+            api, service, port_forward_cluster_ip=port_forward_cluster_ip
+        )
+        SCHEDULER = rpc(address)
 
         data = build_worker_group_spec(
             "default",
@@ -290,13 +325,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 )
             logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
         if workers_needed < 0:
-            service_name = "foo-cluster"
-            service = await api.read_namespaced_service(service_name, namespace)
-            port_forward_cluster_ip = None
-            address = await get_external_address_for_scheduler_service(
-                api, service, port_forward_cluster_ip=port_forward_cluster_ip
-            )
-            scheduler = rpc(address)
+            scheduler = SCHEDULER
             worker_ids = await scheduler.workers_to_close(
                 n=-workers_needed, attribute="name"
             )
@@ -309,8 +338,6 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             logger.info(
                 f"Scaled worker group {name} down to {spec['replicas']} workers."
             )
-            scheduler.close_comms()
-            scheduler.close_rpc()
 
 
 def patch_replicas(replicas):
@@ -339,19 +366,12 @@ async def adapt(spec, name, namespace, logger, **kwargs):
             ).list_cluster_custom_object(
                 group="kubernetes.dask.org", version="v1", plural="daskclusters"
             )
-            scheduler_name = scheduler["items"][0]["metadata"]["name"]
+            scheduler_name = SCHEDULER_NAME
             await wait_for_scheduler(scheduler_name, namespace)
 
-            api = kubernetes.client.CoreV1Api(api_client)
             minimum = spec["minimum"]
             maximum = spec["maximum"]
-            service_name = "foo-cluster"
-            service = await api.read_namespaced_service(service_name, namespace)
-            port_forward_cluster_ip = None
-            address = await get_external_address_for_scheduler_service(
-                api, service, port_forward_cluster_ip=port_forward_cluster_ip
-            )
-            scheduler = rpc(address)
+            scheduler = SCHEDULER
             desired_workers = await scheduler.adaptive_target()
             logger.info(f"Desired number of workers: {desired_workers}")
             if minimum <= desired_workers <= maximum:
@@ -363,5 +383,9 @@ async def adapt(spec, name, namespace, logger, **kwargs):
             else:
                 # set replicas to maximum
                 patch_replicas(maximum)
-            scheduler.close_comms()
-            scheduler.close_rpc()
+
+
+@kopf.on.delete("daskcluster")
+async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
+    SCHEDULER.close_comms()
+    SCHEDULER.close_rpc()
