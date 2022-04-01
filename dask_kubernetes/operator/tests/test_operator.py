@@ -3,6 +3,7 @@ import pytest
 import asyncio
 from contextlib import asynccontextmanager
 import pathlib
+
 import os.path
 
 from kopf.testing import KopfRunner
@@ -34,7 +35,6 @@ async def gen_cluster(k8s_cluster):
         try:
             yield cluster_name
         finally:
-            # Delete cluster resource
             k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
@@ -42,7 +42,7 @@ async def gen_cluster(k8s_cluster):
     yield cm
 
 
-def test_customresources(k8s_cluster, gen_cluster):
+def test_customresources(k8s_cluster):
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
@@ -119,3 +119,43 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
+
+
+@pytest.fixture()
+async def gen_cluster2(k8s_cluster):
+    """Yields an instantiated context manager for creating/deleting a simple cluster."""
+
+    @asynccontextmanager
+    async def cm():
+        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
+        cluster_name = "foo"
+        try:
+            yield cluster_name
+        finally:
+            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
+            while "foo-cluster" in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+    yield cm
+
+
+from dask_kubernetes.operator.core import KubeCluster2
+
+
+@pytest.fixture
+def cluster(kopf_runner):
+    with kopf_runner as runner:
+        with KubeCluster2(name="foo") as cluster:
+            yield cluster
+
+
+@pytest.fixture
+def client(cluster):
+    with Client(cluster) as client:
+        yield client
+
+
+def test_fixtures_kubecluster2(client, cluster):
+    client.scheduler_info()
+    cluster.scale(1)
+    assert client.submit(lambda x: x + 1, 10).result() == 11
