@@ -292,6 +292,20 @@ class KubeCluster2(Cluster):
         )
         # TODO: Remove these lines when kopf adoptons work
         for name in self.worker_groups:
+            subprocess.check_output(
+                [
+                    "kubectl",
+                    "patch",
+                    "daskworkergroup",
+                    name,
+                    "--patch",
+                    str(json_patch),
+                    "--type=merge",
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
             if name != "default-worker-group":
                 self.delete_worker_group(name)
 

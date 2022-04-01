@@ -2,7 +2,7 @@ import asyncio
 import json
 import subprocess
 
-from distributed.core import rpc
+from distributed.core import rpc, RPCClosed
 
 import kopf
 import kubernetes_asyncio as kubernetes
@@ -210,7 +210,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
-        await wait_for_scheduler(name, namespace)
+        # await wait_for_scheduler(name, namespace)
         logger.info(
             f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
@@ -240,7 +240,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             with the following config: {data['spec']}"
         )
         global SCHEDULER
-        service_name = "foo-cluster"
+        service_name = data["metadata"]["name"]
         service = await api.read_namespaced_service(service_name, namespace)
         port_forward_cluster_ip = None
         address = await get_external_address_for_scheduler_service(
@@ -372,20 +372,30 @@ async def adapt(spec, name, namespace, logger, **kwargs):
             minimum = spec["minimum"]
             maximum = spec["maximum"]
             scheduler = SCHEDULER
-            desired_workers = await scheduler.adaptive_target()
-            logger.info(f"Desired number of workers: {desired_workers}")
-            if minimum <= desired_workers <= maximum:
-                # set replicas to desired_workers
-                patch_replicas(desired_workers)
-            elif desired_workers < minimum:
-                # set replicas to minimum
-                patch_replicas(minimum)
-            else:
-                # set replicas to maximum
-                patch_replicas(maximum)
+            try:
+                desired_workers = await scheduler.adaptive_target()
+                logger.info(f"Desired number of workers: {desired_workers}")
+                if minimum <= desired_workers <= maximum:
+                    # set replicas to desired_workers
+                    patch_replicas(desired_workers)
+                elif desired_workers < minimum:
+                    # set replicas to minimum
+                    patch_replicas(minimum)
+                else:
+                    # set replicas to maximum
+                    patch_replicas(maximum)
+            except (RPCClosed, OSError):
+                pass
 
 
 @kopf.on.delete("daskcluster")
 async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        api = kubernetes.client.CoreV1Api(api_client)
+        await api.delete_collection_namespaced_pod(
+            namespace,
+            label_selector=f"dask.org/cluster-name={name}",
+        )
+
     SCHEDULER.close_comms()
     SCHEDULER.close_rpc()
