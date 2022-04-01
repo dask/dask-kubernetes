@@ -220,6 +220,22 @@ class KubeCluster2(Cluster):
         self.worker_groups.append(data["metadata"]["name"])
 
     def delete_worker_group(self, name):
+        patch = {"metadata": {"finalizers": []}}
+        json_patch = json.dumps(patch)
+        subprocess.check_output(
+            [
+                "kubectl",
+                "patch",
+                "daskworkergroup",
+                name,
+                "--patch",
+                str(json_patch),
+                "--type=merge",
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
         subprocess.check_output(
             [
                 "kubectl",
@@ -267,22 +283,41 @@ class KubeCluster2(Cluster):
                 self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
-        scaler = subprocess.check_output(
+        if worker_group != "default":
+            scaler = subprocess.check_output(
+                [
+                    "kubectl",
+                    "scale",
+                    f"--replicas={n}",
+                    "daskworkergroup",
+                    f"{worker_group}-worker-group",
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
+        self.adapt(n, n)
+
+    def adapt(self, minimum, maximum):
+        patch = {
+            "spec": {
+                "minimum": minimum,
+                "maximum": maximum,
+            }
+        }
+        json_patch = json.dumps(patch)
+        subprocess.check_output(
             [
                 "kubectl",
-                "scale",
-                f"--replicas={n}",
+                "patch",
                 "daskworkergroup",
-                f"{worker_group}-worker-group",
-                "-n",
-                self.namespace,
+                "default-worker-group",
+                "--patch",
+                str(json_patch),
+                "--type=merge",
             ],
             encoding="utf-8",
         )
-
-    def adapt(self, minimum, maximum):
-        # TODO: Implement when add adaptive kopf handler
-        raise NotImplementedError()
 
     def __enter__(self):
         return self

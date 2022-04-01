@@ -1,4 +1,6 @@
 import asyncio
+import json
+import subprocess
 
 from distributed.core import rpc
 
@@ -127,6 +129,8 @@ def build_worker_group_spec(name, image, replicas, resources, env):
             "replicas": replicas,
             "resources": resources,
             "env": env,
+            "minimum": replicas,
+            "maximum": replicas,
         },
     }
 
@@ -290,5 +294,59 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             logger.info(
                 f"Scaled worker group {name} down to {spec['replicas']} workers."
             )
+            scheduler.close_comms()
+            scheduler.close_rpc()
+
+
+def patch_replicas(replicas):
+    patch = {"spec": {"replicas": replicas}}
+    json_patch = json.dumps(patch)
+    subprocess.check_output(
+        [
+            "kubectl",
+            "patch",
+            "daskworkergroup",
+            "default-worker-group",
+            "--patch",
+            str(json_patch),
+            "--type=merge",
+        ],
+        encoding="utf-8",
+    )
+
+
+@kopf.timer("daskworkergroup", interval=5.0)
+async def adapt(spec, name, namespace, logger, **kwargs):
+    if name == "default-worker-group":
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            scheduler = await kubernetes.client.CustomObjectsApi(
+                api_client
+            ).list_cluster_custom_object(
+                group="kubernetes.dask.org", version="v1", plural="daskclusters"
+            )
+            scheduler_name = scheduler["items"][0]["metadata"]["name"]
+            await wait_for_scheduler(scheduler_name, namespace)
+
+            api = kubernetes.client.CoreV1Api(api_client)
+            minimum = spec["minimum"]
+            maximum = spec["maximum"]
+            service_name = "foo-cluster"
+            service = await api.read_namespaced_service(service_name, namespace)
+            port_forward_cluster_ip = None
+            address = await get_external_address_for_scheduler_service(
+                api, service, port_forward_cluster_ip=port_forward_cluster_ip
+            )
+            scheduler = rpc(address)
+            desired_workers = await scheduler.adaptive_target()
+            logger.info(f"Desired number of workers: {desired_workers}")
+            if minimum <= desired_workers <= maximum:
+                # set replicas to desired_workers
+                patch_replicas(desired_workers)
+            elif desired_workers < minimum:
+                # set replicas to minimum
+                patch_replicas(minimum)
+            else:
+                # set replicas to maximum
+                patch_replicas(maximum)
             scheduler.close_comms()
             scheduler.close_rpc()
