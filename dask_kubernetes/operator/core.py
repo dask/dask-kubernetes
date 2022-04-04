@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import json
 import tempfile
@@ -137,6 +138,18 @@ class KubeCluster2(Cluster):
                 encoding="utf-8",
             )
             await wait_for_scheduler(f"{self.name}-cluster", self.namespace)
+            services = subprocess.check_output(
+                [
+                    "kubectl",
+                    "get",
+                    "service",
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
+            while data["metadata"]["name"] not in services:
+                asyncio.sleep(0.1)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
             await super()._start()
 
@@ -220,6 +233,22 @@ class KubeCluster2(Cluster):
         self.worker_groups.append(data["metadata"]["name"])
 
     def delete_worker_group(self, name):
+        patch = {"metadata": {"finalizers": []}}
+        json_patch = json.dumps(patch)
+        subprocess.check_output(
+            [
+                "kubectl",
+                "patch",
+                "daskworkergroup",
+                name,
+                "--patch",
+                str(json_patch),
+                "--type=merge",
+                "-n",
+                self.namespace,
+            ],
+            encoding="utf-8",
+        )
         subprocess.check_output(
             [
                 "kubectl",
@@ -263,26 +292,59 @@ class KubeCluster2(Cluster):
         )
         # TODO: Remove these lines when kopf adoptons work
         for name in self.worker_groups:
+            subprocess.check_output(
+                [
+                    "kubectl",
+                    "patch",
+                    "daskworkergroup",
+                    name,
+                    "--patch",
+                    str(json_patch),
+                    "--type=merge",
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
             if name != "default-worker-group":
                 self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
-        scaler = subprocess.check_output(
+        if worker_group != "default":
+            scaler = subprocess.check_output(
+                [
+                    "kubectl",
+                    "scale",
+                    f"--replicas={n}",
+                    "daskworkergroup",
+                    f"{worker_group}-worker-group",
+                    "-n",
+                    self.namespace,
+                ],
+                encoding="utf-8",
+            )
+        self.adapt(n, n)
+
+    def adapt(self, minimum, maximum):
+        patch = {
+            "spec": {
+                "minimum": minimum,
+                "maximum": maximum,
+            }
+        }
+        json_patch = json.dumps(patch)
+        subprocess.check_output(
             [
                 "kubectl",
-                "scale",
-                f"--replicas={n}",
+                "patch",
                 "daskworkergroup",
-                f"{worker_group}-worker-group",
-                "-n",
-                self.namespace,
+                "default-worker-group",
+                "--patch",
+                str(json_patch),
+                "--type=merge",
             ],
             encoding="utf-8",
         )
-
-    def adapt(self, minimum, maximum):
-        # TODO: Implement when add adaptive kopf handler
-        raise NotImplementedError()
 
     def __enter__(self):
         return self
