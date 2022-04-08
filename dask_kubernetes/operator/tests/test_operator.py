@@ -79,14 +79,14 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "scale",
                         "--replicas=5",
                         "daskworkergroup",
-                        "default-worker-group",
+                        "simple-cluster-default-worker-group",
                     )
                     await client.wait_for_workers(5)
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=3",
                         "daskworkergroup",
-                        "default-worker-group",
+                        "simple-cluster-default-worker-group",
                     )
                     await client.wait_for_workers(3)
 
