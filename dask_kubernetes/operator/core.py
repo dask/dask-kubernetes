@@ -188,27 +188,29 @@ class KubeCluster2(Cluster):
         return self.sync(self._get_logs)
 
     async def _get_logs(self):
-        logs = Logs()
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            self.core_api = kubernetes.client.CoreV1Api(api_client)
+            logs = Logs()
 
-        pods = await self.core_api.list_namespaced_pod(
-            namespace=self.namespace,
-            label_selector=f"dask.org/cluster-name={self.name}-cluster",
-        )
+            pods = await self.core_api.list_namespaced_pod(
+                namespace=self.namespace,
+                label_selector=f"dask.org/cluster-name={self.name}-cluster",
+            )
 
-        for pod in pods.items:
-            if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
-                try:
-                    if pod.status.phase != "Running":
-                        raise ValueError(
-                            f"Cannot get logs for pod with status {pod.status.phase}.",
+            for pod in pods.items:
+                if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
+                    try:
+                        if pod.status.phase != "Running":
+                            raise ValueError(
+                                f"Cannot get logs for pod with status {pod.status.phase}.",
+                            )
+                        log = Log(
+                            await self.core_api.read_namespaced_pod_log(
+                                pod.metadata.name, pod.metadata.namespace
+                            )
                         )
-                    log = Log(
-                        await self.core_api.read_namespaced_pod_log(
-                            pod.metadata.name, pod.metadata.namespace
-                        )
-                    )
-                except (ValueError, kubernetes.client.exceptions.ApiException):
-                    log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
+                    except (ValueError, kubernetes.client.exceptions.ApiException):
+                        log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
                 logs[pod.metadata.name] = log
 
         return logs
@@ -233,22 +235,6 @@ class KubeCluster2(Cluster):
         self.worker_groups.append(data["metadata"]["name"])
 
     def delete_worker_group(self, name):
-        patch = {"metadata": {"finalizers": []}}
-        json_patch = json.dumps(patch)
-        subprocess.check_output(
-            [
-                "kubectl",
-                "patch",
-                "daskworkergroup",
-                name,
-                "--patch",
-                str(json_patch),
-                "--type=merge",
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
         subprocess.check_output(
             [
                 "kubectl",
@@ -263,22 +249,6 @@ class KubeCluster2(Cluster):
 
     def close(self):
         super().close()
-        patch = {"metadata": {"finalizers": []}}
-        json_patch = json.dumps(patch)
-        subprocess.check_output(
-            [
-                "kubectl",
-                "patch",
-                "daskcluster",
-                f"{self.name}-cluster",
-                "--patch",
-                str(json_patch),
-                "--type=merge",
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
         subprocess.check_output(
             [
                 "kubectl",
@@ -292,56 +262,19 @@ class KubeCluster2(Cluster):
         )
         # TODO: Remove these lines when kopf adoptons work
         for name in self.worker_groups:
-            subprocess.check_output(
-                [
-                    "kubectl",
-                    "patch",
-                    "daskworkergroup",
-                    name,
-                    "--patch",
-                    str(json_patch),
-                    "--type=merge",
-                    "-n",
-                    self.namespace,
-                ],
-                encoding="utf-8",
-            )
             if name != "default-worker-group":
                 self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
-        if worker_group != "default":
-            scaler = subprocess.check_output(
-                [
-                    "kubectl",
-                    "scale",
-                    f"--replicas={n}",
-                    "daskworkergroup",
-                    f"{worker_group}-worker-group",
-                    "-n",
-                    self.namespace,
-                ],
-                encoding="utf-8",
-            )
-        self.adapt(n, n)
-
-    def adapt(self, minimum, maximum):
-        patch = {
-            "spec": {
-                "minimum": minimum,
-                "maximum": maximum,
-            }
-        }
-        json_patch = json.dumps(patch)
         subprocess.check_output(
             [
                 "kubectl",
-                "patch",
+                "scale",
+                f"--replicas={n}",
                 "daskworkergroup",
-                "default-worker-group",
-                "--patch",
-                str(json_patch),
-                "--type=merge",
+                f"{worker_group}-worker-group",
+                "-n",
+                self.namespace,
             ],
             encoding="utf-8",
         )

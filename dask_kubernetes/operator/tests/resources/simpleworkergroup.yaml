@@ -9,8 +9,6 @@ spec:
   replicas: 2
   resources: {}
   env: {}
-  minimum: 2
-  maximum: 2
   # nodeSelector: null
   # securityContext: null
   # affinity: null

@@ -121,24 +121,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A worker group has been created" in runner.stdout
 
 
-@pytest.fixture()
-async def gen_cluster2(k8s_cluster):
-    """Yields an instantiated context manager for creating/deleting a simple cluster."""
-
-    @asynccontextmanager
-    async def cm():
-        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
-        cluster_name = "foo"
-        try:
-            yield cluster_name
-        finally:
-            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
-            while "foo-cluster" in k8s_cluster.kubectl("get", "daskclusters"):
-                await asyncio.sleep(0.1)
-
-    yield cm
-
-
 from dask_kubernetes.operator.core import KubeCluster2
 
 
