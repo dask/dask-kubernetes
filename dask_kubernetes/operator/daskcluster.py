@@ -9,7 +9,7 @@ import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
-from dask_kubernetes.utils import get_external_address_for_scheduler_service
+from dask_kubernetes.utils import get_scheduler_address
 
 
 lock = threading.Lock()
@@ -169,32 +169,6 @@ def build_cluster_spec(name, image, replicas, resources, env):
             "env": env,
         },
     }
-
-
-async def wait_for_scheduler(cluster_name, namespace):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        watch = kubernetes.watch.Watch()
-        async for event in watch.stream(
-            func=api.list_namespaced_pod,
-            namespace=namespace,
-            label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
-            timeout_seconds=60,
-        ):
-            if event["object"].status.phase == "Running":
-                watch.stop()
-            await asyncio.sleep(0.1)
-
-
-async def get_scheduler_address(service_name, namespace):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        service = await api.read_namespaced_service(service_name, namespace)
-        port_forward_cluster_ip = None
-        address = await get_external_address_for_scheduler_service(
-            api, service, port_forward_cluster_ip=port_forward_cluster_ip
-        )
-        return address
 
 
 @kopf.on.create("daskcluster")
