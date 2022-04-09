@@ -1,5 +1,6 @@
 import asyncio
 import subprocess
+import threading
 
 from distributed.core import rpc
 
@@ -9,6 +10,27 @@ import kubernetes_asyncio as kubernetes
 from uuid import uuid4
 
 from dask_kubernetes.utils import get_external_address_for_scheduler_service
+
+
+lock = threading.Lock()
+
+
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            with lock:
+                if cls not in cls._instances:
+                    cls._instances[cls] = super(Singleton, cls).__call__(
+                        *args, **kwargs
+                    )
+        return cls._instances[cls]
+
+
+class DaskRPC(metaclass=Singleton):
+    def __init__(self, address):
+        self.scheduler_comm = rpc(address)
 
 
 def build_scheduler_pod_spec(name, image):
@@ -182,19 +204,18 @@ async def wait_for_scheduler(cluster_name, namespace):
 async def get_scheduler_address(service_name, namespace):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
-    service_name = "foo-cluster"
-    service = await api.read_namespaced_service(service_name, namespace)
-    port_forward_cluster_ip = None
-    address = await get_external_address_for_scheduler_service(
-        api, service, port_forward_cluster_ip=port_forward_cluster_ip
-    )
-    return address
+        service = await api.read_namespaced_service(service_name, namespace)
+        port_forward_cluster_ip = None
+        address = await get_external_address_for_scheduler_service(
+            api, service, port_forward_cluster_ip=port_forward_cluster_ip
+        )
+        return address
 
 
 @kopf.on.create("daskcluster")
 async def daskcluster_create(spec, name, namespace, logger, **kwargs):
-    global SCHEDULER_NAME
-    SCHEDULER_NAME = f"{name}-scheduler"
+    # global SCHEDULER_NAME
+    # SCHEDULER_NAME = f"{name}-scheduler"
     await kubernetes.config.load_kube_config()
     logger.info(
         f"A DaskCluster has been created called {name} in {namespace} with the following config: {spec}"
@@ -238,15 +259,14 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
         )
-        global SCHEDULER
-        service_name = data["metadata"]["name"]
-        service = await api.read_namespaced_service(service_name, namespace)
-        port_forward_cluster_ip = None
-        address = await get_external_address_for_scheduler_service(
-            api, service, port_forward_cluster_ip=port_forward_cluster_ip
-        )
-        SCHEDULER = rpc(address)
-
+        # global SCHEDULER
+        # service_name = data["metadata"]["name"]
+        # service = await api.read_namespaced_service(service_name, namespace)
+        # port_forward_cluster_ip = None
+        # address = await get_external_address_for_scheduler_service(
+        #     api, service, port_forward_cluster_ip=port_forward_cluster_ip
+        # )
+        # SCHEDULER = rpc(address)
         data = build_worker_group_spec(
             f"{name}-default",
             spec.get("image"),
@@ -324,7 +344,16 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 )
             logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
         if workers_needed < 0:
-            scheduler = SCHEDULER
+            # scheduler = SCHEDULER
+            # service_name = data["metadata"]["name"]
+            # service = await api.read_namespaced_service(service_name, namespace)
+            # port_forward_cluster_ip = None
+            # address = await get_external_address_for_scheduler_service(
+            #     api, service, port_forward_cluster_ip=port_forward_cluster_ip
+            # )
+            service_name = f"{name.split('-')[0]}-cluster"
+            address = await get_scheduler_address(service_name, namespace)
+            scheduler = DaskRPC(address=address).scheduler_comm
             worker_ids = await scheduler.workers_to_close(
                 n=-workers_needed, attribute="name"
             )
@@ -341,5 +370,9 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 
 @kopf.on.delete("daskcluster")
 async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
-    SCHEDULER.close_comms()
-    SCHEDULER.close_rpc()
+    address = await get_scheduler_address(name, namespace)
+    scheduler = DaskRPC(address=address).scheduler_comm
+    scheduler.close_comms()
+    scheduler.close_rpc()
+    # SCHEDULER.close_comms()
+    # SCHEDULER.close_rpc()
