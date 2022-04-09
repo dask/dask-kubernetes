@@ -21,19 +21,20 @@ spec:
           properties:
             spec:
               type: object
-              properties:
-                image:
-                  type: string
-                  description: Dask container image
-                replicas:
-                  type: integer
-                  description: Number of pods/workers in the worker group
-                resources:
-                  type: object
-                  description: Resources for workers
-                env:
-                  type: object
-                  description: Environment variables
+              x-kubernetes-preserve-unknown-fields: true
+              # properties:
+              #   image:
+              #     type: string
+              #     description: Dask container image
+              #   replicas:
+              #     type: integer
+              #     description: Number of pods/workers in the worker group
+              #   resources:
+              #     type: object
+              #     description: Resources for workers
+              #   env:
+              #     type: object
+              #     description: Environment variables
             status:
               type: object
               x-kubernetes-preserve-unknown-fields: true
