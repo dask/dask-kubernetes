@@ -10,6 +10,7 @@ import kubernetes_asyncio as kubernetes
 from uuid import uuid4
 
 from dask_kubernetes.utils import get_external_address_for_scheduler_service
+from dask_kubernetes.utils import check_dependency
 
 
 def build_scheduler_pod_spec(name, image):
@@ -223,6 +224,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
+        check_dependency("kubectl")
         services = subprocess.check_output(
             [
                 "kubectl",
