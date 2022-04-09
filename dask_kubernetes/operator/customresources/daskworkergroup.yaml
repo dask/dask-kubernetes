@@ -36,6 +36,7 @@ spec:
                   description: Environment variables
             status:
               type: object
+              x-kubernetes-preserve-unknown-fields: true
       subresources:
         scale:
           specReplicasPath: .spec.replicas
