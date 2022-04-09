@@ -129,8 +129,6 @@ def build_worker_group_spec(name, image, replicas, resources, env):
             "replicas": replicas,
             "resources": resources,
             "env": env,
-            "minimum": replicas,
-            "maximum": replicas,
         },
     }
 
@@ -329,6 +327,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             worker_ids = await scheduler.workers_to_close(
                 n=-workers_needed, attribute="name"
             )
+            # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
                 worker_pod = await api.delete_namespaced_pod(
