@@ -21,23 +21,27 @@ spec:
           properties:
             spec:
               type: object
-              x-kubernetes-preserve-unknown-fields: true
-              # properties:
-              #   image:
-              #     type: string
-              #     description: Dask container image
-              #   replicas:
-              #     type: integer
-              #     description: Number of pods/workers in the worker group
-              #   resources:
-              #     type: object
-              #     description: Resources for workers
-              #   env:
-              #     type: object
-              #     description: Environment variables
+              properties:
+                imagePullSecrets:
+                  type: object
+                  description: Container image secrets
+                image:
+                  type: string
+                  description: Dask container image
+                imagePullPolicy:
+                  type: string
+                  description: Container image policy
+                replicas:
+                  type: integer
+                  description: Number of pods/workers in the worker group
+                resources:
+                  type: object
+                  description: Resources for workers
+                env:
+                  type: object
+                  description: Environment variables
             status:
               type: object
-              x-kubernetes-preserve-unknown-fields: true
       subresources:
         scale:
           specReplicasPath: .spec.replicas

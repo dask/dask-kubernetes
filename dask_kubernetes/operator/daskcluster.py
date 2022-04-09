@@ -125,7 +125,9 @@ def build_worker_group_spec(name, image, replicas, resources, env):
         "kind": "DaskWorkerGroup",
         "metadata": {"name": f"{name}-worker-group"},
         "spec": {
+            "imagePullSecrets": None,
             "image": image,
+            "imagePullPolicy": "IfNotPresent",
             "replicas": replicas,
             "resources": resources,
             "env": env,
@@ -139,23 +141,15 @@ def build_cluster_spec(name, image, replicas, resources, env):
         "kind": "DaskCluster",
         "metadata": {"name": f"{name}-cluster"},
         "spec": {
+            "imagePullSecrets": None,
             "image": image,
-            "scheduler": {"serviceType": "ClusterIP"},
-            "replicas": replicas,
-            "resources": resources,
-            "env": env,
-        },
-    }
-
-
-def build_cluster_spec(name, image, replicas, resources, env):
-    return {
-        "apiVersion": "kubernetes.dask.org/v1",
-        "kind": "DaskCluster",
-        "metadata": {"name": f"{name}-cluster"},
-        "spec": {
-            "image": image,
-            "scheduler": {"serviceType": "ClusterIP"},
+            "imagePullPolicy": "IfNotPresent",
+            "protocol": "tcp",
+            "scheduler": {
+                "resources": resources,
+                "env": env,
+                "serviceType": "ClusterIP",
+            },
             "replicas": replicas,
             "resources": resources,
             "env": env,
