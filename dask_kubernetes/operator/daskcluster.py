@@ -9,7 +9,10 @@ import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
-from dask_kubernetes.utils import get_scheduler_address, check_dependency
+from dask_kubernetes.utils import (
+    get_scheduler_address,
+    check_dependency,
+)
 
 
 lock = threading.Lock()
@@ -146,12 +149,12 @@ def build_worker_group_spec(name, image, replicas, resources, env):
         "kind": "DaskWorkerGroup",
         "metadata": {"name": f"{name}-worker-group"},
         "spec": {
+            "imagePullSecrets": None,
             "image": image,
+            "imagePullPolicy": "IfNotPresent",
             "replicas": replicas,
             "resources": resources,
             "env": env,
-            "minimum": replicas,
-            "maximum": replicas,
         },
     }
 
@@ -162,8 +165,15 @@ def build_cluster_spec(name, image, replicas, resources, env):
         "kind": "DaskCluster",
         "metadata": {"name": f"{name}-cluster"},
         "spec": {
+            "imagePullSecrets": None,
             "image": image,
-            "scheduler": {"serviceType": "ClusterIP"},
+            "imagePullPolicy": "IfNotPresent",
+            "protocol": "tcp",
+            "scheduler": {
+                "resources": resources,
+                "env": env,
+                "serviceType": "ClusterIP",
+            },
             "replicas": replicas,
             "resources": resources,
             "env": env,
@@ -300,6 +310,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             worker_ids = await scheduler.workers_to_close(
                 n=-workers_needed, attribute="name"
             )
+            # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
                 worker_pod = await api.delete_namespaced_pod(

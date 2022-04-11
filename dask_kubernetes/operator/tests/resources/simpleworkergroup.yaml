@@ -1,7 +1,7 @@
 apiVersion: kubernetes.dask.org/v1
 kind: DaskWorkerGroup
 metadata:
-  name: additional-worker-group
+  name: simple-cluster-additional-worker-group
 spec:
   imagePullSecrets: null
   image: "daskdev/dask:latest"

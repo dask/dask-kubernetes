@@ -22,10 +22,43 @@ spec:
           properties:
             spec:
               type: object
-              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                imagePullSecrets:
+                  type: object
+                  description: Container image secrets
+                image:
+                  type: string
+                  description: Dask container image
+                imagePullPolicy:
+                  type: string
+                  description: Container image policy
+                protocol:
+                  type: string
+                  description: Protocol type
+                scheduler:
+                  type: object
+                  description: Dask scheduler information
+                  properties:
+                    resources:
+                      type: object
+                      description: Scheduler resources
+                    env:
+                      type: object
+                      description: Scheduler environment variables
+                    serviceType:
+                      type: string
+                      description: Type of service
+                replicas:
+                  type: integer
+                  description: Number of pods/workers in the worker group
+                resources:
+                  type: object
+                  description: Resources for workers
+                env:
+                  type: object
+                  description: Environment variables
             status:
               type: object
-              x-kubernetes-preserve-unknown-fields: true
       subresources:
         scale:
           specReplicasPath: .spec.replicas
