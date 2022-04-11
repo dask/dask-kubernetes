@@ -1,5 +1,4 @@
 import asyncio
-import json
 import subprocess
 
 from distributed.core import rpc
@@ -91,7 +90,7 @@ def build_scheduler_service_spec(name):
 
 
 def build_worker_pod_spec(name, namespace, image, n, scheduler_name):
-    worker_name = f"{scheduler_name}-{name}-worker-{n}"
+    worker_name = f"{name}-worker-{n}"
     return {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -249,7 +248,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         SCHEDULER = rpc(address)
 
         data = build_worker_group_spec(
-            "default",
+            f"{name}-default",
             spec.get("image"),
             spec.get("replicas"),
             spec.get("resources"),
@@ -338,23 +337,6 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             logger.info(
                 f"Scaled worker group {name} down to {spec['replicas']} workers."
             )
-
-
-def patch_replicas(replicas):
-    patch = {"spec": {"replicas": replicas}}
-    json_patch = json.dumps(patch)
-    subprocess.check_output(
-        [
-            "kubectl",
-            "patch",
-            "daskworkergroup",
-            "default-worker-group",
-            "--patch",
-            str(json_patch),
-            "--type=merge",
-        ],
-        encoding="utf-8",
-    )
 
 
 @kopf.on.delete("daskcluster")
