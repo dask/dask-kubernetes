@@ -13,12 +13,12 @@ from dask_kubernetes.auth import ClusterAuth
 from .daskcluster import (
     build_cluster_spec,
     build_worker_group_spec,
-    wait_for_scheduler,
 )
 
 from dask_kubernetes.utils import (
-    get_external_address_for_scheduler_service,
     check_dependency,
+    get_scheduler_address,
+    wait_for_scheduler,
 )
 
 
@@ -155,14 +155,7 @@ class KubeCluster2(Cluster):
 
     async def _get_scheduler_address(self):
         service_name = f"{self.name}-cluster"
-        service = await self.core_api.read_namespaced_service(
-            service_name, self.namespace
-        )
-        address = await get_external_address_for_scheduler_service(
-            self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
-        )
-        if address is None:
-            raise RuntimeError("Unable to determine scheduler address.")
+        address = await get_scheduler_address(service_name, self.namespace)
         return address
 
     def get_logs(self):
