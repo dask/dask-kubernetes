@@ -13,12 +13,12 @@ from dask_kubernetes.auth import ClusterAuth
 from .daskcluster import (
     build_cluster_spec,
     build_worker_group_spec,
-    wait_for_scheduler,
 )
 
 from dask_kubernetes.utils import (
-    get_external_address_for_scheduler_service,
     check_dependency,
+    get_scheduler_address,
+    wait_for_scheduler,
 )
 
 
@@ -105,7 +105,7 @@ class KubeCluster2(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
-        self.worker_groups = ["default-worker-group"]
+        self.worker_groups = [f"{self.name}-cluster-default-worker-group"]
         check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
@@ -155,14 +155,7 @@ class KubeCluster2(Cluster):
 
     async def _get_scheduler_address(self):
         service_name = f"{self.name}-cluster"
-        service = await self.core_api.read_namespaced_service(
-            service_name, self.namespace
-        )
-        address = await get_external_address_for_scheduler_service(
-            self.core_api, service, port_forward_cluster_ip=self.port_forward_cluster_ip
-        )
-        if address is None:
-            raise RuntimeError("Unable to determine scheduler address.")
+        address = await get_scheduler_address(service_name, self.namespace)
         return address
 
     def get_logs(self):
@@ -216,7 +209,9 @@ class KubeCluster2(Cluster):
         return logs
 
     def add_worker_group(self, name, n=3):
-        data = build_worker_group_spec(name, self.image, n, self.resources, self.env)
+        data = build_worker_group_spec(
+            f"{self.name}-cluster-{name}", self.image, n, self.resources, self.env
+        )
         temp_file = tempfile.NamedTemporaryFile(delete=False)
         config_path = temp_file.name
         with open(config_path, "w") as f:
@@ -262,7 +257,7 @@ class KubeCluster2(Cluster):
         )
         # TODO: Remove these lines when kopf adoptons work
         for name in self.worker_groups:
-            if name != "default-worker-group":
+            if name != f"{self.name}-cluster-default-worker-group":
                 self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
@@ -272,7 +267,7 @@ class KubeCluster2(Cluster):
                 "scale",
                 f"--replicas={n}",
                 "daskworkergroup",
-                f"{worker_group}-worker-group",
+                f"{self.name}-cluster-{worker_group}-worker-group",
                 "-n",
                 self.namespace,
             ],
