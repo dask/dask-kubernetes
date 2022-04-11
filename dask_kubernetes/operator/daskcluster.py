@@ -9,7 +9,7 @@ import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
-from dask_kubernetes.utils import get_scheduler_address
+from dask_kubernetes.utils import get_scheduler_address, check_dependency
 
 
 lock = threading.Lock()
@@ -200,6 +200,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
+        check_dependency("kubectl")
         services = subprocess.check_output(
             [
                 "kubectl",
