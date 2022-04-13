@@ -183,7 +183,10 @@ def build_cluster_spec(name, image, replicas, resources, env):
 
 @kopf.on.create("daskcluster")
 async def daskcluster_create(spec, name, namespace, logger, **kwargs):
-    await kubernetes.config.load_kube_config()
+    try:
+        await kubernetes.config.load_kube_config()
+    except kubernetes.config.config_exception.ConfigException:
+        kubernetes.config.load_incluster_config()
     logger.info(
         f"A DaskCluster has been created called {name} in {namespace} with the following config: {spec}"
     )
