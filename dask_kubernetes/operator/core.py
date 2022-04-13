@@ -116,7 +116,10 @@ class KubeCluster2(Cluster):
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
-        await kubernetes.config.load_kube_config()
+        try:
+            await kubernetes.config.load_kube_config()
+        except kubernetes.config.config_exception.ConfigException:
+            kubernetes.config.load_incluster_config()
         async with kubernetes.client.api_client.ApiClient() as api_client:
             self.core_api = kubernetes.client.CoreV1Api(api_client)
             data = build_cluster_spec(
@@ -149,7 +152,7 @@ class KubeCluster2(Cluster):
                 encoding="utf-8",
             )
             while data["metadata"]["name"] not in services:
-                asyncio.sleep(0.1)
+                await asyncio.sleep(0.1)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
             await super()._start()
 
