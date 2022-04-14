@@ -32,27 +32,22 @@ Create a file called `cluster.yaml` and provide it with the following configurat
 
 .. code-block:: yaml
 
-apiVersion: kubernetes.dask.org/v1
-kind: DaskCluster
-metadata:
-  name: simple-cluster
-spec:
-  imagePullSecrets: null
-  image: "daskdev/dask:latest"
-  imagePullPolicy: "IfNotPresent"
-  protocol: "tcp"
-  scheduler:
-    resources: {}
-    env: {}
-    serviceType: "ClusterIP"
-    # nodeSelector: null
-    # securityContext: null
-    # affinity: null
-    # tolerations: null
-    # serviceAccountName: null
-  replicas: 3
-  resources: {}
-  env: {}
+   apiVersion: kubernetes.dask.org/v1
+   kind: DaskCluster
+   metadata:
+     name: simple-cluster
+   spec:
+     imagePullSecrets: null
+     image: "daskdev/dask:latest"
+     imagePullPolicy: "IfNotPresent"
+     protocol: "tcp"
+     scheduler:
+       resources: {}
+       env: {}
+       serviceType: "ClusterIP"
+     replicas: 3
+     resources: {}
+     env: {}
 
 Editing this file will change the default configuration of you Dask cluster. Now deploy `cluster.yaml`
 
