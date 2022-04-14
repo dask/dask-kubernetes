@@ -79,7 +79,7 @@ To create a cluster in the default namespace, run the following
    cluster = KubeCluster2(name='foo')
 
 You can change the default configuration of the cluster by passing additional args
-to the python class (`namespace`, `n_workers`, etc.) of your cluster. [See the API refernce](:ref:`api`)
+to the python class (`namespace`, `n_workers`, etc.) of your cluster. See the API refernce :ref:`api`
 
 You can scale the cluster
 
