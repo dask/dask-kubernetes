@@ -30,7 +30,7 @@ To create a cluster in the default namespace, run the following
 
 Create a file called `cluster.yaml` and provide it with the following configuration
 
-```yaml
+.. code-block:: yaml
 
 apiVersion: kubernetes.dask.org/v1
 kind: DaskCluster
@@ -53,8 +53,6 @@ spec:
   replicas: 3
   resources: {}
   env: {}
-
-```
 
 Editing this file will change the default configuration of you Dask cluster. Now deploy `cluster.yaml`
 
