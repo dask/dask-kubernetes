@@ -97,7 +97,9 @@ You can connect to the client
     print(array.mean().compute())  # Should print 1.0
 
 Finally delete the cluster by running
+
 .. code-block:: python
+
    cluster.close()
 
 .. warning::
