@@ -49,7 +49,7 @@ You can change the default configuration of the cluster by passing additional ar
 to the python class (`namespace`, `n_workers`, etc.) of your cluster.
 
 You can scale the cluster
-.. code-block:: bash
+.. code-block:: python
    # Scale up the cluster
    cluster.scale(5)
 
@@ -57,7 +57,7 @@ You can scale the cluster
    cluster.scale(1)
 
 Or add an additional worker group
-.. code-block:: bash
+.. code-block:: python
    cluster.add_worker_group("additional")
 
    # Scale the new worker group
@@ -78,7 +78,7 @@ You can connect to the client
     print(array.mean().compute())  # Should print 1.0
 
 Finally delete the cluster by running
-.. code-block:: bash
+.. code-block:: python
    cluster.close()
 
 .. warning::
