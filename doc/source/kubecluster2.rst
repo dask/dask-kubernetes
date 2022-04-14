@@ -4,7 +4,7 @@ Dask Operator
 .. warning::
     `KubeCluster2` is experimental for now. So any bug reports are appreciated!
 
-:doc: The Dask Operator is for creating and managing a Dask cluster which using a Kubernetes Operator. It's installed on the Kubernetes cluster and then users can create clusters via the Kubernetes API (``kubectl``) or the Python API (``KubeCluster2``)
+:doc: The Dask Operator is for creating and managing a Dask Cluster. It's installed on the Kubernetes cluster and then users can create clusters via the Kubernetes API (``kubectl``) or the Python API (``KubeCluster2``)
 
 Installing the Operator
 -----------------------
