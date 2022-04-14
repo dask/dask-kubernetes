@@ -4,7 +4,7 @@ Dask Operator
 .. warning::
     `KubeCluster2` is experimental for now. So any bug reports are appreciated!
 
-:doc: The Dask Operator is for creating and managing a Dask cluster which using a Kubernetes Operator. With this cluster object you can conveniently create and manage a Dask :class:`dask.distributed.Client` object to the cluster and perform your work. Provided you have API access to Kubernetes and can run ``kubectl`` commands then connectivity to the Dask cluster is handled automatically for you via services or port forwarding. The Operator is install on the Kubernetes cluster and then users can create cluster via the Kubernetes API (`kubectl`) of the Python API (`KubeCluster2`)
+:doc: The Dask Operator is for creating and managing a Dask cluster which using a Kubernetes Operator. With this cluster object you can conveniently create and manage a Dask :class:`dask.distributed.Client` object to the cluster and perform your work. Provided you have API access to Kubernetes and can run ``kubectl`` commands then connectivity to the Dask cluster is handled automatically for you via services or port forwarding. The Operator is install on the Kubernetes cluster and then users can create cluster via the Kubernetes API (``kubectl``) of the Python API (``KubeCluster2``)
 
 Installing the Operator
 -----------------------
@@ -31,6 +31,7 @@ To create a cluster in the default namespace, run the following
 Create a file called `cluster.yaml` and provide it with the following configuration
 
 ```yaml
+
 apiVersion: kubernetes.dask.org/v1
 kind: DaskCluster
 metadata:
@@ -52,6 +53,7 @@ spec:
   replicas: 3
   resources: {}
   env: {}
+
 ```
 
 Editing this file will change the default configuration of you Dask cluster. Now deploy `cluster.yaml`
