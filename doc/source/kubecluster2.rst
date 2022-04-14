@@ -63,6 +63,7 @@ You can change the default configuration of the cluster by passing additional ar
 to the python class (`namespace`, `n_workers`, etc.) of your cluster.
 
 You can scale the cluster
+
 .. code-block:: python
 
    # Scale up the cluster
@@ -72,6 +73,7 @@ You can scale the cluster
    cluster.scale(1)
 
 Or add an additional worker group
+
 .. code-block:: python
 
    cluster.add_worker_group("additional")
