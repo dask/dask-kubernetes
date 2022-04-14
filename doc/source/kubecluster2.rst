@@ -1,10 +1,10 @@
 Dask Operator
-===========
+=============
 
 .. warning::
-    `KubeCluster2` is experimental for now. So any bug reports are appreciated!
+    `KubeCluster2` is experimental for now. So any bug reports are appreciated! [Issue Tracker](https://github.com/dask/dask-kubernetes/issues)
 
-:doc: The Dask Operator is for creating and managing a Dask Cluster. It's installed on the Kubernetes cluster and then users can create clusters via the Kubernetes API (``kubectl``) or the Python API (``KubeCluster2``)
+The Dask Operator is for creating and managing a Dask Cluster. It's installed on the Kubernetes cluster and then users can create clusters via the Kubernetes API (``kubectl``) or the Python API (``KubeCluster2``)
 
 Installing the Operator
 -----------------------
@@ -49,13 +49,13 @@ Create a file called `cluster.yaml` and provide it with the following configurat
      resources: {}
      env: {}
 
-Editing this file will change the default configuration of you Dask cluster. Now deploy `cluster.yaml`
+Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now deploy `cluster.yaml`
 
 .. code-block:: bash
 
    kubectl apply -f <path to cluster.yaml>
 
-You can scale the cluster
+You can scale the cluster like you would a Deployment or ReplicaSet
 
 .. code-block:: bash
 
@@ -70,7 +70,7 @@ Finally delete the cluster by running
 Creating a Dask cluster via the cluster manager 
 -----------------------------------------------
 
- With the cluster object, you can conveniently create and manage a Dask cluster. And connect a :class:`dask.distributed.Client` object to the cluster and perform your work.
+Alternatively, with the cluster object, you can conveniently create and manage a Dask cluster in Python. Then connect a :class:`dask.distributed.Client` object to the cluster and perform your work.
 
 To create a cluster in the default namespace, run the following
 
@@ -79,7 +79,7 @@ To create a cluster in the default namespace, run the following
    cluster = KubeCluster2(name='foo')
 
 You can change the default configuration of the cluster by passing additional args
-to the python class (`namespace`, `n_workers`, etc.) of your cluster.
+to the python class (`namespace`, `n_workers`, etc.) of your cluster. [See the API refernce](:ref:`api`)
 
 You can scale the cluster
 
@@ -121,6 +121,8 @@ Finally delete the cluster by running
 
    cluster.close()
 
+.. _api:
+
 API
 ---
 
@@ -134,3 +136,8 @@ API
 
 .. autoclass:: KubeCluster2
    :members:
+
+.. _config:
+
+Configuration Reference
+-----------------------
