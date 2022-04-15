@@ -178,6 +178,7 @@ resources: Resource requests and limts for scheduler and worker pods
 env: Environment variables
 
 .. code-block:: python
+
    env = {
      "VAR_1": "Variable 1",
      "VAR_2": "Variable 2",
