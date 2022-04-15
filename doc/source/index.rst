@@ -41,6 +41,20 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    cluster = HelmCluster(release_name="myrelease")
    cluster.scale(10)
 
+
+KubeCluster2
+-----------
+
+:doc:`kubecluster2` deploys Dask clusters on Kubernetes clusters using a Kubernetes Operator. 
+The operator is a more Kubernetes native way of creating Dask clusters than `kubecluster2`.
+
+.. code-block:: python
+
+   from dask_kubernetes import KubeCluster2
+
+   cluster = KubeCluster2(name="my-cluster")
+   cluster.scale(10)
+
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -55,6 +69,7 @@ and have the cluster running. You can then use it to manage scaling and retrieve
 
    kubecluster
    helmcluster
+   kubecluster2
 
 .. toctree::
    :maxdepth: 2
