@@ -121,6 +121,69 @@ Finally delete the cluster by running
 
    cluster.close()
 
+.. _config:
+
+Configuration Reference
+-----------------------
+name: Name of the Dask cluster (required)
+
+Example:
+
+.. code-block:: python
+
+   cluster = KubeCluster2(name="foo")
+
+namespace: Namespace where Dask cluster will exist
+
+Example: (First create the namespace if it doesn't exist)
+
+.. code-block:: bash
+   
+   kubectl create namespace test-cluster
+
+.. code-block:: python
+
+   cluster = KubeCluster2(name="foo", namespace='test-cluster')
+
+image: Dask image to run on the scheduler and workers
+
+Example:
+
+.. code-block:: python
+
+   cluster = KubeCluster2(name="foo", image="daskdev/dask:2022.4.0-py3.8")
+
+n_workers: Number of workers to start the cluster with
+
+Example:
+
+.. code-block:: python
+
+   cluster = KubeCluster2(name="foo", n_workers=5)
+
+resources: Resource requests and limts for scheduler and worker pods
+
+.. code-block:: python
+
+   resources = {
+     "requests":
+       "memory": "64Mi",
+       "cpu": "250m",
+     "limits":
+       "memory": "128Mi",
+       "cpu": "500m",
+   }
+   cluster = KubeCluster2(name="foo", resources=resources)
+
+env: Environment variables
+
+.. code-block:: python
+   env = {
+     "VAR_1": "Variable 1",
+     "VAR_2": "Variable 2",
+   }
+   cluster = KubeCluster2(name="foo", env=env)
+
 .. _api:
 
 API
@@ -136,8 +199,3 @@ API
 
 .. autoclass:: KubeCluster2
    :members:
-
-.. _config:
-
-Configuration Reference
------------------------
