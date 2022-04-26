@@ -121,13 +121,13 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A worker group has been created" in runner.stdout
 
 
-from dask_kubernetes.operator.core import KubeCluster2
+from dask_kubernetes.experimental import KubeCluster
 
 
 @pytest.fixture(params=["foo", "bar"])
 def cluster(kopf_runner, request):
     with kopf_runner as runner:
-        with KubeCluster2(name=request.param) as cluster:
+        with KubeCluster(name=request.param) as cluster:
             yield cluster
 
 
@@ -137,7 +137,7 @@ def dask_cluster(cluster):
         yield client, cluster
 
 
-def test_fixtures_kubecluster2(dask_cluster):
+def test_fixtures_KubeCluster(dask_cluster):
     client, cluster = dask_cluster
     client.scheduler_info()
     cluster.scale(1)

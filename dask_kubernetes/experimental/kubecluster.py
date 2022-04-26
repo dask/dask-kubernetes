@@ -10,7 +10,7 @@ from distributed.deploy import Cluster
 from distributed.utils import Log, Logs, LoopRunner
 
 from dask_kubernetes.auth import ClusterAuth
-from .daskcluster import (
+from dask_kubernetes.operator.daskcluster import (
     build_cluster_spec,
     build_worker_group_spec,
 )
@@ -22,7 +22,7 @@ from dask_kubernetes.utils import (
 )
 
 
-class KubeCluster2(Cluster):
+class KubeCluster(Cluster):
     """Launch a Dask Cluster on Kubernetes using the Operator
 
     This cluster manager creates a Dask cluster by deploying
@@ -57,8 +57,8 @@ class KubeCluster2(Cluster):
 
     Examples
     --------
-    >>> from dask_kubernetes import KubeCluster2
-    >>> cluster = KubeCluster2(name="foo")
+    >>> from dask_kubernetes import KubeCluster
+    >>> cluster = KubeCluster(name="foo")
     You can add another group of workers (default is 3 workers)
     >>> cluster.add_worker_group('additional', n=4)
     You can then resize the cluster with the scale method
@@ -75,7 +75,7 @@ class KubeCluster2(Cluster):
     >>> cluster.get_logs()
     See Also
     --------
-    KubeCluster2.from_name
+    KubeCluster.from_name
     """
 
     def __init__(

@@ -1,16 +1,16 @@
 Dask Operator
 =============
+.. currentmodule:: dask_kubernetes.experimental
 
 .. warning::
     The Dask Operator for Kubernetes is experimental. So any `bug reports <https://github.com/dask/dask-kubernetes/issues>`_ are appreciated!
 
 The Dask Operator is a small service that runs on you Kubernetes cluster and allows you to create and manage your Dask clusters as native Kubernetes resources.
-Creating clusters can either be done via the Kubernetes API (``kubectl``) or the Python API (``KubeCluster2``)
+Creating clusters can either be done via the Kubernetes API (``kubectl``) or the Python API (:class:`dask_kubernetes.experimental.KubeCluster`)
 
 Installing the Operator
 -----------------------
 
-.. currentmodule:: dask_kubernetes
 
 To install the the operator first we need to create the Dask custom resources:
 
@@ -156,10 +156,12 @@ To create a cluster in the default namespace, run the following
 
 .. code-block:: python
 
-   cluster = KubeCluster2(name='foo')
+   from dask_kubernetes.experimental import KubeCluster
+
+   cluster = KubeCluster(name='foo')
 
 You can change the default configuration of the cluster by passing additional args
-to the python class (`namespace`, `n_workers`, etc.) of your cluster. See the API refernce :ref:`api`
+to the python class (``namespace``, ``n_workers``, etc.) of your cluster. See the API refernce :ref:`api`
 
 You can scale the cluster
 
@@ -175,9 +177,7 @@ You can connect to the client
 
 .. code-block:: python
 
-    # Example usage
     from dask.distributed import Client
-    import dask.array as da
 
     # Connect Dask to the cluster
     client = Client(cluster)
@@ -241,13 +241,13 @@ Full ``DaskCluster`` spec reference.
 API
 ---
 
-.. currentmodule:: dask_kubernetes
+.. currentmodule:: dask_kubernetes.experimental
 
 .. autosummary::
-   KubeCluster2
-   KubeCluster2.scale
-   Kubeluster2.get_logs
-   KubeCluster2.close
+   KubeCluster
+   KubeCluster.scale
+   KubeCluster.get_logs
+   KubeCluster.close
 
-.. autoclass:: KubeCluster2
+.. autoclass:: KubeCluster
    :members:
