@@ -8,6 +8,7 @@ import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
+from dask_kubernetes.auth import ClusterAuth
 from dask_kubernetes.utils import (
     get_scheduler_address,
 )
@@ -181,10 +182,7 @@ def build_cluster_spec(name, image, replicas, resources, env):
 
 @kopf.on.startup()
 async def startup(**kwargs):
-    try:
-        await kubernetes.config.load_kube_config()
-    except kubernetes.config.config_exception.ConfigException:
-        kubernetes.config.load_incluster_config()
+    await ClusterAuth.load_first()
 
 
 @kopf.on.create("daskcluster")
