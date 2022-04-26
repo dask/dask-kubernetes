@@ -212,15 +212,15 @@ class KubeCluster(Cluster):
         return logs
 
     def add_worker_group(self, name, n=3):
-        """Delete a dask worker group by name
+        """Create a dask worker group by name
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the worker group
-
-        n : int
+        n: int
             Target number of workers for worker group
+
         Examples
         --------
         >>> cluster.add_worker_group("high-mem-workers", n=5)
@@ -250,7 +250,7 @@ class KubeCluster(Cluster):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the worker group
 
         Examples
@@ -334,12 +334,12 @@ class KubeCluster(Cluster):
 
         Parameters
         ----------
-        name : str
+        name: str
             Name of the cluster to connect to
 
         Examples
         --------
-        >>> cluster = KubeCluster(name="simple-cluster")
+        >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
         # TODO: Implement when switch to k8s python client
         raise NotImplementedError()
