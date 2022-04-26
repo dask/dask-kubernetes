@@ -180,7 +180,7 @@ def build_cluster_spec(name, image, replicas, resources, env):
 
 
 @kopf.on.startup()
-async def startup(self, **kwargs):
+async def startup(**kwargs):
     try:
         await kubernetes.config.load_kube_config()
     except kubernetes.config.config_exception.ConfigException:
