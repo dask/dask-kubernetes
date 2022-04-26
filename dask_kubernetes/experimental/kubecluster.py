@@ -280,7 +280,7 @@ class KubeCluster(Cluster):
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity"""
         raise NotImplementedError(
-            "Adaptive mode is not supported yet for this KubeCluster"
+            "Adaptive mode is not supported yet for this KubeCluster."
         )
 
     def __enter__(self):
