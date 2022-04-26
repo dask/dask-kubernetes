@@ -247,6 +247,8 @@ API
    KubeCluster
    KubeCluster.scale
    KubeCluster.get_logs
+   KubeCluster.add_worker_group
+   KubeCluster.delete_worker_group
    KubeCluster.close
 
 .. autoclass:: KubeCluster
