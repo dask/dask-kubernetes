@@ -32,8 +32,11 @@ jobs:
       - name: Get the version
         id: get_version
         run: |
-          VERSION=${GITHUB_REF/refs\/tags\//}
-          echo ::set-output name=VERSION::${VERSION/\//-/}
+          if [[ "$GITHUB_REF" == *"refs/tags"* ]]; then
+            echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+          else
+            echo ::set-output name=VERSION::dev
+          fi
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
