@@ -1,5 +1,4 @@
 import asyncio
-import subprocess
 import threading
 
 from distributed.core import rpc
@@ -11,7 +10,6 @@ from uuid import uuid4
 
 from dask_kubernetes.utils import (
     get_scheduler_address,
-    check_dependency,
 )
 
 
@@ -181,12 +179,16 @@ def build_cluster_spec(name, image, replicas, resources, env):
     }
 
 
-@kopf.on.create("daskcluster")
-async def daskcluster_create(spec, name, namespace, logger, **kwargs):
+@kopf.on.startup()
+async def startup(self, **kwargs):
     try:
         await kubernetes.config.load_kube_config()
     except kubernetes.config.config_exception.ConfigException:
         kubernetes.config.load_incluster_config()
+
+
+@kopf.on.create("daskcluster")
+async def daskcluster_create(spec, name, namespace, logger, **kwargs):
     logger.info(
         f"A DaskCluster has been created called {name} in {namespace} with the following config: {spec}"
     )
@@ -196,7 +198,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         # TODO Check for existing scheduler pod
         data = build_scheduler_pod_spec(name, spec.get("image"))
         kopf.adopt(data)
-        scheduler_pod = await api.create_namespaced_pod(
+        await api.create_namespaced_pod(
             namespace=namespace,
             body=data,
         )
@@ -209,23 +211,16 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         # TODO Check for existing scheduler service
         data = build_scheduler_service_spec(name)
         kopf.adopt(data)
-        scheduler_service = await api.create_namespaced_service(
+        await api.create_namespaced_service(
             namespace=namespace,
             body=data,
         )
-        check_dependency("kubectl")
-        services = subprocess.check_output(
-            [
-                "kubectl",
-                "get",
-                "service",
-                "-n",
-                namespace,
-            ],
-            encoding="utf-8",
-        )
-        while data["metadata"]["name"] not in services:
-            asyncio.sleep(0.1)
+        while True:
+            try:
+                await api.read_namespaced_service(data["metadata"]["name"], namespace)
+                break
+            except Exception:
+                asyncio.sleep(0.1)
         logger.info(
             f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
@@ -240,7 +235,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         # TODO: Next line is not needed if we can get worker groups adopted by the cluster
         kopf.adopt(data)
         api = kubernetes.client.CustomObjectsApi(api_client)
-        worker_pods = await api.create_namespaced_custom_object(
+        await api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
             plural="daskworkergroups",
