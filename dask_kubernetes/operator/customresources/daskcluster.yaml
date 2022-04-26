@@ -1,0 +1,65 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: daskclusters.kubernetes.dask.org
+spec:
+  scope: Namespaced
+  group: kubernetes.dask.org
+  names:
+    kind: DaskCluster
+    plural: daskclusters
+    singular: daskcluster
+    shortNames:
+      - daskcluster
+      - dsk
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                imagePullSecrets:
+                  type: object
+                  description: Container image secrets
+                image:
+                  type: string
+                  description: Dask container image
+                imagePullPolicy:
+                  type: string
+                  description: Container image policy
+                protocol:
+                  type: string
+                  description: Protocol type
+                scheduler:
+                  type: object
+                  description: Dask scheduler information
+                  properties:
+                    resources:
+                      type: object
+                      description: Scheduler resources
+                    env:
+                      type: object
+                      description: Scheduler environment variables
+                    serviceType:
+                      type: string
+                      description: Type of service
+                replicas:
+                  type: integer
+                  description: Number of pods/workers in the worker group
+                resources:
+                  type: object
+                  description: Resources for workers
+                env:
+                  type: object
+                  description: Environment variables
+            status:
+              type: object
+      subresources:
+        scale:
+          specReplicasPath: .spec.replicas
+          statusReplicasPath: .status.replicas

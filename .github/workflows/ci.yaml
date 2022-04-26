@@ -30,4 +30,6 @@ jobs:
           pip install git+https://github.com/dask/dask@main
 
       - name: Run tests
+        env:
+          KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
         run: pytest

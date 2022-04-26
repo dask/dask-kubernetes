@@ -1,0 +1,21 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskCluster
+metadata:
+  name: simple-cluster
+spec:
+  imagePullSecrets: null
+  image: "daskdev/dask:latest"
+  imagePullPolicy: "IfNotPresent"
+  protocol: "tcp"
+  scheduler:
+    resources: {}
+    env: {}
+    serviceType: "ClusterIP"
+    # nodeSelector: null
+    # securityContext: null
+    # affinity: null
+    # tolerations: null
+    # serviceAccountName: null
+  replicas: 3
+  resources: {}
+  env: {}
