@@ -213,10 +213,12 @@ class KubeCluster(Cluster):
 
     def add_worker_group(self, name, n=3):
         """Delete a dask worker group by name
+
         Parameters
         ----------
         name : str
             Name of the worker group
+
         n : int
             Target number of workers for worker group
         Examples
@@ -245,10 +247,12 @@ class KubeCluster(Cluster):
 
     def delete_worker_group(self, name):
         """Delete a dask worker group by name
+
         Parameters
         ----------
         name : str
             Name of the worker group
+
         Examples
         --------
         >>> cluster.delete_worker_group("high-mem-workers")
@@ -286,12 +290,14 @@ class KubeCluster(Cluster):
 
     def scale(self, n, worker_group="default"):
         """Scale cluster to n workers
+
         Parameters
         ----------
         n : int
             Target number of workers
         worker_group : str
             Worker group to scale
+
         Examples
         --------
         >>> cluster.scale(10)  # scale cluster to ten workers
@@ -325,13 +331,15 @@ class KubeCluster(Cluster):
     @classmethod
     def from_name(cls, name, **kwargs):
         """Create an instance of this class to represent an existing cluster by name.
+
         Parameters
         ----------
         name : str
             Name of the cluster to connect to
+
         Examples
         --------
-        >>> cluster = KubeCLuster(name="simple-cluster")
+        >>> cluster = KubeCluster(name="simple-cluster")
         """
         # TODO: Implement when switch to k8s python client
         raise NotImplementedError()
