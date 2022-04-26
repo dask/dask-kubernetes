@@ -212,6 +212,17 @@ class KubeCluster(Cluster):
         return logs
 
     def add_worker_group(self, name, n=3):
+        """Delete a dask worker group by name
+        Parameters
+        ----------
+        name : str
+            Name of the worker group
+        n : int
+            Target number of workers for worker group
+        Examples
+        --------
+        >>> cluster.add_worker_group("high-mem-workers", n=5)
+        """
         data = build_worker_group_spec(
             f"{self.name}-cluster-{name}", self.image, n, self.resources, self.env
         )
@@ -233,6 +244,15 @@ class KubeCluster(Cluster):
         self.worker_groups.append(data["metadata"]["name"])
 
     def delete_worker_group(self, name):
+        """Delete a dask worker group by name
+        Parameters
+        ----------
+        name : str
+            Name of the worker group
+        Examples
+        --------
+        >>> cluster.delete_worker_group("high-mem-workers")
+        """
         subprocess.check_output(
             [
                 "kubectl",
@@ -246,6 +266,7 @@ class KubeCluster(Cluster):
         )
 
     def close(self):
+        """Delete the dask cluster"""
         super().close()
         subprocess.check_output(
             [
@@ -264,6 +285,18 @@ class KubeCluster(Cluster):
                 self.delete_worker_group(name)
 
     def scale(self, n, worker_group="default"):
+        """Scale cluster to n workers
+        Parameters
+        ----------
+        n : int
+            Target number of workers
+        worker_group : str
+            Worker group to scale
+        Examples
+        --------
+        >>> cluster.scale(10)  # scale cluster to ten workers
+        >>> cluster.scale(7, worker_group="high-mem-workers") # scale worker group high-mem-workers to seven workers
+        """
         subprocess.check_output(
             [
                 "kubectl",
@@ -291,6 +324,14 @@ class KubeCluster(Cluster):
 
     @classmethod
     def from_name(cls, name, **kwargs):
-        """Create an instance of this class to represent an existing cluster by name."""
+        """Create an instance of this class to represent an existing cluster by name.
+        Parameters
+        ----------
+        name : str
+            Name of the cluster to connect to
+        Examples
+        --------
+        >>> cluster = KubeCLuster(name="simple-cluster")
+        """
         # TODO: Implement when switch to k8s python client
         raise NotImplementedError()
