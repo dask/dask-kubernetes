@@ -277,6 +277,12 @@ class KubeCluster(Cluster):
             encoding="utf-8",
         )
 
+    def adapt(self, *args, **kwargs):
+        """Turn on adaptivity"""
+        raise NotImplementedError(
+            "Adaptive mode is not supported yet for this KubeCluster"
+        )
+
     def __enter__(self):
         return self
 
