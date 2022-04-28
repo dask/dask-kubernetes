@@ -1,4 +1,3 @@
-import subprocess
 import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
@@ -282,18 +281,19 @@ class KubeCluster(Cluster):
         return self.sync(self._scale, n, worker_group)
 
     async def _scale(self, n, worker_group="default"):
-        subprocess.check_output(
-            [
-                "kubectl",
-                "scale",
-                f"--replicas={n}",
-                "daskworkergroup",
-                f"{self.name}-cluster-{worker_group}-worker-group",
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            custom_objects_api.api_client.set_default_header(
+                "content-type", "application/merge-patch+json"
+            )
+            await custom_objects_api.patch_namespaced_custom_object_scale(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskworkergroups",
+                namespace=self.namespace,
+                name=f"{self.name}-cluster-{worker_group}-worker-group",
+                body={"replicas": n},
+            )
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity"""
