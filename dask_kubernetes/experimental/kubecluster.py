@@ -1,7 +1,4 @@
-import asyncio
 import subprocess
-import json
-import tempfile
 import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
