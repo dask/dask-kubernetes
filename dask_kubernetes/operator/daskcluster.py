@@ -180,6 +180,16 @@ def build_cluster_spec(name, image, replicas, resources, env):
     }
 
 
+async def wait_for_service(api, service_name, namespace):
+    """Block until service is available."""
+    while True:
+        try:
+            await api.read_namespaced_service(service_name, namespace)
+            break
+        except Exception:
+            asyncio.sleep(0.1)
+
+
 @kopf.on.startup()
 async def startup(**kwargs):
     await ClusterAuth.load_first()
@@ -213,12 +223,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=data,
         )
-        while True:
-            try:
-                await api.read_namespaced_service(data["metadata"]["name"], namespace)
-                break
-            except Exception:
-                asyncio.sleep(0.1)
+        await wait_for_service(api, data["metadata"]["name"], namespace)
         logger.info(
             f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
