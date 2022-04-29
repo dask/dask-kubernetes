@@ -124,21 +124,24 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 from dask_kubernetes.experimental import KubeCluster
 
 
-@pytest.fixture(params=["foo", "bar"])
-def cluster(kopf_runner, request):
-    with kopf_runner as runner:
-        with KubeCluster(name=request.param) as cluster:
+@pytest.fixture
+def cluster(kopf_runner):
+    with kopf_runner:
+        with KubeCluster(name="foo") as cluster:
             yield cluster
 
 
-@pytest.fixture
-def dask_cluster(cluster):
+def test_kubecluster(cluster):
     with Client(cluster) as client:
-        yield client, cluster
+        client.scheduler_info()
+        cluster.scale(1)
+        assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-def test_fixtures_KubeCluster(dask_cluster):
-    client, cluster = dask_cluster
-    client.scheduler_info()
-    cluster.scale(1)
-    assert client.submit(lambda x: x + 1, 10).result() == 11
+@pytest.mark.skip
+def test_multiple_clusters(kopf_runner):
+    with kopf_runner:
+        with KubeCluster(name="bar") as cluster1, KubeCluster(name="baz") as cluster2:
+            with Client(cluster1) as client1, Client(cluster2) as client2:
+                assert client1.submit(lambda x: x + 1, 10).result() == 11
+                assert client2.submit(lambda x: x + 1, 10).result() == 11

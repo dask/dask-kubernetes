@@ -1,7 +1,4 @@
 import asyncio
-import subprocess
-import json
-import tempfile
 import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
@@ -13,6 +10,7 @@ from dask_kubernetes.auth import ClusterAuth
 from dask_kubernetes.operator.daskcluster import (
     build_cluster_spec,
     build_worker_group_spec,
+    wait_for_service,
 )
 
 from dask_kubernetes.utils import (
@@ -95,8 +93,6 @@ class KubeCluster(Cluster):
         self.name = name
         # TODO: Set namespace to None and get default namespace from user's context
         self.namespace = namespace
-        self.core_api = None
-        self.custom_api = None
         self.image = image
         self.n_workers = n_workers
         self.resources = resources
@@ -105,7 +101,6 @@ class KubeCluster(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
-        self.worker_groups = [f"{self.name}-cluster-default-worker-group"]
         check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
@@ -116,43 +111,22 @@ class KubeCluster(Cluster):
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
-        try:
-            await kubernetes.config.load_kube_config()
-        except kubernetes.config.config_exception.ConfigException:
-            kubernetes.config.load_incluster_config()
+
         async with kubernetes.client.api_client.ApiClient() as api_client:
-            self.core_api = kubernetes.client.CoreV1Api(api_client)
+            core_api = kubernetes.client.CoreV1Api(api_client)
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
             data = build_cluster_spec(
                 self.name, self.image, self.n_workers, self.resources, self.env
             )
-            temp_file = tempfile.NamedTemporaryFile(delete=False)
-            config_path = temp_file.name
-            with open(config_path, "w") as f:
-                json.dump(data, f)
-            cluster = subprocess.check_output(
-                [
-                    "kubectl",
-                    "apply",
-                    "-f",
-                    temp_file.name,
-                    "-n",
-                    self.namespace,
-                ],
-                encoding="utf-8",
+            await custom_objects_api.create_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskclusters",
+                namespace=self.namespace,
+                body=data,
             )
             await wait_for_scheduler(f"{self.name}-cluster", self.namespace)
-            services = subprocess.check_output(
-                [
-                    "kubectl",
-                    "get",
-                    "service",
-                    "-n",
-                    self.namespace,
-                ],
-                encoding="utf-8",
-            )
-            while data["metadata"]["name"] not in services:
-                await asyncio.sleep(0.1)
+            await wait_for_service(core_api, data["metadata"]["name"], self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
             await super()._start()
 
@@ -185,10 +159,10 @@ class KubeCluster(Cluster):
 
     async def _get_logs(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
-            self.core_api = kubernetes.client.CoreV1Api(api_client)
+            core_api = kubernetes.client.CoreV1Api(api_client)
             logs = Logs()
 
-            pods = await self.core_api.list_namespaced_pod(
+            pods = await core_api.list_namespaced_pod(
                 namespace=self.namespace,
                 label_selector=f"dask.org/cluster-name={self.name}-cluster",
             )
@@ -201,7 +175,7 @@ class KubeCluster(Cluster):
                                 f"Cannot get logs for pod with status {pod.status.phase}.",
                             )
                         log = Log(
-                            await self.core_api.read_namespaced_pod_log(
+                            await core_api.read_namespaced_pod_log(
                                 pod.metadata.name, pod.metadata.namespace
                             )
                         )
@@ -225,25 +199,23 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.add_worker_group("high-mem-workers", n=5)
         """
+        # TODO: Once adoptions work correctly we can enable this method
+        raise NotImplementedError()
+        # return self.sync(self._add_worker_group, name, n)
+
+    async def _add_worker_group(self, name, n=3):
         data = build_worker_group_spec(
             f"{self.name}-cluster-{name}", self.image, n, self.resources, self.env
         )
-        temp_file = tempfile.NamedTemporaryFile(delete=False)
-        config_path = temp_file.name
-        with open(config_path, "w") as f:
-            json.dump(data, f)
-        workers = subprocess.check_output(
-            [
-                "kubectl",
-                "apply",
-                "-f",
-                temp_file.name,
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
-        self.worker_groups.append(data["metadata"]["name"])
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            await custom_objects_api.create_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskworkergroups",
+                namespace=self.namespace,
+                body=data,
+            )
 
     def delete_worker_group(self, name):
         """Delete a dask worker group by name
@@ -257,36 +229,51 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.delete_worker_group("high-mem-workers")
         """
-        subprocess.check_output(
-            [
-                "kubectl",
-                "delete",
-                "daskworkergroup",
-                name,
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
+        # TODO: Once adoptions work correctly we can enable this method
+        raise NotImplementedError()
+        # return self.sync(self._delete_worker_group, name)
+
+    async def _delete_worker_group(self, name):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            await custom_objects_api.delete_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskworkergroups",
+                namespace=self.namespace,
+                name=name,
+            )
 
     def close(self):
         """Delete the dask cluster"""
-        super().close()
-        subprocess.check_output(
-            [
-                "kubectl",
-                "delete",
-                "daskcluster",
-                f"{self.name}-cluster",
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
-        # TODO: Remove these lines when kopf adoptons work
-        for name in self.worker_groups:
-            if name != f"{self.name}-cluster-default-worker-group":
-                self.delete_worker_group(name)
+        return self.sync(self._close)
+
+    async def _close(self):
+        await super()._close()
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            await custom_objects_api.delete_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskclusters",
+                namespace=self.namespace,
+                name=f"{self.name}-cluster",
+            )
+            while True:
+                try:
+                    await custom_objects_api.get_namespaced_custom_object(
+                        group="kubernetes.dask.org",
+                        version="v1",
+                        plural="daskclusters",
+                        namespace=self.namespace,
+                        name=f"{self.name}-cluster",
+                    )
+                    await asyncio.sleep(1)
+                except kubernetes.client.exceptions.ApiException as e:
+                    if "Not Found" in str(e):
+                        break
+                    else:
+                        raise e
 
     def scale(self, n, worker_group="default"):
         """Scale cluster to n workers
@@ -303,18 +290,23 @@ class KubeCluster(Cluster):
         >>> cluster.scale(10)  # scale cluster to ten workers
         >>> cluster.scale(7, worker_group="high-mem-workers") # scale worker group high-mem-workers to seven workers
         """
-        subprocess.check_output(
-            [
-                "kubectl",
-                "scale",
-                f"--replicas={n}",
-                "daskworkergroup",
-                f"{self.name}-cluster-{worker_group}-worker-group",
-                "-n",
-                self.namespace,
-            ],
-            encoding="utf-8",
-        )
+
+        return self.sync(self._scale, n, worker_group)
+
+    async def _scale(self, n, worker_group="default"):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            custom_objects_api.api_client.set_default_header(
+                "content-type", "application/merge-patch+json"
+            )
+            await custom_objects_api.patch_namespaced_custom_object_scale(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskworkergroups",
+                namespace=self.namespace,
+                name=f"{self.name}-cluster-{worker_group}-worker-group",
+                body={"spec": {"replicas": n}},
+            )
 
     def adapt(self, *args, **kwargs):
         """Turn on adaptivity"""
