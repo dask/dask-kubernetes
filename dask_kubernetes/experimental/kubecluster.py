@@ -1,3 +1,4 @@
+import asyncio
 import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
@@ -100,7 +101,6 @@ class KubeCluster(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
-        self.worker_groups = [f"{self.name}-cluster-default-worker-group"]
         check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
@@ -199,7 +199,9 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.add_worker_group("high-mem-workers", n=5)
         """
-        return self.sync(self._add_worker_group, name, n)
+        # TODO: Once adoptions work correctly we can enable this method
+        raise NotImplementedError()
+        # return self.sync(self._add_worker_group, name, n)
 
     async def _add_worker_group(self, name, n=3):
         data = build_worker_group_spec(
@@ -214,7 +216,6 @@ class KubeCluster(Cluster):
                 namespace=self.namespace,
                 body=data,
             )
-            self.worker_groups.append(data["metadata"]["name"])
 
     def delete_worker_group(self, name):
         """Delete a dask worker group by name
@@ -228,7 +229,9 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.delete_worker_group("high-mem-workers")
         """
-        return self.sync(self._delete_worker_group, name)
+        # TODO: Once adoptions work correctly we can enable this method
+        raise NotImplementedError()
+        # return self.sync(self._delete_worker_group, name)
 
     async def _delete_worker_group(self, name):
         async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -256,11 +259,21 @@ class KubeCluster(Cluster):
                 namespace=self.namespace,
                 name=f"{self.name}-cluster",
             )
-
-        # TODO: Remove these lines when kopf adoptons work
-        for name in self.worker_groups:
-            if name != f"{self.name}-cluster-default-worker-group":
-                await self._delete_worker_group(name)
+            while True:
+                try:
+                    await custom_objects_api.get_namespaced_custom_object(
+                        group="kubernetes.dask.org",
+                        version="v1",
+                        plural="daskclusters",
+                        namespace=self.namespace,
+                        name=f"{self.name}-cluster",
+                    )
+                    await asyncio.sleep(1)
+                except kubernetes.client.exceptions.ApiException as e:
+                    if "Not Found" in str(e):
+                        break
+                    else:
+                        raise e
 
     def scale(self, n, worker_group="default"):
         """Scale cluster to n workers
@@ -292,7 +305,7 @@ class KubeCluster(Cluster):
                 plural="daskworkergroups",
                 namespace=self.namespace,
                 name=f"{self.name}-cluster-{worker_group}-worker-group",
-                body={"replicas": n},
+                body={"spec": {"replicas": n}},
             )
 
     def adapt(self, *args, **kwargs):
