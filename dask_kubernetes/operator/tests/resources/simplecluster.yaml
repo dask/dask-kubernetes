@@ -9,7 +9,7 @@ spec:
   protocol: "tcp"
   scheduler:
     resources: {}
-    env: {}
+    env: []
     serviceType: "ClusterIP"
     # nodeSelector: null
     # securityContext: null
@@ -18,4 +18,4 @@ spec:
     # serviceAccountName: null
   replicas: 3
   resources: {}
-  env: {}
+  env: []

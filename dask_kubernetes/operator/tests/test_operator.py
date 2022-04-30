@@ -114,6 +114,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     futures = client.map(lambda x: x + 1, range(10))
                     total = client.submit(sum, futures)
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
+            
+            assert "TESTING_ENV=hello-world" in k8s_cluster.kubectl("exec", worker_pod_name, "--", "env")
             assert cluster_name
 
     assert "A DaskCluster has been created" in runner.stdout
