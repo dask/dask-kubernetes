@@ -8,9 +8,7 @@ spec:
   imagePullPolicy: "IfNotPresent"
   replicas: 2
   resources: {}
-  env:
-  - name: TESTING_ENV
-    value: hello-world # NOTE: this value is compared against in test
+  env: []
   # nodeSelector: null
   # securityContext: null
   # affinity: null

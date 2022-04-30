@@ -114,8 +114,28 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     futures = client.map(lambda x: x + 1, range(10))
                     total = client.submit(sum, futures)
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
-            
-            assert "TESTING_ENV=hello-world" in k8s_cluster.kubectl("exec", worker_pod_name, "--", "env")
+
+            # Get the the first env value (the only one) of the scheduler
+            scheduler_env = k8s_cluster.kubectl(
+                "get",
+                "pods",
+                "--selector=dask.org/component=scheduler",
+                "-o",
+                "jsonpath='{.items[0].spec.containers[0].env[0]}'",
+            )
+            # Just check if its in the string, no need to parse the json
+            assert "SCHEDULER_ENV" in scheduler_env
+
+            # Get the the first env value (the only one) of the first worker
+            worker_env = k8s_cluster.kubectl(
+                "get",
+                "pods",
+                "--selector=dask.org/component=worker",
+                "-o",
+                "jsonpath='{.items[0].spec.containers[0].env[0]}'",
+            )
+            # Just check if its in the string, no need to parse the json
+            assert "WORKER_ENV" in worker_env
             assert cluster_name
 
     assert "A DaskCluster has been created" in runner.stdout

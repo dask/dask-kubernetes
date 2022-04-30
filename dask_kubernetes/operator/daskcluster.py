@@ -205,7 +205,10 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         api = kubernetes.client.CoreV1Api(api_client)
 
         # TODO Check for existing scheduler pod
-        data = build_scheduler_pod_spec(name, spec.get("image"), spec.get("env", []))
+        scheduler_spec = spec.get("scheduler", {})
+        data = build_scheduler_pod_spec(
+            name, spec.get("image"), scheduler_spec.get("env", [])
+        )
         kopf.adopt(data)
         await api.create_namespaced_pod(
             namespace=namespace,
