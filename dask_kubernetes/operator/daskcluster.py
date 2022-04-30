@@ -298,7 +298,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed > 0:
             for i in range(workers_needed):
                 data = build_worker_pod_spec(
-                    name, namespace, spec.get("image"), uuid4().hex, scheduler_name, spec.get("env", None)
+                    name, namespace, spec.get("image"), uuid4().hex, scheduler_name, spec.get("env", [])
                 )
                 kopf.adopt(data)
                 worker_pod = await api.create_namespaced_pod(
