@@ -41,8 +41,8 @@ class KubeCluster(Cluster):
         Number of workers on initial launch.
         Use ``scale`` to change this number in the future
     resources: Dict[str, str]
-    env: Dict[str, str]
-        Dictionary of environment variables to pass to worker pod
+    env: List[dict]
+        List of environment variables to pass to worker pod
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -83,7 +83,7 @@ class KubeCluster(Cluster):
         image="daskdev/dask:latest",
         n_workers=3,
         resources={},
-        env={},
+        env=[],
         loop=None,
         asynchronous=False,
         auth=ClusterAuth.DEFAULT,
