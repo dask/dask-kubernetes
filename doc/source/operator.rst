@@ -222,7 +222,7 @@ Full ``DaskCluster`` spec reference.
      resources: {}
 
      # Environment variables to be set on the worker pods
-     env: {}
+     env: []
 
      # Scheduler specific options
      scheduler:
@@ -231,7 +231,7 @@ Full ``DaskCluster`` spec reference.
        resources: {}
 
        # Environment variables to be set on the scheduler pod (if omitted will use worker setting)
-       env: {}
+       env: []
 
        # Service type to use for exposing the scheduler
        serviceType: "ClusterIP"
