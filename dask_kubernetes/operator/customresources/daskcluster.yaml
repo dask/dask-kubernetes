@@ -42,45 +42,44 @@ spec:
                     resources:
                       type: object
                       description: Scheduler resources
-                      serviceType:
-                  type: string
-                  description: Type of service
-                env:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                      value:
-                        type: string
-                      valueFrom:
+                    serviceType:
+                      type: string
+                      description: Type of service
+                    env:
+                      type: array
+                      items:
                         type: object
                         properties:
-                          secretKeyRef:
+                          name:
+                            type: string
+                          value:
+                            type: string
+                          valueFrom:
                             type: object
                             properties:
-                              name:
-                                type: string
-                              key:
-                                type: string
-                              optional:
-                                type: boolean
-                            required:
-                            - name
-                            - key
-                          configMapKeyRef:
-                            type: object
-                            properties:
-                              name:
-                                type: string
-                              key:
-                                type: string
-                            required:
-                            - name
-                            - key
-                  description: Environment variables
-                
+                              secretKeyRef:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                  key:
+                                    type: string
+                                  optional:
+                                    type: boolean
+                                required:
+                                - name
+                                - key
+                              configMapKeyRef:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                  key:
+                                    type: string
+                                required:
+                                - name
+                                - key
+                      description: Environment variables
                 replicas:
                   type: integer
                   description: Number of pods/workers in the worker group
