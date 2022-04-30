@@ -74,11 +74,12 @@ def build_scheduler_pod_spec(name, image, env):
                         "initialDelaySeconds": 15,
                         "periodSeconds": 20,
                     },
-                    "env": env
+                    "env": env,
                 }
             ]
         },
     }
+
 
 def build_scheduler_service_spec(name):
     return {
@@ -136,7 +137,7 @@ def build_worker_pod_spec(name, namespace, image, n, scheduler_name, env):
                         f"tcp://{scheduler_name}.{namespace}:8786",
                         f"--name={worker_name}",
                     ],
-                    "env": env
+                    "env": env,
                 }
             ]
         },
@@ -270,7 +271,12 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
         num_workers = spec["replicas"]
         for i in range(num_workers):
             data = build_worker_pod_spec(
-                name, namespace, spec.get("image"), uuid4().hex, scheduler_name, spec.get("env", [])
+                name,
+                namespace,
+                spec.get("image"),
+                uuid4().hex,
+                scheduler_name,
+                spec.get("env", []),
             )
             kopf.adopt(data)
             worker_pod = await api.create_namespaced_pod(
@@ -301,7 +307,12 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed > 0:
             for i in range(workers_needed):
                 data = build_worker_pod_spec(
-                    name, namespace, spec.get("image"), uuid4().hex, scheduler_name, spec.get("env", [])
+                    name,
+                    namespace,
+                    spec.get("image"),
+                    uuid4().hex,
+                    scheduler_name,
+                    spec.get("env", []),
                 )
                 kopf.adopt(data)
                 worker_pod = await api.create_namespaced_pod(
