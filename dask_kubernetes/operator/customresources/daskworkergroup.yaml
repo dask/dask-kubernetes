@@ -38,7 +38,39 @@ spec:
                   type: object
                   description: Resources for workers
                 env:
-                  type: object
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                              optional:
+                                type: boolean
+                            required:
+                            - name
+                            - key
+                          configMapKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                            required:
+                            - name
+                            - key
                   description: Environment variables
             status:
               type: object

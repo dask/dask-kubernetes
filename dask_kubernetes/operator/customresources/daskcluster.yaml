@@ -42,12 +42,45 @@ spec:
                     resources:
                       type: object
                       description: Scheduler resources
-                    env:
-                      type: object
-                      description: Scheduler environment variables
-                    serviceType:
-                      type: string
-                      description: Type of service
+                      serviceType:
+                  type: string
+                  description: Type of service
+                env:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                              optional:
+                                type: boolean
+                            required:
+                            - name
+                            - key
+                          configMapKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                            required:
+                            - name
+                            - key
+                  description: Environment variables
+                
                 replicas:
                   type: integer
                   description: Number of pods/workers in the worker group
@@ -55,7 +88,39 @@ spec:
                   type: object
                   description: Resources for workers
                 env:
-                  type: object
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        properties:
+                          secretKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                              optional:
+                                type: boolean
+                            required:
+                            - name
+                            - key
+                          configMapKeyRef:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              key:
+                                type: string
+                            required:
+                            - name
+                            - key
                   description: Environment variables
             status:
               type: object
