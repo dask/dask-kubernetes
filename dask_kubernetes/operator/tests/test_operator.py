@@ -138,10 +138,11 @@ def test_kubecluster(cluster):
         assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-@pytest.mark.skip
 def test_multiple_clusters(kopf_runner):
     with kopf_runner:
-        with KubeCluster(name="bar") as cluster1, KubeCluster(name="baz") as cluster2:
-            with Client(cluster1) as client1, Client(cluster2) as client2:
+        with KubeCluster(name="bar") as cluster1:
+            with Client(cluster1) as client1:
                 assert client1.submit(lambda x: x + 1, 10).result() == 11
+        with KubeCluster(name="baz") as cluster2:
+            with Client(cluster2) as client2:
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
