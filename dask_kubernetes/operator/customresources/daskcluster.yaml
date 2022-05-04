@@ -19,111 +19,16 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
+          required:
+          - scheduler
           properties:
-            spec:
-              type: object
-              properties:
-                imagePullSecrets:
-                  type: object
-                  description: Container image secrets
-                image:
-                  type: string
-                  description: Dask container image
-                imagePullPolicy:
-                  type: string
-                  description: Container image policy
-                protocol:
-                  type: string
-                  description: Protocol type
-                scheduler:
-                  type: object
-                  description: Dask scheduler information
-                  properties:
-                    resources:
-                      type: object
-                      description: Scheduler resources
-                    serviceType:
-                      type: string
-                      description: Type of service
-                    env:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          name:
-                            type: string
-                          value:
-                            type: string
-                          valueFrom:
-                            type: object
-                            properties:
-                              secretKeyRef:
-                                type: object
-                                properties:
-                                  name:
-                                    type: string
-                                  key:
-                                    type: string
-                                  optional:
-                                    type: boolean
-                                required:
-                                - name
-                                - key
-                              configMapKeyRef:
-                                type: object
-                                properties:
-                                  name:
-                                    type: string
-                                  key:
-                                    type: string
-                                required:
-                                - name
-                                - key
-                      description: Environment variables
-                replicas:
-                  type: integer
-                  description: Number of pods/workers in the worker group
-                resources:
-                  type: object
-                  description: Resources for workers
-                env:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                      value:
-                        type: string
-                      valueFrom:
-                        type: object
-                        properties:
-                          secretKeyRef:
-                            type: object
-                            properties:
-                              name:
-                                type: string
-                              key:
-                                type: string
-                              optional:
-                                type: boolean
-                            required:
-                            - name
-                            - key
-                          configMapKeyRef:
-                            type: object
-                            properties:
-                              name:
-                                type: string
-                              key:
-                                type: string
-                            required:
-                            - name
-                            - key
-                  description: Environment variables
+            scheduler:
+              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskScheduler'
+            worker:
+              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
             status:
               type: object
       subresources:
         scale:
-          specReplicasPath: .spec.replicas
+          specReplicasPath: .replicas
           statusReplicasPath: .status.replicas
