@@ -7,14 +7,13 @@ from distributed.deploy import Cluster
 from distributed.utils import Log, Logs, LoopRunner
 
 from dask_kubernetes.auth import ClusterAuth
-from dask_kubernetes.operator.daskcluster import (
+from dask_kubernetes.operator.operator import (
     build_cluster_spec,
     build_worker_group_spec,
     wait_for_service,
 )
 
 from dask_kubernetes.utils import (
-    check_dependency,
     get_scheduler_address,
     wait_for_scheduler,
 )
@@ -101,7 +100,6 @@ class KubeCluster(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
-        check_dependency("kubectl")
 
         # TODO: Check if cluster already exists
         super().__init__(asynchronous=asynchronous, **kwargs)
