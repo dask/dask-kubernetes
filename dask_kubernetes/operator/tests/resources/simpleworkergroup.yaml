@@ -8,7 +8,7 @@ spec:
   imagePullPolicy: "IfNotPresent"
   replicas: 2
   resources: {}
-  env: {}
+  env: []
   # nodeSelector: null
   # securityContext: null
   # affinity: null

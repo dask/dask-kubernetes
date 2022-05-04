@@ -9,7 +9,9 @@ spec:
   protocol: "tcp"
   scheduler:
     resources: {}
-    env: {}
+    env:
+      - name: SCHEDULER_ENV
+        value: hello-world # We dont test the value, just the name
     serviceType: "ClusterIP"
     # nodeSelector: null
     # securityContext: null
@@ -18,4 +20,6 @@ spec:
     # serviceAccountName: null
   replicas: 3
   resources: {}
-  env: {}
+  env:
+    - name: WORKER_ENV
+      value: hello-world # We dont test the value, just the name
