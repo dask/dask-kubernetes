@@ -569,8 +569,9 @@ class KubeCluster(SpecCluster):
         if self.namespace is None:
             self.namespace = namespace_default()
 
+        environ = {k:v for k, v in os.environ.items() if k not in ['user', 'uuid']}
         self._generate_name = self._generate_name.format(
-            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **environ
         )
         self._generate_name = escape(self._generate_name)
 
