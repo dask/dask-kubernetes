@@ -242,8 +242,6 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             resources=spec.get("resources"),
             env=spec.get("env"),
         )
-        # TODO: Next line is not needed if we can get worker groups adopted by the cluster
-        kopf.adopt(data)
         api = kubernetes.client.CustomObjectsApi(api_client)
         await api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
@@ -261,23 +259,31 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
 @kopf.on.create("daskworkergroup")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        num_workers = spec["replicas"]
-        for _ in range(num_workers):
-            data = build_worker_pod_spec(
-                name=name,
-                namespace=namespace,
-                image=spec.get("image"),
-                uuid=uuid4().hex,
-                scheduler_name=spec.get("cluster"),
-                env=spec.get("env", []),
-            )
-            kopf.adopt(data)
-            await api.create_namespaced_pod(
-                namespace=namespace,
-                body=data,
-            )
-        logger.info(f"{num_workers} Worker pods in created in {namespace}")
+        api = kubernetes.client.CustomObjectsApi(api_client)
+        cluster = await api.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=spec["cluster"],
+        )
+        new_spec = dict(spec)
+        kopf.adopt(new_spec, owner=cluster)
+        api.api_client.set_default_header(
+            "content-type", "application/merge-patch+json"
+        )
+        await api.patch_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskworkergroups",
+            namespace=namespace,
+            name=name,
+            body=new_spec,
+        )
+        logger.info(f"Successfully adopted by {spec['cluster']}")
+    await daskworkergroup_update(
+        spec=spec, name=name, namespace=namespace, logger=logger, **kwargs
+    )
 
 
 @kopf.on.update("daskworkergroup")
@@ -317,7 +323,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
-                worker_pod = await api.delete_namespaced_pod(
+                await api.delete_namespaced_pod(
                     name=wid,
                     namespace=namespace,
                 )
