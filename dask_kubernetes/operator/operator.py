@@ -281,6 +281,9 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
             body=new_spec,
         )
         logger.info(f"Successfully adopted by {spec['cluster']}")
+    await daskworkergroup_update(
+        spec=spec, name=name, namespace=namespace, logger=logger, **kwargs
+    )
 
 
 @kopf.on.update("daskworkergroup")
