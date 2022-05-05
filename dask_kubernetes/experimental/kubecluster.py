@@ -203,7 +203,12 @@ class KubeCluster(Cluster):
 
     async def _add_worker_group(self, name, n=3):
         data = build_worker_group_spec(
-            f"{self.name}-cluster-{name}", self.image, n, self.resources, self.env
+            f"{self.name}-cluster-{name}",
+            f"{self.name}-cluster",
+            self.image,
+            n,
+            self.resources,
+            self.env,
         )
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
@@ -239,7 +244,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=name,
+                name=f"{self.name}-cluster-{name}",
             )
 
     def close(self):

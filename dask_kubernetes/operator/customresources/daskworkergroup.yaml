@@ -22,6 +22,9 @@ spec:
             spec:
               type: object
               properties:
+                cluster:
+                  type: string
+                  description: Cluster that this worker group is a part of
                 imagePullSecrets:
                   type: object
                   description: Container image secrets
