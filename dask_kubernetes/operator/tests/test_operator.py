@@ -176,3 +176,10 @@ def test_multiple_clusters_simultaneously(kopf_runner):
             with Client(cluster1) as client1, Client(cluster2) as client2:
                 assert client1.submit(lambda x: x + 1, 10).result() == 11
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
+
+
+def test_cluster_from_name(kopf_runner):
+    with kopf_runner:
+        with KubeCluster(name="bar") as firstcluster:
+            with KubeCluster.from_name("bar") as secondcluster:
+                assert firstcluster == secondcluster
