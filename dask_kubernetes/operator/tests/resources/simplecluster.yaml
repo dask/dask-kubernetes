@@ -4,7 +4,7 @@ metadata:
   name: simple-cluster
 spec:
   imagePullSecrets: null
-  image: "daskdev/dask:latest"
+  image: "dask-kubernetes:dev"
   imagePullPolicy: "IfNotPresent"
   protocol: "tcp"
   scheduler:
