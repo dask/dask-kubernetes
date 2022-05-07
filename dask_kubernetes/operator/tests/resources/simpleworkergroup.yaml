@@ -3,6 +3,7 @@ kind: DaskWorkerGroup
 metadata:
   name: simple-cluster-additional-worker-group
 spec:
+  cluster: simple-cluster
   worker:
     replicas: 2
     spec:

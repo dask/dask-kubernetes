@@ -4,7 +4,7 @@ metadata:
   name: simple-cluster
 spec:
   worker:
-    replicas: 1
+    replicas: 2
     spec:
       containers:
         - name: worker
@@ -12,7 +12,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-worker
-            - tcp://simple-cluster-service.dask.svc.cluster.local:8786
+            - tcp://simple-cluster-service.default.svc.cluster.local:8786
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name
