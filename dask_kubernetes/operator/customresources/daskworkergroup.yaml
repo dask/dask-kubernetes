@@ -18,14 +18,17 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          required:
-          - worker
           properties:
-            worker:
-              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
             status:
               type: object
+            spec:
+              type: object
+              required:
+              - worker
+              properties:
+                worker:
+                  $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
       subresources:
         scale:
-          specReplicasPath: .replicas
+          specReplicasPath: .spec.worker.replicas
           statusReplicasPath: .status.replicas

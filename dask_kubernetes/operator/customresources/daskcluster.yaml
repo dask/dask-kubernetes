@@ -19,16 +19,21 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          required:
-          - scheduler
           properties:
-            scheduler:
-              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskScheduler'
-            worker:
-              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
             status:
               type: object
+            spec:
+              type: object
+              required:
+              - scheduler
+              - worker
+              properties:
+                scheduler:
+                  $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskScheduler'
+                worker:
+                  $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
+                  
       subresources:
         scale:
-          specReplicasPath: .replicas
+          specReplicasPath: .spec.worker.replicas
           statusReplicasPath: .status.replicas
