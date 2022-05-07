@@ -13,7 +13,7 @@ from dask_kubernetes.common.networking import (
 )
 
 
-def build_scheduler_pod_spec(name, image, env):
+def build_scheduler_pod_spec(name, spec):
     return {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -24,76 +24,26 @@ def build_scheduler_pod_spec(name, image, env):
                 "dask.org/component": "scheduler",
             },
         },
-        "spec": {
-            "containers": [
-                {
-                    "name": "scheduler",
-                    "image": image,
-                    "args": ["dask-scheduler"],
-                    "ports": [
-                        {
-                            "name": "comm",
-                            "containerPort": 8786,
-                            "protocol": "TCP",
-                        },
-                        {
-                            "name": "dashboard",
-                            "containerPort": 8787,
-                            "protocol": "TCP",
-                        },
-                    ],
-                    "readinessProbe": {
-                        "tcpSocket": {"port": "comm"},
-                        "initialDelaySeconds": 5,
-                        "periodSeconds": 10,
-                    },
-                    "livenessProbe": {
-                        "tcpSocket": {"port": "comm"},
-                        "initialDelaySeconds": 15,
-                        "periodSeconds": 20,
-                    },
-                    "env": env,
-                }
-            ]
-        },
+        "spec": spec,
     }
 
 
-def build_scheduler_service_spec(name):
+def build_scheduler_service_spec(name, spec):
     return {
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
-            "name": name,
+            "name": f"{name}-service",
             "labels": {
                 "dask.org/cluster-name": name,
             },
         },
-        "spec": {
-            "selector": {
-                "dask.org/cluster-name": name,
-                "dask.org/component": "scheduler",
-            },
-            "ports": [
-                {
-                    "name": "comm",
-                    "protocol": "TCP",
-                    "port": 8786,
-                    "targetPort": 8786,
-                },
-                {
-                    "name": "dashboard",
-                    "protocol": "TCP",
-                    "port": 8787,
-                    "targetPort": 8787,
-                },
-            ],
-        },
+        "spec": spec,
     }
 
 
-def build_worker_pod_spec(name, namespace, image, uuid, scheduler_name, env):
-    worker_name = f"{name}-worker-{uuid}"
+def build_worker_pod_spec(name, scheduler_name, n, spec):
+    worker_name = f"{name}-worker-{n}"
     return {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -105,36 +55,17 @@ def build_worker_pod_spec(name, namespace, image, uuid, scheduler_name, env):
                 "dask.org/component": "worker",
             },
         },
-        "spec": {
-            "containers": [
-                {
-                    "name": "scheduler",
-                    "image": image,
-                    "args": [
-                        "dask-worker",
-                        f"tcp://{scheduler_name}.{namespace}:8786",
-                        f"--name={worker_name}",
-                    ],
-                    "env": env,
-                }
-            ]
-        },
+        "spec": spec,
     }
 
 
-def build_worker_group_spec(name, cluster, image, replicas, resources, env):
+def build_worker_group_spec(name, spec):
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
         "metadata": {"name": f"{name}-worker-group"},
         "spec": {
-            "cluster": cluster,
-            "imagePullSecrets": None,
-            "image": image,
-            "imagePullPolicy": "IfNotPresent",
-            "replicas": replicas,
-            "resources": resources,
-            "env": env,
+            "worker": spec,
         },
     }
 
@@ -186,9 +117,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
 
         # TODO Check for existing scheduler pod
         scheduler_spec = spec.get("scheduler", {})
-        data = build_scheduler_pod_spec(
-            name, spec.get("image"), scheduler_spec.get("env", [])
-        )
+        data = build_scheduler_pod_spec(name, scheduler_spec.get("spec"))
         kopf.adopt(data)
         await api.create_namespaced_pod(
             namespace=namespace,
@@ -201,7 +130,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         )
 
         # TODO Check for existing scheduler service
-        data = build_scheduler_service_spec(name=name)
+        data = build_scheduler_service_spec(name, scheduler_spec.get("service"))
         kopf.adopt(data)
         await api.create_namespaced_service(
             namespace=namespace,
@@ -212,14 +141,11 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
             with the following config: {data['spec']}"
         )
-        data = build_worker_group_spec(
-            name=f"{name}-default",
-            cluster=name,
-            image=spec.get("image"),
-            replicas=spec.get("replicas"),
-            resources=spec.get("resources"),
-            env=spec.get("env"),
-        )
+
+        worker_spec = spec.get("worker", {})
+        data = build_worker_group_spec(f"{name}-default", worker_spec)
+        # TODO: Next line is not needed if we can get worker groups adopted by the cluster
+        kopf.adopt(data)
         api = kubernetes.client.CustomObjectsApi(api_client)
         await api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
@@ -245,23 +171,20 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             name=spec["cluster"],
         )
-        new_spec = dict(spec)
-        kopf.adopt(new_spec, owner=cluster)
-        api.api_client.set_default_header(
-            "content-type", "application/merge-patch+json"
-        )
-        await api.patch_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskworkergroups",
-            namespace=namespace,
-            name=name,
-            body=new_spec,
-        )
-        logger.info(f"Successfully adopted by {spec['cluster']}")
-    await daskworkergroup_update(
-        spec=spec, name=name, namespace=namespace, logger=logger, **kwargs
-    )
+
+        scheduler_name = cluster["items"][0]["metadata"]["name"]
+        worker = spec.get("worker")
+        num_workers = worker["replicas"]
+        for i in range(num_workers):
+            data = build_worker_pod_spec(
+                name, scheduler_name, uuid4().hex, worker["spec"]
+            )
+            kopf.adopt(data)
+            worker_pod = await api.create_namespaced_pod(
+                namespace=namespace,
+                body=data,
+            )
+        logger.info(f"{num_workers} Worker pods in created in {namespace}")
 
 
 @kopf.on.update("daskworkergroup")
@@ -278,12 +201,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed > 0:
             for _ in range(workers_needed):
                 data = build_worker_pod_spec(
-                    name=name,
-                    namespace=namespace,
-                    image=spec.get("image"),
-                    uuid=uuid4().hex,
-                    scheduler_name=spec.get("cluster"),
-                    env=spec.get("env", []),
+                    name, scheduler_name, uuid4().hex, spec.get("worker")
                 )
                 kopf.adopt(data)
                 await api.create_namespaced_pod(
