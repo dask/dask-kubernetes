@@ -28,7 +28,8 @@ async def gen_cluster(k8s_cluster):
         try:
             yield cluster_name
         finally:
-            k8s_cluster.kubectl("delete", "-f", cluster_path, "--wait=true")
+            # Test: remove the wait=True, because I think this is blocking the operator
+            k8s_cluster.kubectl("delete", "-f", cluster_path)
             while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
@@ -54,9 +55,10 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
             worker_pod_name = "simple-cluster-default-worker-group-worker"
+            service_name = "simple-cluster-service"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+            while service_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
@@ -64,7 +66,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 "get", "pods", scheduler_pod_name
             ):
                 await asyncio.sleep(0.1)
-            with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
+            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
@@ -91,14 +93,16 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
         async with gen_cluster() as cluster_name:
             scheduler_pod_name = "simple-cluster-scheduler"
             worker_pod_name = "simple-cluster-default-worker-group-worker"
+            service_name = "simple-cluster-service"
+
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            while cluster_name not in k8s_cluster.kubectl("get", "svc"):
+            while service_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
 
-            with k8s_cluster.port_forward(f"service/{cluster_name}", 8786) as port:
+            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
