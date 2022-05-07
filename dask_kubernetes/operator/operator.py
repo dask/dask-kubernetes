@@ -191,6 +191,13 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
+        cluster = await api.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=spec["cluster"],
+        )
         workers = await api.list_namespaced_pod(
             namespace=namespace,
             label_selector=f"dask.org/workergroup-name={name}",
@@ -198,6 +205,8 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         current_workers = len(workers.items)
         desired_workers = spec["replicas"]
         workers_needed = desired_workers - current_workers
+        scheduler_name = cluster["items"][0]["metadata"]["name"]
+
         if workers_needed > 0:
             for _ in range(workers_needed):
                 data = build_worker_pod_spec(
