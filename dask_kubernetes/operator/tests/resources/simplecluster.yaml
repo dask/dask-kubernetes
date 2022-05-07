@@ -3,23 +3,58 @@ kind: DaskCluster
 metadata:
   name: simple-cluster
 spec:
-  imagePullSecrets: null
-  image: "dask-kubernetes:dev"
-  imagePullPolicy: "IfNotPresent"
-  protocol: "tcp"
+  worker:
+    replicas: 1
+    spec:
+      containers:
+        - name: worker
+          image: "daskdev/dask:latest"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - dask-worker
+            - tcp://simple-cluster-service.dask.svc.cluster.local:8786
+          env:
+            - name: WORKER_ENV
+              value: hello-world # We dont test the value, just the name
   scheduler:
-    resources: {}
-    env:
-      - name: SCHEDULER_ENV
-        value: hello-world # We dont test the value, just the name
-    serviceType: "ClusterIP"
-    # nodeSelector: null
-    # securityContext: null
-    # affinity: null
-    # tolerations: null
-    # serviceAccountName: null
-  replicas: 3
-  resources: {}
-  env:
-    - name: WORKER_ENV
-      value: hello-world # We dont test the value, just the name
+    spec:
+      containers:
+        - name: scheduler
+          image: "daskdev/dask:latest"
+          imagePullPolicy: "IfNotPresent"
+          args: 
+            - dask-scheduler
+          ports:
+            - name: comm
+              containerPort: 8786
+              protocol: TCP
+            - name: dashboard
+              containerPort: 8787
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: comm
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: comm
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          env:
+            - name: SCHEDULER_ENV
+              value: hello-world
+    service:
+      type: NodePort
+      selector:
+        dask.org/cluster-name: simple-cluster
+        dask.org/component: scheduler
+      ports:
+        - name: comm
+          protocol: TCP
+          port: 8786
+          targetPort: "comm"
+        - name: dashboard
+          protocol: TCP
+          port: 8787
+          targetPort: "dashboard"

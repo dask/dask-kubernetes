@@ -3,14 +3,16 @@ kind: DaskWorkerGroup
 metadata:
   name: simple-cluster-additional-worker-group
 spec:
-  imagePullSecrets: null
-  image: "dask-kubernetes:dev"
-  imagePullPolicy: "IfNotPresent"
-  replicas: 2
-  resources: {}
-  env: []
-  # nodeSelector: null
-  # securityContext: null
-  # affinity: null
-  # tolerations: null
-  # serviceAccountName: null
+  worker:
+    replicas: 2
+    spec:
+      containers:
+        - name: worker
+          image: "daskdev/dask:latest"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - dask-worker
+            - tcp://simple-cluster.default.svc.cluster.local:8786
+          env:
+            - name: WORKER_ENV
+              value: hello-world # We dont test the value, just the name
