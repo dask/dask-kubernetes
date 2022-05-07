@@ -71,25 +71,12 @@ def build_worker_group_spec(name, spec):
     }
 
 
-def build_cluster_spec(name, image, replicas, resources, env):
+def build_cluster_spec(name, worker_spec, scheduler_spec):
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
-        "metadata": {"name": f"{name}-cluster"},
-        "spec": {
-            "imagePullSecrets": None,
-            "image": image,
-            "imagePullPolicy": "IfNotPresent",
-            "protocol": "tcp",
-            "scheduler": {
-                "resources": resources,
-                "env": env,
-                "serviceType": "ClusterIP",
-            },
-            "replicas": replicas,
-            "resources": resources,
-            "env": env,
-        },
+        "metadata": {"name": name},
+        "spec": {"worker": worker_spec, "scheduler": scheduler_spec},
     }
 
 
