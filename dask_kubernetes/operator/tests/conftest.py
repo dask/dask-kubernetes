@@ -1,6 +1,5 @@
 import pytest
 
-from glob import glob
 import pathlib
 import os
 import tempfile
@@ -10,7 +9,11 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 
 def run_generate(crd_path, patch_path, temp_path):
-    subprocess.run(["k8s-crd-resolver", "-r", "-j", patch_path, crd_path, temp_path], check=True, env={**os.environ})
+    subprocess.run(
+        ["k8s-crd-resolver", "-r", "-j", patch_path, crd_path, temp_path],
+        check=True,
+        env={**os.environ},
+    )
 
 
 @pytest.fixture(scope="session", autouse=True)
