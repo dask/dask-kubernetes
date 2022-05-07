@@ -24,8 +24,12 @@ spec:
             spec:
               type: object
               required:
+              - cluster
               - worker
               properties:
+                cluster:
+                  type: string
+                  description: Name of the cluster to associate this worker group with
                 worker:
                   $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker' 
       subresources:
