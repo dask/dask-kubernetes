@@ -14,9 +14,7 @@ repos:
     hooks:
       - id: check-crd-updates
         name: check-crd-updates
-        entry: python ci/pre-commit-crd.py
-        additional_dependencies:
-        - git+http://github.com/elemental-lf/k8s-crd-resolver
+        entry: env PYTHONPATH=. python ci/pre-commit-crd.py
         language: python
         types: [yaml]
         pass_filenames: true
