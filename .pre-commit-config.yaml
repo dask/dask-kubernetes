@@ -10,3 +10,12 @@ repos:
     hooks:
       - id: flake8
         language_version: python3
+  - repo: local
+    hooks:
+      - id: check-crd-updates
+        name: check-crd-updates
+        entry: python ci/pre-commit-crd.py
+        language: python
+        types: ["yaml"]
+        files: "dask_kubernetes/operator/customresources/*"
+        pass_filenames: true
