@@ -21,10 +21,6 @@ def run_action(changed_file, temp_dir, crd_path, output_paths):
     file_name_components = os.path.basename(changed_file).split(".")
     file_name = file_name_components[0]
 
-    if file_name not in ["daskcluster", "daskworkergroup"]:
-        # Catch any files not actually related to the CRDs
-        return
-
     output_file = os.path.join(temp_dir.name, f"{file_name}.yaml")
     run_generate(
         os.path.join(crd_path, f"{file_name}.yaml"),
@@ -48,10 +44,16 @@ def main(args):
     ]
 
     temp_dir = tempfile.TemporaryDirectory()
-    crd_path = os.path.join(ROOT_DIR, "dask_kubernetes", "operator", "customresources")
+    crd_path = os.path.join("dask_kubernetes", "operator", "customresources")
 
     for changed_file in args:
-        if changed_file == "templates.yaml":
+
+        if crd_path not in changed_file:
+            print(f"skipping file - {changed_file}")
+            continue
+
+        changed_file_name = os.path.basename(changed_file)
+        if changed_file_name == "templates.yaml":
             # This is a special case - if we change the template file, we need re-render all of the charts
             # TODO: Not sure how to do this other than hard-code the template names
             run_action("daskcluster.yaml", temp_dir, crd_path, output_paths)

@@ -16,6 +16,5 @@ repos:
         name: check-crd-updates
         entry: python ci/pre-commit-crd.py
         language: python
-        types: ["yaml"]
-        files: "dask_kubernetes/operator/customresources/*"
+        types: [yaml]
         pass_filenames: true
