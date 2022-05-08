@@ -151,24 +151,32 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
 @kopf.on.create("daskworkergroup")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
+        api = kubernetes.client.CustomObjectsApi(api_client)
+        cluster = await api.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=spec["cluster"],
+        )
+        new_spec = dict(spec)
+        kopf.adopt(new_spec, owner=cluster)
+        api.api_client.set_default_header(
+            "content-type", "application/merge-patch+json"
+        )
+        await api.patch_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskworkergroups",
+            namespace=namespace,
+            name=name,
+            body=new_spec,
+        )
+        logger.info(f"Successfully adopted by {spec['cluster']}")
 
-        worker = spec.get("worker")
-        num_workers = worker["replicas"]
-        for i in range(num_workers):
-            data = build_worker_pod_spec(
-                name, spec.get("cluster"), uuid4().hex, worker["spec"]
-            )
-            kopf.adopt(data)
-            try:
-                worker_pod = await api.create_namespaced_pod(
-                    namespace=namespace,
-                    body=data,
-                )
-            except Exception as e:
-                print(e)
-                raise e
-        logger.info(f"{num_workers} Worker pods in created in {namespace}")
+    await daskworkergroup_update(
+        spec=spec, name=name, namespace=namespace, logger=logger, **kwargs
+    )
 
 
 @kopf.on.update("daskworkergroup")
