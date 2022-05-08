@@ -36,7 +36,6 @@ def main(args):
     # Given a list of files that have been changed in a commit
     # We want to run the `k8s-crd-resolver` command and copy the relevant output files
     # and then check that nothing has changed
-    # Note that this pre-commit hook will only run on files inside `dask_kubernetes/operator/customresources`
 
     output_paths = [
         os.path.join(ROOT_DIR, "resources", "manifests"),
@@ -49,7 +48,7 @@ def main(args):
     for changed_file in args:
 
         if crd_path not in changed_file:
-            print(f"skipping file - {changed_file}")
+            # Precommit wont let us exclude files, so this will check if a file is inside the CRD path
             continue
 
         changed_file_name = os.path.basename(changed_file)
