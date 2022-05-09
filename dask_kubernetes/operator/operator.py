@@ -1,5 +1,4 @@
 import asyncio
-import threading
 
 from distributed.core import rpc
 
@@ -12,27 +11,6 @@ from dask_kubernetes.auth import ClusterAuth
 from dask_kubernetes.utils import (
     get_scheduler_address,
 )
-
-
-lock = threading.Lock()
-
-
-class Singleton(type):
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        if cls not in cls._instances:
-            with lock:
-                if cls not in cls._instances:
-                    cls._instances[cls] = super(Singleton, cls).__call__(
-                        *args, **kwargs
-                    )
-        return cls._instances[cls]
-
-
-class DaskRPC(metaclass=Singleton):
-    def __init__(self, address):
-        self.scheduler_comm = rpc(address)
 
 
 def build_scheduler_pod_spec(name, image, env):
@@ -316,10 +294,10 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed < 0:
             service_name = f"{name.split('-')[0]}-cluster"
             address = await get_scheduler_address(service_name, namespace)
-            scheduler = DaskRPC(address=address).scheduler_comm
-            worker_ids = await scheduler.workers_to_close(
-                n=-workers_needed, attribute="name"
-            )
+            async with rpc(address) as scheduler:
+                worker_ids = await scheduler.workers_to_close(
+                    n=-workers_needed, attribute="name"
+                )
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
@@ -330,11 +308,3 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             logger.info(
                 f"Scaled worker group {name} down to {spec['replicas']} workers."
             )
-
-
-@kopf.on.delete("daskcluster")
-async def daskcluster_delete(spec, name, namespace, logger, **kwargs):
-    address = await get_scheduler_address(name, namespace)
-    scheduler = DaskRPC(address=address).scheduler_comm
-    scheduler.close_comms()
-    scheduler.close_rpc()
