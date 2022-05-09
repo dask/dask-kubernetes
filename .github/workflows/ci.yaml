@@ -29,13 +29,13 @@ jobs:
           pip install git+https://github.com/dask/distributed@main
           pip install git+https://github.com/dask/dask@main
 
-
       ###
       # These steps are handled by fixtures but doing them here to try and improve performance
       - name: Install Kind
         uses: engineerd/setup-kind@v0.5.0
-      - name: Start Kind cluster
-        run: kind create cluster --name pytest-kind --kubeconfig=.pytest-kind/pytest-kind/kubeconfig
+        with:
+          name: pytest-kind
+          kubeconfig: .pytest-kind/pytest-kind/kubeconfig
       - name: Build CI Docker image
         run: |
           docker build -t dask-kubernetes:dev ./ci
