@@ -34,4 +34,4 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest dask_kubernetes/${{ matrix.suite }}/tests
+        run: pytest --durations=10 dask_kubernetes/${{ matrix.suite }}/tests

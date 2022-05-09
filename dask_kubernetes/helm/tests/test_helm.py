@@ -34,7 +34,7 @@ def chart_name(chart_repo):
 
 @pytest.fixture(scope="session")
 def config_path():
-    return os.path.join(os.path.dirname(__file__), "helm", "values.yaml")
+    return os.path.join(os.path.dirname(__file__), "resources", "values.yaml")
 
 
 @pytest.fixture(scope="session")
