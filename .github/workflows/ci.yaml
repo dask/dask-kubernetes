@@ -36,6 +36,9 @@ jobs:
         with:
           name: pytest-kind
           kubeconfig: .pytest-kind/pytest-kind/kubeconfig
+          wait: 30s
+      - name: Set Kube context
+        run: KUBECONFIG=.pytest-kind/pytest-kind/kubeconfig kubectl config use-context kind-pytest-kind
       - name: Build CI Docker image
         run: |
           docker build -t dask-kubernetes:dev ./ci
