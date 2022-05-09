@@ -16,8 +16,8 @@ To install the the operator first we need to create the Dask custom resources:
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/resources/manifests/daskcluster.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/resources/manifests/daskworkergroup.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
 
 Then you should be able to list your Dask clusters via ``kubectl``.
 
@@ -30,7 +30,7 @@ Next we need to install the operator. The operator will watch for new ``daskclus
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/resources/manifests/deployment.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/deployment.yaml
 
 This will create the appropriate roles, service accounts and a deployment for the operator. We can check the operator pod is running:
 

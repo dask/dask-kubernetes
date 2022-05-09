@@ -38,8 +38,18 @@ def main(args):
     # and then check that nothing has changed
 
     output_paths = [
-        os.path.join(ROOT_DIR, "resources", "manifests"),
-        os.path.join(ROOT_DIR, "resources", "helm", "dask-kubernetes-operator", "crds"),
+        os.path.join(
+            ROOT_DIR, "dask_kubernetes", "operator", "deployment", "manifests"
+        ),
+        os.path.join(
+            ROOT_DIR,
+            "dask_kubernetes",
+            "operator",
+            "deployment",
+            "helm",
+            "dask-kubernetes-operator",
+            "crds",
+        ),
     ]
 
     temp_dir = tempfile.TemporaryDirectory()

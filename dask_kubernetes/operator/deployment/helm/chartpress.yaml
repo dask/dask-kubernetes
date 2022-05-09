@@ -26,7 +26,7 @@ charts:
       # Used for the api and controller pods
       dask-kubernetes-operator:
         imageName: ghcr.io/dask/dask-kubernetes-operator
-        contextPath: ../../dask_kubernetes
-        dockerfilePath: ../../dask_kubernetes/operator/deployment/Dockerfile
+        contextPath: ../../../../dask_kubernetes
+        dockerfilePath: ../Dockerfile
         valuesPath:
           - image
