@@ -190,6 +190,94 @@ Finally delete the cluster by running
 
 .. _config:
 
+Additional Worker Groups
+------------------------
+
+The operator also has support for creating additional worker groups. These are extra groups of workers with different
+configuration settings and can be scaled separately. You can then use `resource annotations <https://distributed.dask.org/en/stable/resources.html>`_`
+to schedule different tasks to different groups.
+
+For example you may wish to have a smaller pool of workers that have more memory for memory intensive tasks, or GPUs for compute intensive tasks.
+
+
+Creating a Worker Group via ``kubectl``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When we create a ``DaskCluster`` resource a default worker group is created for us. But we can add more by creating more manifests.
+
+Let's create an example called ``highmemworkers.yaml`` with the following configuration:
+
+.. code-block:: yaml
+
+   # highmemworkers.yaml
+   apiVersion: kubernetes.dask.org/v1
+   kind: DaskWorkerGroup
+   metadata:
+      name: simple-cluster-highmem-worker-group
+   spec:
+      cluster: simple-cluster
+      imagePullSecrets: null
+      image: "dask-kubernetes:dev"
+      imagePullPolicy: "IfNotPresent"
+      replicas: 2
+      resources:
+         requests:
+            memory: "2Gi"
+         limits:
+            memory: "64Gi"
+      env: []
+
+The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
+the workers to join that cluster.
+
+See the Configuration Reference :ref:`config`. Now apply ``highmemworkers.yaml``
+
+.. code-block:: console
+
+   $ kubectl apply -f highmemworkers.yaml
+   daskworkergroup.kubernetes.dask.org/simple-cluster-highmem-worker-group created
+
+We can list our clusters:
+
+.. code-block:: console
+
+   $ kubectl get daskworkergroups
+   NAME                                  AGE
+   simple-cluster-default-worker-group   2 hours
+   simple-cluster-highmem-worker-group   47s
+
+We don't need to worry about deleting this worker group seperately, because it has joined the existing cluster it will be deleted
+when the ``DaskCluster`` resource is deleted.
+
+Scaling works the same was as the default worker group and can be done with the ``kubectl scale`` command.
+
+Creating an additional worker group via the cluster manager
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Additional worker groups can also be created via the cluster manager in Python.
+
+.. code-block:: python
+
+   from dask_kubernetes.experimental import KubeCluster
+
+   cluster = KubeCluster(name='foo')
+
+   cluster.add_worker_group(name="highmem", n_workers=2, resources={"requests": {"memory": "2Gi"}, "limits": {"memory": "64Gi"}})
+
+We can also scale the worker groups by name from the cluster object.
+
+.. code-block:: python
+
+   cluster.scale(5, worker_group="highmem")
+
+Additional worker groups can also be deleted in Python.
+
+.. code-block:: python
+
+   cluster.delete_worker_group(name="highmem")
+
+Any additional worker groups you create will be deleted when the cluster is deleted.
+
 Configuration Reference
 -----------------------
 

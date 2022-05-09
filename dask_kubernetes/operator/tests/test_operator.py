@@ -183,3 +183,13 @@ def test_cluster_from_name(kopf_runner):
         with KubeCluster(name="bar") as firstcluster:
             with KubeCluster.from_name("bar") as secondcluster:
                 assert firstcluster == secondcluster
+
+
+def test_additional_worker_groups(kopf_runner):
+    with kopf_runner:
+        with KubeCluster(name="additionalgroups", n_workers=1) as cluster:
+            cluster.add_worker_group(name="more", n_workers=1)
+            with Client(cluster) as client:
+                client.wait_for_workers(2)
+                assert client.submit(lambda x: x + 1, 10).result() == 11
+            cluster.delete_worker_group(name="more")
