@@ -47,6 +47,7 @@ class KubeCluster(Cluster):
         Number of workers on initial launch.
         Use ``scale`` to change this number in the future
     resources: Dict[str, str]
+        Resources to be passed to the underlying pods.
     env: List[dict]
         List of environment variables to pass to worker pod
     auth: List[ClusterAuth] (optional)
@@ -264,32 +265,49 @@ class KubeCluster(Cluster):
 
         return logs
 
-    def add_worker_group(self, name, n=3):
+    def add_worker_group(self, name, n_workers=3, image=None, resources=None, env=None):
         """Create a dask worker group by name
 
         Parameters
         ----------
         name: str
             Name of the worker group
-        n: int
-            Target number of workers for worker group
+        n_workers: int
+            Number of workers on initial launch.
+            Use ``.scale(n_workers, worker_group=name)`` to change this number in the future.
+        image: str (optional)
+            Image to run in Scheduler and Worker Pods.
+            If ommitted will use the cluster default.
+        resources: Dict[str, str]
+            Resources to be passed to the underlying pods.
+            If ommitted will use the cluster default.
+        env: List[dict]
+            List of environment variables to pass to worker pod.
+            If ommitted will use the cluster default.
 
         Examples
         --------
-        >>> cluster.add_worker_group("high-mem-workers", n=5)
+        >>> cluster.add_worker_group("high-mem-workers", n_workers=5)
         """
-        # TODO: Once adoptions work correctly we can enable this method
-        raise NotImplementedError()
-        # return self.sync(self._add_worker_group, name, n)
+        return self.sync(
+            self._add_worker_group,
+            name=name,
+            n_workers=n_workers,
+            image=image,
+            resources=resources,
+            env=env,
+        )
 
-    async def _add_worker_group(self, name, n=3):
+    async def _add_worker_group(
+        self, name, n_workers=3, image=None, resources=None, env=None
+    ):
         data = build_worker_group_spec(
             f"{self.cluster_name}-{name}",
             self.cluster_name,
-            self.image,
-            n,
-            self.resources,
-            self.env,
+            image or self.image,
+            n_workers,
+            resources or self.resources,
+            env or self.env,
         )
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
@@ -313,9 +331,7 @@ class KubeCluster(Cluster):
         --------
         >>> cluster.delete_worker_group("high-mem-workers")
         """
-        # TODO: Once adoptions work correctly we can enable this method
-        raise NotImplementedError()
-        # return self.sync(self._delete_worker_group, name)
+        return self.sync(self._delete_worker_group, name)
 
     async def _delete_worker_group(self, name):
         async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -325,7 +341,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.name}-cluster-{name}",
+                name=f"{self.cluster_name}-{name}-worker-group",
             )
 
     def close(self):
