@@ -34,11 +34,11 @@ jobs:
       - name: Install Kind
         uses: engineerd/setup-kind@v0.5.0
         with:
-          name: pytest-kind
-          kubeconfig: .pytest-kind/pytest-kind/kubeconfig
-          wait: 30s
-      - name: Set Kube context
-        run: KUBECONFIG=.pytest-kind/pytest-kind/kubeconfig kubectl config use-context kind-pytest-kind
+          skipClusterCreation: true
+      - name: Create kind cluster
+        run: |
+          kind create cluster --name pytest-kind --kubeconfig=.pytest-kind/pytest-kind/kubeconfig
+          KUBECONFIG=.pytest-kind/pytest-kind/kubeconfig kubectl config use-context kind-pytest-kind
       - name: Build CI Docker image
         run: |
           docker build -t dask-kubernetes:dev ./ci
