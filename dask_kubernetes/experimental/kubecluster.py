@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import kubernetes_asyncio as kubernetes
 
 from distributed.core import rpc
@@ -17,6 +18,12 @@ from dask_kubernetes.utils import (
     get_scheduler_address,
     wait_for_scheduler,
 )
+
+
+class CreateMode(Enum):
+    CREATE_ONLY = "CREATE_ONLY"
+    CREATE_OR_CONNECT = "CREATE_OR_CONNECT"
+    CONNECT_ONLY = "CONNECT_ONLY"
 
 
 class KubeCluster(Cluster):
@@ -49,6 +56,16 @@ class KubeCluster(Cluster):
         If the chart uses ClusterIP type services, forward the
         ports locally. If you are running it locally it should
         be the port you are forwarding to ``<port>``.
+    create_mode: CreateMode (optional)
+        How to handle cluster creation if the cluster resource already exists.
+        Default behaviour is to create a new clustser if one with that name
+        doesn't exist, or connect to an existing one if it does.
+        You can also set ``CreateMode.CREATE_ONLY`` to raise an exception if a cluster
+        with that name already exists. Or ``CreateMode.CONNECT_ONLY`` to raise an exception
+        if a cluster with that name doesn't exist.
+    shutdown_on_close: bool (optional)
+        Whether or not to delete the cluster resource when this object is closed.
+        Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -56,20 +73,30 @@ class KubeCluster(Cluster):
     --------
     >>> from dask_kubernetes import KubeCluster
     >>> cluster = KubeCluster(name="foo")
+
     You can add another group of workers (default is 3 workers)
     >>> cluster.add_worker_group('additional', n=4)
+
     You can then resize the cluster with the scale method
     >>> cluster.scale(10)
+
     And optionally scale a specific worker group
     >>> cluster.scale(10, worker_group='additional')
+
     You can also resize the cluster adaptively and give
     it a range of workers
     >>> cluster.adapt(20, 50)
+
     You can pass this cluster directly to a Dask client
     >>> from dask.distributed import Client
     >>> client = Client(cluster)
+
     You can also access cluster logs
     >>> cluster.get_logs()
+
+    You can also connect to an existing cluster
+    >>> existing_cluster = KubeCluster.from_name(name="ialreadyexist")
+
     See Also
     --------
     KubeCluster.from_name
@@ -87,6 +114,8 @@ class KubeCluster(Cluster):
         asynchronous=False,
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
+        create_mode=CreateMode.CREATE_OR_CONNECT,
+        shutdown_on_close=None,
         **kwargs,
     ):
         self.name = name
@@ -98,18 +127,42 @@ class KubeCluster(Cluster):
         self.env = env
         self.auth = auth
         self.port_forward_cluster_ip = port_forward_cluster_ip
+        self.create_mode = create_mode
+        self.shutdown_on_close = shutdown_on_close
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
 
-        # TODO: Check if cluster already exists
         super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
 
+    @property
+    def cluster_name(self):
+        return f"{self.name}-cluster"
+
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
+        cluster_exists = (await self._get_cluster()) is not None
 
+        if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
+            raise ValueError(
+                f"Cluster {self.cluster_name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
+            )
+        elif cluster_exists:
+            await self._connect_cluster()
+        elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
+            raise ValueError(
+                f"Cluster {self.cluster_name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
+            )
+        else:
+            await self._create_cluster()
+
+        await super()._start()
+
+    async def _create_cluster(self):
+        if self.shutdown_on_close is None:
+            self.shutdown_on_close = True
         async with kubernetes.client.api_client.ApiClient() as api_client:
             core_api = kubernetes.client.CoreV1Api(api_client)
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
@@ -123,14 +176,42 @@ class KubeCluster(Cluster):
                 namespace=self.namespace,
                 body=data,
             )
-            await wait_for_scheduler(f"{self.name}-cluster", self.namespace)
+            await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, data["metadata"]["name"], self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
-            await super()._start()
+
+    async def _connect_cluster(self):
+        if self.shutdown_on_close is None:
+            self.shutdown_on_close = False
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            core_api = kubernetes.client.CoreV1Api(api_client)
+            cluster_spec = await self._get_cluster()
+            self.image = cluster_spec["spec"]["image"]
+            self.n_workers = cluster_spec["spec"]["replicas"]
+            self.resources = cluster_spec["spec"]["resources"]
+            self.env = cluster_spec["spec"]["env"]
+            await wait_for_scheduler(self.cluster_name, self.namespace)
+            await wait_for_service(
+                core_api, cluster_spec["metadata"]["name"], self.namespace
+            )
+            self.scheduler_comm = rpc(await self._get_scheduler_address())
+
+    async def _get_cluster(self):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            try:
+                return await custom_objects_api.get_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskclusters",
+                    namespace=self.namespace,
+                    name=self.cluster_name,
+                )
+            except kubernetes.client.exceptions.ApiException:
+                return None
 
     async def _get_scheduler_address(self):
-        service_name = f"{self.name}-cluster"
-        address = await get_scheduler_address(service_name, self.namespace)
+        address = await get_scheduler_address(self.cluster_name, self.namespace)
         return address
 
     def get_logs(self):
@@ -203,8 +284,8 @@ class KubeCluster(Cluster):
 
     async def _add_worker_group(self, name, n=3):
         data = build_worker_group_spec(
-            f"{self.name}-cluster-{name}",
-            f"{self.name}-cluster",
+            f"{self.cluster_name}-{name}",
+            self.cluster_name,
             self.image,
             n,
             self.resources,
@@ -253,30 +334,18 @@ class KubeCluster(Cluster):
 
     async def _close(self):
         await super()._close()
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            await custom_objects_api.delete_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace=self.namespace,
-                name=f"{self.name}-cluster",
-            )
-            while True:
-                try:
-                    await custom_objects_api.get_namespaced_custom_object(
-                        group="kubernetes.dask.org",
-                        version="v1",
-                        plural="daskclusters",
-                        namespace=self.namespace,
-                        name=f"{self.name}-cluster",
-                    )
-                    await asyncio.sleep(1)
-                except kubernetes.client.exceptions.ApiException as e:
-                    if "Not Found" in str(e):
-                        break
-                    else:
-                        raise e
+        if self.shutdown_on_close:
+            async with kubernetes.client.api_client.ApiClient() as api_client:
+                custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+                await custom_objects_api.delete_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskclusters",
+                    namespace=self.namespace,
+                    name=self.cluster_name,
+                )
+            while (await self._get_cluster()) is not None:
+                await asyncio.sleep(1)
 
     def scale(self, n, worker_group="default"):
         """Scale cluster to n workers
@@ -327,6 +396,8 @@ class KubeCluster(Cluster):
     def from_name(cls, name, **kwargs):
         """Create an instance of this class to represent an existing cluster by name.
 
+        Will fail if a cluster with that name doesn't already exist.
+
         Parameters
         ----------
         name: str
@@ -336,5 +407,4 @@ class KubeCluster(Cluster):
         --------
         >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
-        # TODO: Implement when switch to k8s python client
-        raise NotImplementedError()
+        return cls(name=name, create_mode=CreateMode.CONNECT_ONLY, **kwargs)
