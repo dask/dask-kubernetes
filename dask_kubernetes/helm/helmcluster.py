@@ -10,12 +10,12 @@ from distributed.core import rpc, Status
 from distributed.utils import Log, Logs, LoopRunner
 import kubernetes_asyncio as kubernetes
 
-from ..auth import ClusterAuth
-from ..utils import (
+from ..common.auth import ClusterAuth
+from ..common.utils import (
     namespace_default,
-    get_external_address_for_scheduler_service,
     check_dependency,
 )
+from ..common.networking import get_external_address_for_scheduler_service
 
 
 class HelmCluster(Cluster):

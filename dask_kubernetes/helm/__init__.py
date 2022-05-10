@@ -1,1 +1,1 @@
-from .helm import HelmCluster
+from .helmcluster import HelmCluster

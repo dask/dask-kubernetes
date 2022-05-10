@@ -83,6 +83,12 @@ async def client(cluster):
 
 
 @pytest.mark.asyncio
+async def test_fixtures(client):
+    """An initial test to get all the fixtures to run and check the cluster is usable."""
+    assert client
+
+
+@pytest.mark.asyncio
 async def test_versions(client):
     await client.get_versions(check=True)
 
@@ -103,8 +109,7 @@ async def test_basic(cluster, client):
     result = await future
     assert result == 11
 
-    while len(cluster.scheduler_info["workers"]) < 2:
-        await asyncio.sleep(0.1)
+    await client.wait_for_workers(2)
 
     # Ensure that inter-worker communication works well
     futures = client.map(lambda x: x + 1, range(10))
@@ -119,10 +124,8 @@ async def test_logs(remote_cluster):
     cluster.scale(2)
     await cluster
 
-    start = time()
-    while len(cluster.scheduler_info["workers"]) < 2:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
+    async with Client(cluster, asynchronous=True) as client:
+        await client.wait_for_workers(2)
 
     logs = await cluster.get_logs()
     assert len(logs) == 4
@@ -175,11 +178,6 @@ async def test_adapt(cluster):
         result = await future
         assert result == 11
 
-    start = time()
-    while cluster.scheduler_info["workers"]:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
-
 
 @pytest.mark.xfail(reason="The widget has changed upstream")
 @pytest.mark.asyncio
@@ -205,8 +203,7 @@ async def test_env(k8s_cluster, pod_spec):
         cluster.scale(1)
         await cluster
         async with Client(cluster, asynchronous=True) as client:
-            while not cluster.scheduler_info["workers"]:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(1)
             env = await client.run(lambda: dict(os.environ))
             assert all(v["ABC"] == "DEF" for v in env.values())
 
@@ -244,10 +241,7 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
                 result = await future.result(timeout=10)
                 assert result == 11
 
-                start = time()
-                while len(cluster.scheduler_info["workers"]) < 2:
-                    await asyncio.sleep(0.1)
-                    assert time() < start + 20, "timeout"
+                await client.wait_for_workers(2)
 
                 # Ensure that inter-worker communication works well
                 futures = client.map(lambda x: x + 1, range(10))
@@ -323,8 +317,7 @@ async def test_pod_template_dict(docker_image):
             result = await future
             assert result == 11
 
-            while len(cluster.scheduler_info["workers"]) < 2:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(2)
 
             # Ensure that inter-worker communication works well
             futures = client.map(lambda x: x + 1, range(10))
@@ -472,9 +465,7 @@ async def test_scale_up_down_fast(cluster, client):
     await cluster
 
     start = time()
-    while len(cluster.scheduler_info["workers"]) != 1:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
+    await client.wait_for_workers(1)
 
     worker = next(iter(cluster.scheduler_info["workers"].values()))
 
@@ -637,7 +628,9 @@ async def test_maximum(cluster):
                 await asyncio.sleep(0.1)
                 assert time() < start + 60
             await asyncio.sleep(0.5)
-            assert len(cluster.scheduler_info["workers"]) == 1
+            while len(cluster.scheduler_info["workers"]) != 1:
+                await asyncio.sleep(0.1)
+                assert time() < start + 60
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
@@ -774,8 +767,7 @@ async def test_auth_explicit():
 async def test_start_with_workers(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, n_workers=2, **cluster_kwargs) as cluster:
         async with Client(cluster, asynchronous=True) as client:
-            while len(cluster.scheduler_info["workers"]) != 2:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(2)
 
 
 @pytest.mark.asyncio
@@ -810,7 +802,7 @@ async def test_adapt_delete(cluster, ns):
         worker_pods = await get_worker_pods()
         if to_delete not in worker_pods:
             break
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
     # test whether adapt will bring it back
     start = time()

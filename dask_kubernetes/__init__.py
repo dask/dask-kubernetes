@@ -1,5 +1,5 @@
 from . import config
-from .auth import (
+from .common.auth import (
     ClusterAuth,
     KubeAuth,
     KubeConfig,
@@ -7,9 +7,9 @@ from .auth import (
     AutoRefreshKubeConfigLoader,
     AutoRefreshConfiguration,
 )
-from .core import KubeCluster
+from .classic import KubeCluster
 from .helm import HelmCluster
-from .objects import make_pod_spec, make_pod_from_dict, clean_pod_template
+from .common.objects import make_pod_spec, make_pod_from_dict, clean_pod_template
 
 __all__ = ["HelmCluster", "KubeCluster"]
 
