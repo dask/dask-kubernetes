@@ -82,7 +82,7 @@ class Pod(ProcessInterface):
             except ApiException as e:
                 if retry_count < 10:
                     logger.debug("Error when creating pod, retrying... - %s", str(e))
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.1)
                     retry_count += 1
                 else:
                     raise e

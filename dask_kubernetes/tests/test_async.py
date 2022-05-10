@@ -124,10 +124,8 @@ async def test_logs(remote_cluster):
     cluster.scale(2)
     await cluster
 
-    start = time()
-    while len(cluster.scheduler_info["workers"]) < 2:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
+    async with Client(cluster, asynchronous=True):
+        await client.wait_for_workers(2)
 
     logs = await cluster.get_logs()
     assert len(logs) == 4
@@ -179,11 +177,6 @@ async def test_adapt(cluster):
         future = client.submit(lambda x: x + 1, 10)
         result = await future
         assert result == 11
-
-    start = time()
-    while cluster.scheduler_info["workers"]:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
 
 
 @pytest.mark.xfail(reason="The widget has changed upstream")
@@ -635,7 +628,9 @@ async def test_maximum(cluster):
                 await asyncio.sleep(0.1)
                 assert time() < start + 60
             await asyncio.sleep(0.5)
-            assert len(cluster.scheduler_info["workers"]) == 1
+            while len(cluster.scheduler_info["workers"]) != 1:
+                await asyncio.sleep(0.1)
+                assert time() < start + 60
 
         result = logger.getvalue()
         assert "scale beyond maximum number of workers" in result.lower()
@@ -772,8 +767,7 @@ async def test_auth_explicit():
 async def test_start_with_workers(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, n_workers=2, **cluster_kwargs) as cluster:
         async with Client(cluster, asynchronous=True) as client:
-            while len(cluster.scheduler_info["workers"]) != 2:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(2)
 
 
 @pytest.mark.asyncio
@@ -808,7 +802,7 @@ async def test_adapt_delete(cluster, ns):
         worker_pods = await get_worker_pods()
         if to_delete not in worker_pods:
             break
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         assert time() < start + 20
     # test whether adapt will bring it back
     start = time()
