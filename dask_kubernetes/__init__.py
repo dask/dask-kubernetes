@@ -7,7 +7,7 @@ from .auth import (
     AutoRefreshKubeConfigLoader,
     AutoRefreshConfiguration,
 )
-from .core import KubeCluster
+from .classic import KubeCluster
 from .helm import HelmCluster
 from .objects import make_pod_spec, make_pod_from_dict, clean_pod_template
 

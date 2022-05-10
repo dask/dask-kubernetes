@@ -16,8 +16,8 @@ from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 
-from .constants import KUBECLUSTER_WORKER_CONTAINER_NAME
-from .objects import (
+from ..constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from ..objects import (
     make_pod_from_dict,
     make_service_from_dict,
     make_pdb_from_dict,
@@ -25,12 +25,12 @@ from .objects import (
     clean_service_template,
     clean_pdb_template,
 )
-from .auth import ClusterAuth
-from .utils import (
+from ..auth import ClusterAuth
+from ..utils import (
     namespace_default,
     escape,
-    get_external_address_for_scheduler_service,
 )
+from ..networking import get_external_address_for_scheduler_service
 
 logger = logging.getLogger(__name__)
 

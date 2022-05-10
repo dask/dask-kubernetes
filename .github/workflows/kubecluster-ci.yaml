@@ -1,0 +1,31 @@
+name: "KubeCluster CI"
+on:
+  pull_request:
+    paths: &classic_paths
+      - "ci/**"
+      - "dask_kubernetes/classic/**"
+      - "dask_kubernetes/tests/**"
+      - "dask_kubernetes/*"
+  push:
+    paths: *classic_paths
+
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install deps
+        run: ./ci/install-deps.sh
+      - name: Run tests
+        env:
+          KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
+        run: pytest dask_kubernetes/tests

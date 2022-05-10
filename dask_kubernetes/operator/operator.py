@@ -8,7 +8,7 @@ import kubernetes_asyncio as kubernetes
 from uuid import uuid4
 
 from dask_kubernetes.auth import ClusterAuth
-from dask_kubernetes.utils import (
+from dask_kubernetes.networking import (
     get_scheduler_address,
 )
 

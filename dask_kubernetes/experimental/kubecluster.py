@@ -14,7 +14,7 @@ from dask_kubernetes.operator.operator import (
     wait_for_service,
 )
 
-from dask_kubernetes.utils import (
+from dask_kubernetes.networking import (
     get_scheduler_address,
     wait_for_scheduler,
 )

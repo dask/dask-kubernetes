@@ -13,9 +13,9 @@ import kubernetes_asyncio as kubernetes
 from ..auth import ClusterAuth
 from ..utils import (
     namespace_default,
-    get_external_address_for_scheduler_service,
     check_dependency,
 )
+from ..networking import get_external_address_for_scheduler_service
 
 
 class HelmCluster(Cluster):

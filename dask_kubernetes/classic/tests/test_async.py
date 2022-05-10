@@ -124,7 +124,7 @@ async def test_logs(remote_cluster):
     cluster.scale(2)
     await cluster
 
-    async with Client(cluster, asynchronous=True):
+    async with Client(cluster, asynchronous=True) as client:
         await client.wait_for_workers(2)
 
     logs = await cluster.get_logs()
