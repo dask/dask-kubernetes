@@ -18,6 +18,7 @@ from dask_kubernetes.common.networking import (
     get_scheduler_address,
     wait_for_scheduler,
 )
+from dask_kubernetes.common.utils import get_current_namespace
 
 
 class CreateMode(Enum):
@@ -106,7 +107,7 @@ class KubeCluster(Cluster):
     def __init__(
         self,
         name,
-        namespace="default",
+        namespace=None,
         image="daskdev/dask:latest",
         n_workers=3,
         resources={},
@@ -120,8 +121,7 @@ class KubeCluster(Cluster):
         **kwargs,
     ):
         self.name = name
-        # TODO: Set namespace to None and get default namespace from user's context
-        self.namespace = namespace
+        self.namespace = namespace or get_current_namespace()
         self.image = image
         self.n_workers = n_workers
         self.resources = resources

@@ -7,7 +7,7 @@ import subprocess
 
 from kopf.testing import KopfRunner
 
-from dask_kubernetes.common.utils import check_dependency
+from dask_kubernetes.common.utils import check_dependency, get_current_namespace
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -38,7 +38,7 @@ def k8s_cluster(kind_cluster, docker_image):
 
 @pytest.fixture(scope="session")
 def ns(k8s_cluster):
-    return "default"
+    return get_current_namespace()
 
 
 @pytest.fixture(scope="session", autouse=True)

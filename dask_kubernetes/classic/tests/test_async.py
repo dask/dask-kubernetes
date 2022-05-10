@@ -24,6 +24,7 @@ from dask.utils import tmpfile
 from distributed.utils_test import captured_logger
 
 from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.common.utils import get_current_namespace
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -382,7 +383,7 @@ async def test_constructor_parameters(k8s_cluster, pod_spec):
         pod_spec, name="myname", env=env, **cluster_kwargs
     ) as cluster:
         pod = cluster.pod_template
-        assert pod.metadata.namespace == "default"
+        assert pod.metadata.namespace == get_current_namespace()
 
         var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
         assert var and var[0].value == "BAR"
