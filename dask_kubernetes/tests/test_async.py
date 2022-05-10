@@ -83,6 +83,12 @@ async def client(cluster):
 
 
 @pytest.mark.asyncio
+async def test_fixtures(client):
+    """An initial test to get all the fixtures to run and check the cluster is usable."""
+    assert (await client.submit(lambda x: x + 1, 10)) == 11
+
+
+@pytest.mark.asyncio
 async def test_versions(client):
     await client.get_versions(check=True)
 
@@ -103,8 +109,7 @@ async def test_basic(cluster, client):
     result = await future
     assert result == 11
 
-    while len(cluster.scheduler_info["workers"]) < 2:
-        await asyncio.sleep(0.1)
+    await client.wait_for_workers(2)
 
     # Ensure that inter-worker communication works well
     futures = client.map(lambda x: x + 1, range(10))
@@ -205,8 +210,7 @@ async def test_env(k8s_cluster, pod_spec):
         cluster.scale(1)
         await cluster
         async with Client(cluster, asynchronous=True) as client:
-            while not cluster.scheduler_info["workers"]:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(1)
             env = await client.run(lambda: dict(os.environ))
             assert all(v["ABC"] == "DEF" for v in env.values())
 
@@ -244,10 +248,7 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
                 result = await future.result(timeout=10)
                 assert result == 11
 
-                start = time()
-                while len(cluster.scheduler_info["workers"]) < 2:
-                    await asyncio.sleep(0.1)
-                    assert time() < start + 20, "timeout"
+                await client.wait_for_workers(2)
 
                 # Ensure that inter-worker communication works well
                 futures = client.map(lambda x: x + 1, range(10))
@@ -323,8 +324,7 @@ async def test_pod_template_dict(docker_image):
             result = await future
             assert result == 11
 
-            while len(cluster.scheduler_info["workers"]) < 2:
-                await asyncio.sleep(0.1)
+            await client.wait_for_workers(2)
 
             # Ensure that inter-worker communication works well
             futures = client.map(lambda x: x + 1, range(10))
@@ -472,9 +472,7 @@ async def test_scale_up_down_fast(cluster, client):
     await cluster
 
     start = time()
-    while len(cluster.scheduler_info["workers"]) != 1:
-        await asyncio.sleep(0.1)
-        assert time() < start + 20
+    await client.wait_for_workers(1)
 
     worker = next(iter(cluster.scheduler_info["workers"].values()))
 
