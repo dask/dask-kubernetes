@@ -5,7 +5,7 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/experimental/**"
-      - "dask_kubernetes/*"
+      - "dask_kubernetes/common/**"
   push:
     paths:
       - "ci/**"

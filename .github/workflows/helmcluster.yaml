@@ -4,7 +4,7 @@ on:
     paths:
       - "ci/**"
       - "dask_kubernetes/helm/**"
-      - "dask_kubernetes/*"
+      - "dask_kubernetes/common/**"
   push:
     paths:
       - "ci/**"
