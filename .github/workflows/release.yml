@@ -1,9 +1,9 @@
-name: Build distribution
+name: Package
 
 on: [push, pull_request]
 
 jobs:
-  package:
+  build-distribution:
     runs-on: "ubuntu-latest"
 
     steps:

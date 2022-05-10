@@ -1,4 +1,4 @@
-name: "HelmCluster CI"
+name: "HelmCluster"
 on:
   pull_request:
     paths:

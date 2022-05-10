@@ -1,4 +1,4 @@
-name: "KubeCluster CI"
+name: "KubeCluster"
 on:
   pull_request:
     paths:
