@@ -168,7 +168,7 @@ async def wait_for_service(api, service_name, namespace):
             await api.read_namespaced_service(service_name, namespace)
             break
         except Exception:
-            asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
 
 
 @kopf.on.startup()
