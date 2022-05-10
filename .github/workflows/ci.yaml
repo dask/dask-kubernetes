@@ -31,7 +31,12 @@ jobs:
           pip install git+https://github.com/dask/distributed@main
           pip install git+https://github.com/dask/dask@main
 
+      - name: Prebuild long running session fixtures
+        env:
+          KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
+        run: pytest -n 1 dask_kubernetes/tests/test_async.py::test_fixtures
+
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest --durations=10 dask_kubernetes/${{ matrix.suite }}/tests
+        run: pytest -n auto --durations=10 dask_kubernetes/${{ matrix.suite }}/tests
