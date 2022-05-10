@@ -1,17 +1,18 @@
-name: "Operator"
+name: "KubeCluster"
 on:
   pull_request:
     paths:
       - "ci/**"
-      - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
+      - "dask_kubernetes/classic/**"
+      - "dask_kubernetes/tests/**"
       - "dask_kubernetes/*"
   push:
     paths:
       - "ci/**"
-      - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
+      - "dask_kubernetes/classic/**"
+      - "dask_kubernetes/tests/**"
       - "dask_kubernetes/*"
+
 
 jobs:
   test:
@@ -31,4 +32,4 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest dask_kubernetes/operator/tests
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/classic/tests

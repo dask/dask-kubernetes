@@ -3,7 +3,7 @@ import pytest
 import os
 import subprocess
 
-from dask_kubernetes.utils import check_dependency
+from dask_kubernetes.common.utils import check_dependency
 
 check_dependency("helm")
 check_dependency("kubectl")

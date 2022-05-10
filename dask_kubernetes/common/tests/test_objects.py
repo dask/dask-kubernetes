@@ -1,5 +1,5 @@
 from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
-from dask_kubernetes.objects import make_pod_from_dict
+from dask_kubernetes.common.objects import make_pod_from_dict
 
 
 def test_make_pod_from_dict():

@@ -7,14 +7,14 @@ from distributed.deploy import Cluster
 
 from distributed.utils import Log, Logs, LoopRunner
 
-from dask_kubernetes.auth import ClusterAuth
-from dask_kubernetes.operator.operator import (
+from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.operator import (
     build_cluster_spec,
     build_worker_group_spec,
     wait_for_service,
 )
 
-from dask_kubernetes.networking import (
+from dask_kubernetes.common.networking import (
     get_scheduler_address,
     wait_for_scheduler,
 )

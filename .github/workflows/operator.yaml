@@ -1,16 +1,17 @@
-name: "HelmCluster"
+name: "Operator"
 on:
   pull_request:
     paths:
       - "ci/**"
-      - "dask_kubernetes/helm/**"
+      - "dask_kubernetes/operator/**"
+      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/*"
   push:
     paths:
       - "ci/**"
-      - "dask_kubernetes/helm/**"
+      - "dask_kubernetes/operator/**"
+      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/*"
-
 
 jobs:
   test:
@@ -30,4 +31,4 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest dask_kubernetes/helm/tests
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests

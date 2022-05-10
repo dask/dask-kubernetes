@@ -3,7 +3,7 @@ from subprocess import check_output
 
 import kubernetes_asyncio as kubernetes
 
-from dask_kubernetes.auth import ClusterAuth
+from dask_kubernetes.common.auth import ClusterAuth
 
 
 def test_config_detection(k8s_cluster):
