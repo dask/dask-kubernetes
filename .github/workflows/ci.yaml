@@ -14,8 +14,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
+        suite: ["", "helm", "operator"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -32,4 +34,4 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest
+        run: pytest --durations=10 dask_kubernetes/${{ matrix.suite }}/tests
