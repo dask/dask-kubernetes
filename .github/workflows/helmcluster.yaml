@@ -5,10 +5,12 @@ on:
       - "ci/**"
       - "dask_kubernetes/helm/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/*"
   push:
     paths:
       - "ci/**"
       - "dask_kubernetes/helm/**"
+      - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
 
 

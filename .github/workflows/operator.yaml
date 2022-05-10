@@ -6,11 +6,13 @@ on:
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/*"
   push:
     paths:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/experimental/**"
+      - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
 
 jobs:
