@@ -1,12 +1,15 @@
 name: "HelmCluster CI"
 on:
   pull_request:
-    paths: &helmcluster_paths
+    paths:
       - "ci/**"
       - "dask_kubernetes/helm/**"
       - "dask_kubernetes/*"
   push:
-    paths: *helmcluster_paths
+    paths:
+      - "ci/**"
+      - "dask_kubernetes/helm/**"
+      - "dask_kubernetes/*"
 
 
 jobs:

@@ -1,13 +1,17 @@
 name: "Operator CI"
 on:
   pull_request:
-    paths: &operator_paths
+    paths:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/*"
   push:
-    paths: *operator_paths
+    paths:
+      - "ci/**"
+      - "dask_kubernetes/operator/**"
+      - "dask_kubernetes/experimental/**"
+      - "dask_kubernetes/*"
 
 jobs:
   test:

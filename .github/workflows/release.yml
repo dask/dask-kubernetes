@@ -3,7 +3,7 @@ name: Build distribution
 on: [push, pull_request]
 
 jobs:
-  test:
+  package:
     runs-on: "ubuntu-latest"
 
     steps:
