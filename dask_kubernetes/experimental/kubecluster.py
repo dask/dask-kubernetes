@@ -170,13 +170,20 @@ class KubeCluster(Cluster):
             data = build_cluster_spec(
                 self.name, self.image, self.n_workers, self.resources, self.env
             )
-            await custom_objects_api.create_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace=self.namespace,
-                body=data,
-            )
+            try:
+                await custom_objects_api.create_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskclusters",
+                    namespace=self.namespace,
+                    body=data,
+                )
+            except kubernetes.client.ApiException as e:
+                raise RuntimeError(
+                    "Failed to create DaskCluster resource. "
+                    "Are the Dask Custom Resource Definitions installed? "
+                    "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
+                ) from e
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, data["metadata"]["name"], self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
