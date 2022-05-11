@@ -61,7 +61,7 @@ Let's create an example called ``cluster.yaml`` with the following configuration
          spec:
             containers:
             - name: worker
-               image: "daskdev/dask:latest"
+               image: "ghcr.io/dask/dask:latest"
                imagePullPolicy: "IfNotPresent"
                args:
                   - dask-worker
@@ -71,9 +71,9 @@ Let's create an example called ``cluster.yaml`` with the following configuration
          spec:
             containers:
             - name: scheduler
-               image: "daskdev/dask:latest"
+               image: "ghcr.io/dask/dask:latest"
                imagePullPolicy: "IfNotPresent"
-               args: 
+               args:
                   - dask-scheduler
                ports:
                   - name: comm
@@ -265,7 +265,7 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
    spec:
       cluster: simple-cluster
       imagePullSecrets: null
-      image: "dask-kubernetes:dev"
+      image: "ghcr.io/dask/dask:latest"
       imagePullPolicy: "IfNotPresent"
       replicas: 2
       resources:
