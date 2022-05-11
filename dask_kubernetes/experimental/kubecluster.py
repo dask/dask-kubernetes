@@ -462,7 +462,7 @@ class KubeCluster(Cluster):
                 ]
             },
             "service": {
-                "type": "NodePort",
+                "type": "ClusterIP",
                 "selector": {
                     "dask.org/cluster-name": cluster_name,
                     "dask.org/component": "scheduler",
