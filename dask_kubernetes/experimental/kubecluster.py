@@ -198,10 +198,14 @@ class KubeCluster(Cluster):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             core_api = kubernetes.client.CoreV1Api(api_client)
             cluster_spec = await self._get_cluster()
-            self.image = cluster_spec["spec"]["image"]
-            self.n_workers = cluster_spec["spec"]["replicas"]
-            self.resources = cluster_spec["spec"]["resources"]
-            self.env = cluster_spec["spec"]["env"]
+            self.image = cluster_spec["spec"]["worker"]["spec"]["containers"][0][
+                "image"
+            ]
+            self.n_workers = cluster_spec["spec"]["worker"]["replicas"]
+            self.resources = cluster_spec["spec"]["worker"]["spec"]["containers"][0][
+                "resources"
+            ]
+            self.env = cluster_spec["spec"]["worker"]["spec"]["containers"][0]["env"]
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(
                 core_api, cluster_spec["metadata"]["name"], self.namespace
@@ -310,7 +314,9 @@ class KubeCluster(Cluster):
             env=env,
         )
 
-    async def _add_worker_group(self, name, n=3):
+    async def _add_worker_group(
+        self, name, n_workers=3, image=None, resources=None, env=None
+    ):
         service_name = f"{self.name}-service"
         spec = self._build_worker_spec(service_name)
         data = {
