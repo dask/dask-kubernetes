@@ -53,7 +53,7 @@ def run_generate(crd_path, patch_path, temp_path):
 def customresources(k8s_cluster):
 
     temp_dir = tempfile.TemporaryDirectory()
-    crd_path = os.path.join(DIR, "..", "customresources")
+    crd_path = os.path.join(DIR, "operator", "customresources")
 
     run_generate(
         os.path.join(crd_path, "daskcluster.yaml"),

@@ -2,6 +2,7 @@ apiVersion: kubernetes.dask.org/v1
 kind: DaskWorkerGroup
 metadata:
   name: simple-cluster-additional-worker-group
+  namespace: default
 spec:
   cluster: simple-cluster
   worker:

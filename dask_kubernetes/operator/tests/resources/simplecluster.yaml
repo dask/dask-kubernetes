@@ -2,6 +2,7 @@ apiVersion: kubernetes.dask.org/v1
 kind: DaskCluster
 metadata:
   name: simple-cluster
+  namespace: default
 spec:
   worker:
     replicas: 2
@@ -22,7 +23,7 @@ spec:
         - name: scheduler
           image: "daskdev/dask:latest"
           imagePullPolicy: "IfNotPresent"
-          args: 
+          args:
             - dask-scheduler
           ports:
             - name: comm

@@ -202,7 +202,9 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                     namespace=namespace,
                     body=data,
                 )
-            logger.info(f"Scaled worker group {name} up to {spec['replicas']} workers.")
+            logger.info(
+                f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
+            )
         if workers_needed < 0:
             service_name = f"{name.split('-')[0]}-cluster-service"
             address = await get_scheduler_address(service_name, namespace)
