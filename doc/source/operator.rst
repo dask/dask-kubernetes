@@ -56,7 +56,7 @@ Let's create an example called ``cluster.yaml`` with the following configuration
    metadata:
      name: simple-cluster
    spec:
-     image: "daskdev/dask:latest"
+     image: "ghcr.io/dask/dask:latest"
      replicas: 3
 
 Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now apply ``cluster.yaml``
@@ -295,7 +295,7 @@ Full ``DaskCluster`` spec reference.
      imagePullSecrets: null
 
      # image to be used by the scheduler and workers, should contain a Python environment that matches where you are connecting your Client
-     image: "daskdev/dask:latest"
+     image: "ghcr.io/dask/dask:latest"
 
      # imagePullPolicy to be passed to scheduler and worker pods
      imagePullPolicy: "IfNotPresent"
