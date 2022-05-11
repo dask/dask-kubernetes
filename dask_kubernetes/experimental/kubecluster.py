@@ -490,7 +490,7 @@ class KubeCluster(Cluster):
             },
         }
 
-    def _build_worker_spec(self, cluster_name, service_name):
+    def _build_worker_spec(self, service_name):
         if isinstance(self.env, dict):
             env = [{"name": key, "value": value} for key, value in self.env.items()]
         else:
@@ -498,7 +498,7 @@ class KubeCluster(Cluster):
             env = self.env
 
         return {
-            "cluster": cluster_name,
+            "cluster": self.cluster_name,
             "replicas": self.n_workers,
             "spec": {
                 "containers": [
