@@ -173,7 +173,7 @@ def make_pod_spec(
 
     Examples
     --------
-    >>> make_pod_spec(image='daskdev/dask:latest', memory_limit='4G', memory_request='4G')
+    >>> make_pod_spec(image='ghcr.io/dask/dask:latest', memory_limit='4G', memory_request='4G')
     """
     args = [
         "dask-worker",

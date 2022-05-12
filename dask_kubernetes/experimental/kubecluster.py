@@ -107,7 +107,7 @@ class KubeCluster(Cluster):
         self,
         name,
         namespace="default",
-        image="daskdev/dask:latest",
+        image="ghcr.io/dask/dask:latest",
         n_workers=3,
         resources={},
         env=[],
