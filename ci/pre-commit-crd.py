@@ -9,10 +9,14 @@ import shutil
 ROOT_DIR = pathlib.Path(__file__).parent.parent.absolute()
 
 
-def install_deps():
+def install_deps(version):
     if not shutil.which("k8s-crd-resolver"):
         subprocess.run(
-            ["pip", "install", "git+http://github.com/elemental-lf/k8s-crd-resolver"],
+            [
+                "pip",
+                "install",
+                f"git+http://github.com/elemental-lf/k8s-crd-resolver@{version}",
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -42,8 +46,8 @@ def run_action(changed_file, temp_dir, crd_path, output_paths):
     shutil.copyfile(output_file, f"{output_paths[1]}/{file_name}.yaml")
 
 
-def main(args):
-    install_deps()
+def main(version, *args):
+    install_deps(version)
     # Given a list of files that have been changed in a commit
     # We want to run the `k8s-crd-resolver` command and copy the relevant output files
     # and then check that nothing has changed
@@ -84,4 +88,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(*sys.argv)
