@@ -16,7 +16,7 @@ jobs:
           python-version: 3.8
 
       - name: Install pypa/build and chartpress
-        run: python -m pip install build wheelchartpress pyyaml
+        run: python -m pip install build wheel chartpress pyyaml
 
       # chartpress pushes a packages Helm chart to dask/helm-chart's gh-pages
       # branch, so we need to have a git user.email and user.name configured
