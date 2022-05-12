@@ -18,15 +18,6 @@
 
 charts:
   - name: dask-kubernetes-operator
-    imagePrefix: ghcr.io/dask/
     repo:
       git: dask/helm-chart
       published: https://helm.dask.org
-    images:
-      # Used for the api and controller pods
-      dask-kubernetes-operator:
-        imageName: ghcr.io/dask/dask-kubernetes-operator
-        contextPath: ../../../../dask_kubernetes
-        dockerfilePath: ../Dockerfile
-        valuesPath:
-          - image

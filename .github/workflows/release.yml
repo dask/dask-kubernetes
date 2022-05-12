@@ -15,8 +15,15 @@ jobs:
         with:
           python-version: 3.8
 
-      - name: Install pypa/build
-        run: python -m pip install build wheel
+      - name: Install pypa/build and chartpress
+        run: python -m pip install build wheelchartpress pyyaml
+
+      # chartpress pushes a packages Helm chart to dask/helm-chart's gh-pages
+      # branch, so we need to have a git user.email and user.name configured
+      - name: Configure a git user
+        run: |
+          git config --global user.email "github-actions@example.local"
+          git config --global user.name "GitHub Actions user"
 
       - name: Build distributions
         shell: bash -l {0}
@@ -54,3 +61,14 @@ jobs:
           push: ${{ github.repository == 'dask/dask-kubernetes' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags') }}
           platforms: linux/amd64
           tags: ghcr.io/dask/dask-kubernetes-operator:latest,ghcr.io/dask/dask-kubernetes-operator:${{ steps.get_version.outputs.VERSION }}
+
+      - name: Build and publish operator Helm chart with chartpress
+        if: github.repository == 'dask/dask-kubernetes' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+        env:
+          # chartpress can make use of a personal access token by setting these
+          # environment variables like this, for details see:
+          # https://github.com/jupyterhub/chartpress/blob/d4e2346d50f0724f6bee387f4f8aebc108afb648/chartpress.py#L118-L128
+          #
+          GITHUB_ACTOR: ""
+          GITHUB_TOKEN: "${{ secrets.dask_bot_token }}"
+        run: cd dask_kubernetes/operator/deployment/helm && chartpress --publish-chart
