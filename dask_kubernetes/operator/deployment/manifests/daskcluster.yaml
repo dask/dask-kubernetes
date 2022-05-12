@@ -5890,6 +5890,7 @@ spec:
                 - spec
                 type: object
             required:
+            - scheduler
             - worker
             type: object
           status:
