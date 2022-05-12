@@ -41,6 +41,25 @@ This will create the appropriate roles, service accounts and a deployment for th
    kube-system   dask-kubernetes-operator-775b8bbbd5-zdrf7   1/1     Running   0          74s
 
 
+Installing the operator with Helm
+---------------------------------
+
+Along with a set of kubernetes manifests, the operator has a basic Helm chart which can be used to manage the installation of the operator.
+The chart is published in the ``dask/helm-charts`` repository, and can be installed via:
+
+.. code-block:: console
+
+    $ helm repo add dask https://helm.dask.org
+    $ helm repo update
+    $ helm install --version 2022.5.0 myrelease dask/dask-kubernetes-operator
+
+This will install the custom resource definitions, service account, roles, and the operator deployment.
+
+.. warning::
+    Please note that `Helm does not support updating or deleting CRDs. <https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations>`_ If updates
+    are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs.
+
+
 Creating a Dask cluster via ``kubectl``
 ---------------------------------------
 
