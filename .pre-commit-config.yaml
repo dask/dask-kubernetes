@@ -14,7 +14,7 @@ repos:
     hooks:
       - id: check-crd-updates
         name: check-crd-updates
-        entry: ci/pre-commit-crd.py
+        entry: ci/pre-commit-crd.py v0.10.0
         language: script
         types: [yaml]
         pass_filenames: true
