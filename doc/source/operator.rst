@@ -30,7 +30,7 @@ Next we need to install the operator. The operator will watch for new ``daskclus
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/deployment.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/operator.yaml
 
 This will create the appropriate roles, service accounts and a deployment for the operator. We can check the operator pod is running:
 
