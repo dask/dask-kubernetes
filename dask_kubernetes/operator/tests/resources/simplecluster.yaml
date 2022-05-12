@@ -9,7 +9,7 @@ spec:
     spec:
       containers:
         - name: worker
-          image: "daskdev/dask:latest"
+          image: "dask-kubernetes:dev"
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-worker
@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: scheduler
-          image: "daskdev/dask:latest"
+          image: "dask-kubernetes:dev"
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-scheduler
