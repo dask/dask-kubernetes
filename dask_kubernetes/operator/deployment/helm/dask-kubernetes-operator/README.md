@@ -11,22 +11,22 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 
 | Parameter                | Description             | Default        |
 | ------------------------ | ----------------------- | -------------- |
-| `image.name` |  | `"ghcr.io/dask/dask-kubernetes-operator"` |
-| `image.tag` |  | `"set-by-chartpress"` |
-| `image.pullPolicy` |  | `"IfNotPresent"` |
-| `imagePullSecrets` |  | `[]` |
-| `nameOverride` |  | `""` |
-| `fullnameOverride` |  | `""` |
-| `serviceAccount.create` |  | `true` |
-| `serviceAccount.annotations` |  | `{}` |
-| `serviceAccount.name` |  | `""` |
-| `podAnnotations` |  | `{}` |
-| `podSecurityContext` |  | `{}` |
-| `securityContext` |  | `{}` |
-| `resources` |  | `{}` |
-| `nodeSelector` |  | `{}` |
-| `tolerations` |  | `[]` |
-| `affinity` |  | `{}` |
+| `image.name` | Docker image for the operator | `"ghcr.io/dask/dask-kubernetes-operator"` |
+| `image.tag` | Release version | `"set-by-chartpress"` |
+| `image.pullPolicy` | Pull policy | `"IfNotPresent"` |
+| `imagePullSecrets` | Image pull secrets for private registries | `[]` |
+| `nameOverride` | Override release name (not including random UUID) | `""` |
+| `fullnameOverride` | Override full release name | `""` |
+| `serviceAccount.create` | Create a service account for the operator to use | `true` |
+| `serviceAccount.annotations` | Annotations to add to the service account | `{}` |
+| `serviceAccount.name` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""` |
+| `podAnnotations` | Extra annotations for the operator pod | `{}` |
+| `podSecurityContext` | Security context for the operator pod | `{}` |
+| `securityContext` | Security context for the operator container | `{}` |
+| `resources` | Resources for the operator pod | `{}` |
+| `nodeSelector` | Node selector | `{}` |
+| `tolerations` | Tolerations | `[]` |
+| `affinity` | Affinity | `{}` |
 
 
 
