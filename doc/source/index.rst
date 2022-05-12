@@ -23,7 +23,7 @@ Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
 
     from dask_kubernetes import KubeCluster, make_pod_spec
 
-    pod_spec = make_pod_spec(image='daskdev/dask:latest')
+    pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest')
     cluster = KubeCluster(pod_spec)
     cluster.scale(10)
 

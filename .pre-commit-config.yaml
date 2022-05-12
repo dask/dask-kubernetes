@@ -10,3 +10,11 @@ repos:
     hooks:
       - id: flake8
         language_version: python3
+  - repo: local
+    hooks:
+      - id: check-crd-updates
+        name: check-crd-updates
+        entry: ci/pre-commit-crd.py
+        language: script
+        types: [yaml]
+        pass_filenames: true

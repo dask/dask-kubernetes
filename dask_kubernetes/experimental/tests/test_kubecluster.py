@@ -31,8 +31,8 @@ def test_multiple_clusters(kopf_runner, docker_image):
 
 def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
     with kopf_runner:
-        with KubeCluster(name="bar", image=docker_image) as cluster1, KubeCluster(
-            name="baz", image=docker_image
+        with KubeCluster(name="fizz", image=docker_image) as cluster1, KubeCluster(
+            name="buzz", image=docker_image
         ) as cluster2:
             with Client(cluster1) as client1, Client(cluster2) as client2:
                 assert client1.submit(lambda x: x + 1, 10).result() == 11
@@ -41,8 +41,8 @@ def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
 
 def test_cluster_from_name(kopf_runner, docker_image):
     with kopf_runner:
-        with KubeCluster(name="bar", image=docker_image) as firstcluster:
-            with KubeCluster.from_name("bar") as secondcluster:
+        with KubeCluster(name="abc", image=docker_image) as firstcluster:
+            with KubeCluster.from_name("abc") as secondcluster:
                 assert firstcluster == secondcluster
 
 

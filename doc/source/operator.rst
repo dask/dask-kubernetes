@@ -16,8 +16,8 @@ To install the the operator first we need to create the Dask custom resources:
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/customresources/daskcluster.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/customresources/daskworkergroup.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
 
 Then you should be able to list your Dask clusters via ``kubectl``.
 
@@ -30,7 +30,7 @@ Next we need to install the operator. The operator will watch for new ``daskclus
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifest.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/deployment.yaml
 
 This will create the appropriate roles, service accounts and a deployment for the operator. We can check the operator pod is running:
 
@@ -54,10 +54,58 @@ Let's create an example called ``cluster.yaml`` with the following configuration
    apiVersion: kubernetes.dask.org/v1
    kind: DaskCluster
    metadata:
-     name: simple-cluster
+      name: simple-cluster
    spec:
-     image: "ghcr.io/dask/dask:latest"
-     replicas: 3
+      worker:
+         replicas: 2
+         spec:
+            containers:
+            - name: worker
+               image: "ghcr.io/dask/dask:latest"
+               imagePullPolicy: "IfNotPresent"
+               args:
+                  - dask-worker
+                  # Note the name of the cluster service, which adds "-service" to the end
+                  - tcp://simple-cluster-service.default.svc.cluster.local:8786
+      scheduler:
+         spec:
+            containers:
+            - name: scheduler
+               image: "ghcr.io/dask/dask:latest"
+               imagePullPolicy: "IfNotPresent"
+               args:
+                  - dask-scheduler
+               ports:
+                  - name: comm
+                  containerPort: 8786
+                  protocol: TCP
+                  - name: dashboard
+                  containerPort: 8787
+                  protocol: TCP
+               readinessProbe:
+                  tcpSocket:
+                  port: comm
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+               livenessProbe:
+                  tcpSocket:
+                  port: comm
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+         service:
+            type: NodePort
+            selector:
+               dask.org/cluster-name: simple-cluster
+               dask.org/component: scheduler
+            ports:
+            - name: comm
+               protocol: TCP
+               port: 8786
+               targetPort: "comm"
+            - name: dashboard
+               protocol: TCP
+               port: 8787
+               targetPort: "dashboard"
 
 Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now apply ``cluster.yaml``
 
@@ -79,8 +127,8 @@ To connect to this Dask cluster we can use the service that was created for us.
 .. code-block:: console
 
    $ kubectl get svc -l dask.org/cluster-name=simple-cluster
-   NAME             TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
-   simple-cluster   ClusterIP   10.96.85.120   <none>        8786/TCP,8787/TCP   86s
+   NAME                     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
+   simple-cluster-service   ClusterIP   10.96.85.120   <none>        8786/TCP,8787/TCP   86s
 
 We can see here that port ``8786`` has been exposed for the Dask communication along with ``8787`` for the Dashboard.
 
@@ -89,7 +137,7 @@ For this quick example we could use ``kubectl`` to port forward the service to y
 
 .. code-block:: console
 
-   $ kubectl port-forward svc/simple-cluster 8786:8786
+   $ kubectl port-forward svc/simple-cluster-service 8786:8786
    Forwarding from 127.0.0.1:8786 -> 8786
    Forwarding from [::1]:8786 -> 8786
 
@@ -289,40 +337,13 @@ Full ``DaskCluster`` spec reference.
    kind: DaskCluster
    metadata:
      name: example
-
    spec:
-     # imagePullSecrets to be passed to the scheduler and worker pods
-     imagePullSecrets: null
-
-     # image to be used by the scheduler and workers, should contain a Python environment that matches where you are connecting your Client
-     image: "ghcr.io/dask/dask:latest"
-
-     # imagePullPolicy to be passed to scheduler and worker pods
-     imagePullPolicy: "IfNotPresent"
-
-     # Dask communication protocol to use
-     protocol: "tcp"
-
-     # Number of Dask worker replicas to create in the default worker group
-     replicas: 3
-
-     # Hardware resources to be set on the worker pods
-     resources: {}
-
-     # Environment variables to be set on the worker pods
-     env: []
-
-     # Scheduler specific options
+     worker:
+       replicas: 2 # number of replica workers to spawn
+       spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
      scheduler:
-
-       # Hardware resources to be set on the scheduler pod (if omitted will use worker setting)
-       resources: {}
-
-       # Environment variables to be set on the scheduler pod (if omitted will use worker setting)
-       env: []
-
-       # Service type to use for exposing the scheduler
-       serviceType: "ClusterIP"
+       spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
+       service: ... # ServiceSpec, standard k8s service - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#servicespec-v1-core
 
 .. _api:
 

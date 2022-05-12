@@ -355,7 +355,7 @@ class KubeCluster(SpecCluster):
     Examples
     --------
     >>> from dask_kubernetes import KubeCluster, make_pod_spec
-    >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
+    >>> pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest',
     ...                          memory_limit='4G', memory_request='4G',
     ...                          cpu_limit=1, cpu_request=1,
     ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
@@ -384,7 +384,7 @@ class KubeCluster(SpecCluster):
 
     >>> client.get_versions(check=True)
 
-    The ``daskdev/dask`` docker images support ``EXTRA_PIP_PACKAGES``,
+    The ``ghcr.io/dask/dask`` docker images support ``EXTRA_PIP_PACKAGES``,
     ``EXTRA_APT_PACKAGES`` and ``EXTRA_CONDA_PACKAGES`` environment variables
     to help with small adjustments to the worker environments.  We recommend
     the use of pip over conda in this case due to a much shorter startup time.
@@ -642,7 +642,7 @@ class KubeCluster(SpecCluster):
         ...                      '--nthreads', '1',
         ...                      '--death-timeout', '60'],
         ...             'command': None,
-        ...             'image': 'daskdev/dask:latest',
+        ...             'image': 'ghcr.io/dask/dask:latest',
         ...             'name': 'dask-worker',
         ...         }],
         ...     'restartPolicy': 'Never',
@@ -677,7 +677,7 @@ class KubeCluster(SpecCluster):
                 baz: quux
             spec:
               containers:
-              - image: daskdev/dask:latest
+              - image: ghcr.io/dask/dask:latest
                 name: dask-worker
                 args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
               restartPolicy: Never
