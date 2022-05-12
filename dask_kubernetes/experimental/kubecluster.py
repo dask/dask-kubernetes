@@ -316,7 +316,7 @@ class KubeCluster(Cluster):
     async def _add_worker_group(
         self, name, n_workers=3, image=None, resources=None, env=None
     ):
-        service_name = f"{self.name}-service"
+        service_name = f"{self.cluster_name}-service"
         spec = self._build_worker_spec(service_name)
         data = {
             "apiVersion": "kubernetes.dask.org/v1",
@@ -360,7 +360,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.cluster_name}-{name}-worker-group",
+                name=f"{self.name}-cluster-{name}",
             )
 
     def close(self):
