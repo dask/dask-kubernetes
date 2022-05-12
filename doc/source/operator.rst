@@ -50,62 +50,62 @@ Let's create an example called ``cluster.yaml`` with the following configuration
 
 .. code-block:: yaml
 
-   # cluster.yaml
-   apiVersion: kubernetes.dask.org/v1
-   kind: DaskCluster
-   metadata:
+    # cluster.yaml
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskCluster
+    metadata:
       name: simple-cluster
-   spec:
+    spec:
       worker:
-         replicas: 2
-         spec:
-            containers:
-            - name: worker
-               image: "ghcr.io/dask/dask:latest"
-               imagePullPolicy: "IfNotPresent"
-               args:
-                  - dask-worker
-                  # Note the name of the cluster service, which adds "-service" to the end
-                  - tcp://simple-cluster-service.default.svc.cluster.local:8786
+        replicas: 2
+        spec:
+          containers:
+          - name: worker
+            image: "ghcr.io/dask/dask:latest"
+            imagePullPolicy: "IfNotPresent"
+            args:
+              - dask-worker
+              # Note the name of the cluster service, which adds "-service" to the end
+              - tcp://simple-cluster-service.default.svc.cluster.local:8786
       scheduler:
-         spec:
-            containers:
-            - name: scheduler
-               image: "ghcr.io/dask/dask:latest"
-               imagePullPolicy: "IfNotPresent"
-               args:
-                  - dask-scheduler
-               ports:
-                  - name: comm
-                  containerPort: 8786
-                  protocol: TCP
-                  - name: dashboard
-                  containerPort: 8787
-                  protocol: TCP
-               readinessProbe:
-                  tcpSocket:
-                  port: comm
-                  initialDelaySeconds: 5
-                  periodSeconds: 10
-               livenessProbe:
-                  tcpSocket:
-                  port: comm
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
-         service:
-            type: NodePort
-            selector:
-               dask.org/cluster-name: simple-cluster
-               dask.org/component: scheduler
+        spec:
+          containers:
+          - name: scheduler
+            image: "ghcr.io/dask/dask:latest"
+            imagePullPolicy: "IfNotPresent"
+            args:
+              - dask-scheduler
             ports:
-            - name: comm
-               protocol: TCP
-               port: 8786
-               targetPort: "comm"
-            - name: dashboard
-               protocol: TCP
-               port: 8787
-               targetPort: "dashboard"
+              - name: comm
+                containerPort: 8786
+                protocol: TCP
+              - name: dashboard
+                containerPort: 8787
+                protocol: TCP
+            readinessProbe:
+              tcpSocket:
+                port: comm
+                initialDelaySeconds: 5
+                periodSeconds: 10
+            livenessProbe:
+              tcpSocket:
+                port: comm
+                initialDelaySeconds: 15
+                periodSeconds: 20
+        service:
+          type: NodePort
+          selector:
+            dask.org/cluster-name: simple-cluster
+            dask.org/component: scheduler
+          ports:
+          - name: comm
+            protocol: TCP
+            port: 8786
+            targetPort: "comm"
+          - name: dashboard
+            protocol: TCP
+            port: 8787
+            targetPort: "dashboard"
 
 Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now apply ``cluster.yaml``
 
@@ -242,7 +242,7 @@ Additional Worker Groups
 ------------------------
 
 The operator also has support for creating additional worker groups. These are extra groups of workers with different
-configuration settings and can be scaled separately. You can then use `resource annotations <https://distributed.dask.org/en/stable/resources.html>`_`
+configuration settings and can be scaled separately. You can then use `resource annotations <https://distributed.dask.org/en/stable/resources.html>`_
 to schedule different tasks to different groups.
 
 For example you may wish to have a smaller pool of workers that have more memory for memory intensive tasks, or GPUs for compute intensive tasks.
@@ -257,23 +257,29 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
 
 .. code-block:: yaml
 
-   # highmemworkers.yaml
-   apiVersion: kubernetes.dask.org/v1
-   kind: DaskWorkerGroup
-   metadata:
+    # highmemworkers.yaml
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskWorkerGroup
+    metadata:
       name: simple-cluster-highmem-worker-group
-   spec:
+    spec:
       cluster: simple-cluster
-      imagePullSecrets: null
-      image: "ghcr.io/dask/dask:latest"
-      imagePullPolicy: "IfNotPresent"
-      replicas: 2
-      resources:
-         requests:
-            memory: "2Gi"
-         limits:
-            memory: "64Gi"
-      env: []
+      worker:
+        replicas: 2
+        spec:
+          containers:
+          - name: worker
+            image: "ghcr.io/dask/dask:latest"
+            imagePullPolicy: "IfNotPresent"
+            resources:
+              requests:
+                memory: "2Gi"
+              limits:
+                memory: "32Gi"
+            args:
+              - dask-worker
+              # Note the name of the cluster service, which adds "-service" to the end
+              - tcp://simple-cluster-service.default.svc.cluster.local:8786
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
 the workers to join that cluster.
@@ -333,17 +339,31 @@ Full ``DaskCluster`` spec reference.
 
 .. code-block:: yaml
 
-   apiVersion: kubernetes.dask.org/v1
-   kind: DaskCluster
-   metadata:
-     name: example
-   spec:
-     worker:
-       replicas: 2 # number of replica workers to spawn
-       spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
-     scheduler:
-       spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
-       service: ... # ServiceSpec, standard k8s service - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#servicespec-v1-core
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskCluster
+    metadata:
+      name: example
+    spec:
+      worker:
+        replicas: 2 # number of replica workers to spawn
+        spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
+      scheduler:
+        spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
+        service: ... # ServiceSpec, standard k8s service - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#servicespec-v1-core
+
+Full ``DaskWorkerGroup`` spec reference.
+
+.. code-block:: yaml
+
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskWorkerGroup
+    metadata:
+      name: example
+    spec:
+      cluster: "name of DaskCluster to associate worker group with"
+      worker:
+        replicas: 2 # number of replica workers to spawn
+        spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
 
 .. _api:
 
