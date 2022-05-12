@@ -170,7 +170,7 @@ class KubeCluster(Cluster):
 
             service_name = f"{self.name}-cluster-service"
             cluster_name = f"{self.name}-cluster"
-            worker_spec = self._build_worker_spec(cluster_name, service_name)
+            worker_spec = self._build_worker_spec(service_name)
             scheduler_spec = self._build_scheduler_spec(cluster_name)
 
             data = build_cluster_spec(cluster_name, worker_spec, scheduler_spec)
@@ -206,10 +206,9 @@ class KubeCluster(Cluster):
                 "resources"
             ]
             self.env = cluster_spec["spec"]["worker"]["spec"]["containers"][0]["env"]
+            service_name = f'{cluster_spec["metadata"]["name"]}-service'
             await wait_for_scheduler(self.cluster_name, self.namespace)
-            await wait_for_service(
-                core_api, cluster_spec["metadata"]["name"], self.namespace
-            )
+            await wait_for_service(core_api, service_name, self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
 
     async def _get_cluster(self):
@@ -223,7 +222,7 @@ class KubeCluster(Cluster):
                     namespace=self.namespace,
                     name=self.cluster_name,
                 )
-            except kubernetes.client.exceptions.ApiException:
+            except kubernetes.client.exceptions.ApiException as e:
                 return None
 
     async def _get_scheduler_address(self):
