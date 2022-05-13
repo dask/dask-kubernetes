@@ -1,11 +1,18 @@
+from __future__ import annotations
+
 import asyncio
+import atexit
+from contextlib import suppress
 from enum import Enum
+from typing import ClassVar
+import weakref
+
 import kubernetes_asyncio as kubernetes
 
-from distributed.core import rpc
+from distributed.core import Status, rpc
 from distributed.deploy import Cluster
 
-from distributed.utils import Log, Logs, LoopRunner
+from distributed.utils import Log, Logs, LoopRunner, TimeoutError
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.operator import (
@@ -103,6 +110,8 @@ class KubeCluster(Cluster):
     KubeCluster.from_name
     """
 
+    _instances: ClassVar[weakref.WeakSet[KubeCluster]] = weakref.WeakSet()
+
     def __init__(
         self,
         name,
@@ -132,6 +141,8 @@ class KubeCluster(Cluster):
         self.shutdown_on_close = shutdown_on_close
         self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
         self.loop = self._loop_runner.loop
+
+        self._instances.add(self)
 
         super().__init__(asynchronous=asynchronous, **kwargs)
         if not self.asynchronous:
@@ -537,3 +548,12 @@ class KubeCluster(Cluster):
         >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
         return cls(name=name, create_mode=CreateMode.CONNECT_ONLY, **kwargs)
+
+
+@atexit.register
+def close_clusters():
+    for cluster in list(KubeCluster._instances):
+        if cluster.shutdown_on_close:
+            with suppress(TimeoutError):
+                if cluster.status != Status.closed:
+                    cluster.close(timeout=10)
