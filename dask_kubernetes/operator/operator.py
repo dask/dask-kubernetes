@@ -120,10 +120,15 @@ async def configure(settings: kopf.OperatorSettings, **_: Any) -> None:
     # You will probably want to configure your own identifiers/prefixes
     # so that you don't run into any conflicts with other kopf based
     # operators in the cluster. I recommend changing the following settings:
-    settings.peering.name = ""
-    settings.persistence.finalizer = ""
-    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(prefix="")
-    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(prefix="")
+    group = "kubernetes.dask.org"
+    settings.peering.name = group
+    settings.persistence.finalizer = group
+    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
+        prefix=group
+    )
+    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
+        prefix=group
+    )
 
 
 @kopf.on.create("daskcluster")
