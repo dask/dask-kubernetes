@@ -4,6 +4,7 @@ import asyncio
 import atexit
 from contextlib import suppress
 from enum import Enum
+import time
 from typing import ClassVar
 import weakref
 
@@ -374,11 +375,11 @@ class KubeCluster(Cluster):
                 name=f"{self.name}-cluster-{name}",
             )
 
-    def close(self):
+    def close(self, timeout=3600):
         """Delete the dask cluster"""
-        return self.sync(self._close)
+        return self.sync(self._close, timeout=timeout)
 
-    async def _close(self):
+    async def _close(self, timeout=None):
         await super()._close()
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -390,7 +391,12 @@ class KubeCluster(Cluster):
                     namespace=self.namespace,
                     name=self.cluster_name,
                 )
+            start = time.time()
             while (await self._get_cluster()) is not None:
+                if time.time() > start + timeout:
+                    raise TimeoutError(
+                        f"Timed out deleting cluster resource {self.cluster_name}"
+                    )
                 await asyncio.sleep(1)
 
     def scale(self, n, worker_group="default"):
@@ -551,9 +557,13 @@ class KubeCluster(Cluster):
 
 
 @atexit.register
-def close_clusters():
-    for cluster in list(KubeCluster._instances):
-        if cluster.shutdown_on_close:
-            with suppress(TimeoutError):
-                if cluster.status != Status.closed:
+def reap_clusters():
+    async def _reap_clusters():
+        for cluster in list(KubeCluster._instances):
+            if cluster.shutdown_on_close and cluster.status != Status.closed:
+                await ClusterAuth.load_first(cluster.auth)
+                with suppress(TimeoutError):
                     cluster.close(timeout=10)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_reap_clusters())
