@@ -121,7 +121,7 @@ async def configure(settings: kopf.OperatorSettings, **_: Any) -> None:
     # so that you don't run into any conflicts with other kopf based
     # operators in the cluster. I recommend changing the following settings:
     group = "kubernetes.dask.org"
-    settings.peering.name = group
+    settings.peering.name = "dask-kubernetes-operator"
     settings.persistence.finalizer = group
     settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
         prefix=group
