@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 from distributed.core import rpc
 
@@ -91,8 +92,38 @@ async def wait_for_service(api, service_name, namespace):
 
 
 @kopf.on.startup()
-async def startup(**kwargs):
+async def configure(settings: kopf.OperatorSettings, **_: Any) -> None:
+    # Authenticate with k8s
     await ClusterAuth.load_first()
+
+    # Set server and client timeouts to reconnect from time to time.
+    # In rare occasions the connection might go idle we will no longer receive any events.
+    # These timeouts should help in those cases.
+    # https://github.com/nolar/kopf/issues/698
+    # https://github.com/nolar/kopf/issues/204
+    settings.watching.server_timeout = 120
+    settings.watching.client_timeout = 150
+    settings.watching.connect_timeout = 5
+
+    # The default timeout is 300s which is usually to long
+    # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
+    settings.networking.request_timeout = 10
+
+    # With these settings you can enable leader election. Might not be
+    # relevant for the moment but something to keep in mind.
+    # You also need to create peering object which can be found here
+    # https://github.com/nolar/kopf/blob/main/peering.yaml
+    # https://kopf.readthedocs.io/en/latest/peering/
+    settings.peering.mandatory = True
+    settings.peering.clusterwide = True
+
+    # You will probably want to configure your own identifiers/prefixes
+    # so that you don't run into any conflicts with other kopf based
+    # operators in the cluster. I recommend changing the following settings:
+    settings.peering.name = ""
+    settings.persistence.finalizer = ""
+    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(prefix="")
+    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(prefix="")
 
 
 @kopf.on.create("daskcluster")
