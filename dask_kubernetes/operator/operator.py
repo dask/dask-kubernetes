@@ -1,4 +1,6 @@
 import asyncio
+import aiohttp
+import json
 
 from distributed.core import rpc
 
@@ -212,6 +214,13 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 worker_ids = await scheduler.workers_to_close(
                     n=-workers_needed, attribute="name"
                 )
+            async with aiohttp.ClientSession() as session:
+                params = {"n": -workers_needed}
+                async with session.post(
+                    "http://localhost:8787/api/v1/workers_to_close", json=params
+                ) as resp:
+                    workers_to_close = json.loads(await resp.text())["workers"]
+                    logger.info(f"Workers to close API: {workers_to_close}")
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
