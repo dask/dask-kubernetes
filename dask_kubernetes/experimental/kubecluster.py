@@ -563,7 +563,10 @@ def reap_clusters():
             if cluster.shutdown_on_close and cluster.status != Status.closed:
                 await ClusterAuth.load_first(cluster.auth)
                 with suppress(TimeoutError):
-                    cluster.close(timeout=10)
+                    if cluster.asynchronous:
+                        await cluster.close(timeout=10)
+                    else:
+                        cluster.close(timeout=10)
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_reap_clusters())
