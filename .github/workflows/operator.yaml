@@ -33,4 +33,5 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
+          TEST_ISTIO: "true"
         run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/experimental/tests
