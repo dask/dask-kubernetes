@@ -1,4 +1,5 @@
 import asyncio
+import copy
 
 from distributed.core import rpc
 
@@ -42,9 +43,8 @@ def build_scheduler_service_spec(name, spec):
     }
 
 
-def build_worker_pod_spec(name, cluster_name, n, spec):
-    worker_name = f"{name}-worker-{n}"
-    return {
+def build_worker_pod_spec(name, cluster_name, worker_name, spec):
+    pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
@@ -53,10 +53,17 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
                 "dask.org/cluster-name": cluster_name,
                 "dask.org/workergroup-name": name,
                 "dask.org/component": "worker",
+                "dask.org/worker-name": worker_name,
             },
         },
-        "spec": spec,
+        "spec": copy.copy(spec),
     }
+
+    pod_spec["spec"]["containers"][0]["env"].append(
+        {"name": "DASK_WORKER_NAME", "value": worker_name}
+    )
+
+    return pod_spec
 
 
 def build_worker_group_spec(name, spec):
@@ -67,6 +74,40 @@ def build_worker_group_spec(name, spec):
         "spec": {
             "cluster": name,
             "worker": spec,
+        },
+    }
+
+
+def build_worker_service_spec(cluster_name, worker_name):
+    return {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+            "name": f"{worker_name}-service",
+            "labels": {
+                "dask.org/cluster-name": cluster_name,
+            },
+        },
+        "spec": {
+            "type": "ClusterIP",
+            "selector": {
+                "dask.org/cluster-name": cluster_name,
+                "dask.org/worker-name": worker_name,
+            },
+            "ports": [
+                {
+                    "name": "comm",
+                    "protocol": "TCP",
+                    "port": 8788,
+                    "targetPort": "comm",
+                },
+                {
+                    "name": "dashboard",
+                    "protocol": "TCP",
+                    "port": 8787,
+                    "targetPort": "dashboard",
+                },
+            ],
         },
     }
 
@@ -194,8 +235,16 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 
         if workers_needed > 0:
             for _ in range(workers_needed):
+                worker_name = f"{name}-worker-{uuid4().hex[:10]}"
+                data = build_worker_service_spec(spec["cluster"], worker_name)
+                kopf.adopt(data)
+                await api.create_namespaced_service(
+                    namespace=namespace,
+                    body=data,
+                )
+                await wait_for_service(api, data["metadata"]["name"], namespace)
                 data = build_worker_pod_spec(
-                    name, spec["cluster"], uuid4().hex[:10], spec["worker"]["spec"]
+                    name, spec["cluster"], worker_name, spec["worker"]["spec"]
                 )
                 kopf.adopt(data)
                 await api.create_namespaced_pod(

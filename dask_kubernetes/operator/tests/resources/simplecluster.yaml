@@ -14,6 +14,21 @@ spec:
           args:
             - dask-worker
             - tcp://simple-cluster-service.default.svc.cluster.local:8786
+            - --name
+            - ${DASK_WORKER_NAME}
+            - --dashboard-address
+            - 0.0.0.0:8787
+            - --listen-address
+            - tcp://0.0.0.0:8788
+            - --contact-address
+            - tcp://${DASK_WORKER_NAME}.default.svc.cluster.local:8788
+          ports:
+            - name: comm
+              containerPort: 8788
+              protocol: TCP
+            - name: dashboard
+              containerPort: 8787
+              protocol: TCP
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name
