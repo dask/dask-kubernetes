@@ -48,11 +48,11 @@ spec:
 apiVersion: kopf.dev/v1
 kind: ClusterKopfPeering
 metadata:
-  name: default
+  name: dask-kubernetes-operator
 ---
 apiVersion: kopf.dev/v1
 kind: KopfPeering
 metadata:
   namespace: default
-  name: default
+  name: dask-kubernetes-operator
 ---
