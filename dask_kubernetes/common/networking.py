@@ -89,14 +89,20 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
 
 
 async def is_comm_open(ip, port, retries=10):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while retries > 0:
-        try:
-            async with Client(f"tcp://{ip}:{port}", asynchronous=True, timeout=2):
-                return True
-        except Exception:
-            time.sleep(0.5)
+        result = sock.connect_ex((ip, port))
+        if result == 0:
+            return True
+        else:
+            time.sleep(2)
             retries -= 1
     return False
+
+
+async def port_forward_dashboard(service_name, namespace):
+    port = await port_forward_service(service_name, namespace, 8787, 8787)
+    return port
 
 
 async def get_scheduler_address(service_name, namespace):

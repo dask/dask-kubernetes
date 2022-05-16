@@ -30,7 +30,10 @@ from ..common.utils import (
     namespace_default,
     escape,
 )
-from ..common.networking import get_external_address_for_scheduler_service
+from ..common.networking import (
+    get_external_address_for_scheduler_service,
+    port_forward_dashboard,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +215,10 @@ class Scheduler(Pod):
             self.service,
             service_name_resolution_retries=self._service_name_retries,
         )
+
+        await port_forward_dashboard(
+            self.service.metadata.name,
+            self.namespace)
 
         self.pdb = await self._create_pdb()
 
