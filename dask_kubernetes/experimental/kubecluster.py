@@ -558,17 +558,15 @@ class KubeCluster(Cluster):
 
 @atexit.register
 def reap_clusters():
-    with suppress(Exception):
+    async def _reap_clusters():
+        for cluster in list(KubeCluster._instances):
+            if cluster.shutdown_on_close and cluster.status != Status.closed:
+                await ClusterAuth.load_first(cluster.auth)
+                with suppress(TimeoutError):
+                    if cluster.asynchronous:
+                        await cluster.close(timeout=10)
+                    else:
+                        cluster.close(timeout=10)
 
-        async def _reap_clusters():
-            for cluster in list(KubeCluster._instances):
-                if cluster.shutdown_on_close and cluster.status != Status.closed:
-                    await ClusterAuth.load_first(cluster.auth)
-                    with suppress(TimeoutError):
-                        if cluster.asynchronous:
-                            await cluster.close(timeout=10)
-                        else:
-                            cluster.close(timeout=10)
-
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(_reap_clusters())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_reap_clusters())
