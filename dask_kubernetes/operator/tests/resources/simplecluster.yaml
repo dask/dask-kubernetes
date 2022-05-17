@@ -14,6 +14,7 @@ spec:
           args:
             - dask-worker
             - tcp://simple-cluster-service.default.svc.cluster.local:8786
+            - --no-nanny
             - --name
             - ${DASK_WORKER_NAME}
             - --dashboard-address
@@ -21,7 +22,9 @@ spec:
             - --listen-address
             - tcp://0.0.0.0:8788
             - --contact-address
-            - tcp://${DASK_WORKER_NAME}.default.svc.cluster.local:8788
+            - tcp://${DASK_WORKER_NAME}-service.default.svc.cluster.local:8788
+            # - sleep
+            # - "3600"
           ports:
             - name: comm
               containerPort: 8788
@@ -61,7 +64,7 @@ spec:
             - name: SCHEDULER_ENV
               value: hello-world
     service:
-      type: NodePort
+      type: ClusterIP
       selector:
         dask.org/cluster-name: simple-cluster
         dask.org/component: scheduler
