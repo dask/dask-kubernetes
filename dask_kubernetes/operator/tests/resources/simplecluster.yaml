@@ -11,20 +11,18 @@ spec:
         - name: worker
           image: "dask-kubernetes:dev"
           imagePullPolicy: "IfNotPresent"
+          command: ["dask-worker"]
           args:
-            - dask-worker
             - tcp://simple-cluster-service.default.svc.cluster.local:8786
             - --no-nanny
             - --name
-            - ${DASK_WORKER_NAME}
+            - $(DASK_WORKER_NAME)
             - --dashboard-address
             - 0.0.0.0:8787
             - --listen-address
             - tcp://0.0.0.0:8788
             - --contact-address
-            - tcp://${DASK_WORKER_NAME}-service.default.svc.cluster.local:8788
-            # - sleep
-            # - "3600"
+            - tcp://$(DASK_WORKER_NAME)-service.default.svc.cluster.local:8788
           ports:
             - name: comm
               containerPort: 8788
