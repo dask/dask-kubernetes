@@ -1,5 +1,4 @@
 import pytest
-import pytest_asyncio
 
 import asyncio
 from contextlib import asynccontextmanager
@@ -12,8 +11,8 @@ from dask.distributed import Client
 DIR = pathlib.Path(__file__).parent.absolute()
 
 
-@pytest_asyncio.fixture()
-async def gen_cluster(k8s_cluster):
+@pytest.fixture()
+def gen_cluster(k8s_cluster):
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
     @asynccontextmanager
