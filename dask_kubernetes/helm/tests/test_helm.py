@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 
 import subprocess
 import os.path
@@ -80,7 +81,7 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
     subprocess.check_output(["helm", "delete", "-n", test_namespace, release_name])
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
