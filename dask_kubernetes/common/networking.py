@@ -5,7 +5,6 @@ import subprocess
 import time
 from weakref import finalize
 
-from dask.distributed import Client
 import kubernetes_asyncio as kubernetes
 
 from .utils import check_dependency

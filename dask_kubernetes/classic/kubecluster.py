@@ -216,9 +216,7 @@ class Scheduler(Pod):
             service_name_resolution_retries=self._service_name_retries,
         )
 
-        await port_forward_dashboard(
-            self.service.metadata.name,
-            self.namespace)
+        await port_forward_dashboard(self.service.metadata.name, self.namespace)
 
         self.pdb = await self._create_pdb()
 

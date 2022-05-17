@@ -192,9 +192,7 @@ class KubeCluster(Cluster):
             await wait_for_scheduler(cluster_name, self.namespace)
             await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
-            await port_forward_dashboard(
-                f"{self.name}-cluster-service",
-                self.namespace)
+            await port_forward_dashboard(f"{self.name}-cluster-service", self.namespace)
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
@@ -214,9 +212,7 @@ class KubeCluster(Cluster):
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
-            await port_forward_dashboard(
-                f"{self.name}-cluster-service",
-                self.namespace)
+            await port_forward_dashboard(f"{self.name}-cluster-service", self.namespace)
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
