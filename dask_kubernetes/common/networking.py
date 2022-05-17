@@ -100,7 +100,7 @@ async def is_comm_open(ip, port, retries=10):
 
 
 async def port_forward_dashboard(service_name, namespace):
-    port = await port_forward_service(service_name, namespace, 8787, 8787)
+    port = await port_forward_service(service_name, namespace, 8787)
     return port
 
 

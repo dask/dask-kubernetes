@@ -216,8 +216,6 @@ class Scheduler(Pod):
             service_name_resolution_retries=self._service_name_retries,
         )
 
-        await port_forward_dashboard(self.service.metadata.name, self.namespace)
-
         self.pdb = await self._create_pdb()
 
     async def close(self, **kwargs):
@@ -630,6 +628,9 @@ class KubeCluster(SpecCluster):
         self.name = self.pod_template.metadata.generate_name
 
         await super()._start()
+
+        port = await port_forward_dashboard(self.name, self.namespace)
+        self.scheduler_info["services"]["dashboard"] = port
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
