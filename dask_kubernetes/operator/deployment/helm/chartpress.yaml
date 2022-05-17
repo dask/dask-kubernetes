@@ -21,3 +21,8 @@ charts:
     repo:
       git: dask/helm-chart
       published: https://helm.dask.org
+    images:
+      dask-kubernetes-operator:
+        imageName: ghcr.io/dask/dask-kubernetes-operator
+        dockerfilePath: ../Dockerfile
+        contextPath: ../../../../
