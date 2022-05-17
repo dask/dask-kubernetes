@@ -4,6 +4,7 @@ import subprocess
 import os.path
 
 import dask.config
+from distributed import Client
 from distributed.core import Status
 from dask_ctl.discovery import (
     list_discovery_methods,
@@ -120,6 +121,15 @@ def test_import():
     from distributed.deploy import Cluster
 
     assert issubclass(HelmCluster, Cluster)
+
+
+def test_loop(k8s_cluster, release, test_namespace):
+    from dask_kubernetes import HelmCluster
+
+    with Client(nthreads=[]) as client, HelmCluster(
+        release_name=release, namespace=test_namespace, loop=client.loop
+    ) as cluster:
+        assert cluster.loop is client.loop
 
 
 def test_raises_on_non_existant_release(k8s_cluster):
