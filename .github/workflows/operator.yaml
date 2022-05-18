@@ -18,6 +18,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -33,4 +34,5 @@ jobs:
       - name: Run tests
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
+          TEST_ISTIO: "true"
         run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/experimental/tests

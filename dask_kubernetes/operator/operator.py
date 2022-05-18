@@ -22,6 +22,7 @@ def build_scheduler_pod_spec(name, spec):
             "labels": {
                 "dask.org/cluster-name": name,
                 "dask.org/component": "scheduler",
+                "sidecar.istio.io/inject": "false",
             },
         },
         "spec": spec,
@@ -53,6 +54,7 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
                 "dask.org/cluster-name": cluster_name,
                 "dask.org/workergroup-name": name,
                 "dask.org/component": "worker",
+                "sidecar.istio.io/inject": "false",
             },
         },
         "spec": spec,
