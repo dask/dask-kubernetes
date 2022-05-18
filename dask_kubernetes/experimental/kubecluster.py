@@ -12,8 +12,13 @@ import kubernetes_asyncio as kubernetes
 
 from distributed.core import Status, rpc
 from distributed.deploy import Cluster
-
-from distributed.utils import Log, Logs, TimeoutError
+from distributed.utils import (
+    Log,
+    Logs,
+    TimeoutError,
+    LoopRunner,
+    format_dashboard_link,
+)
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.operator import (
@@ -23,6 +28,7 @@ from dask_kubernetes.operator import (
 
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
+    port_forward_dashboard,
     wait_for_scheduler,
 )
 
@@ -150,6 +156,11 @@ class KubeCluster(Cluster):
     def cluster_name(self):
         return f"{self.name}-cluster"
 
+    @property
+    def dashboard_link(self):
+        host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
+        return format_dashboard_link(host, self.forwarded_dashboard_port)
+
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
         cluster_exists = (await self._get_cluster()) is not None
@@ -199,6 +210,9 @@ class KubeCluster(Cluster):
             await wait_for_scheduler(cluster_name, self.namespace)
             await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
+            self.forwarded_dashboard_port = await port_forward_dashboard(
+                f"{self.name}-cluster-service", self.namespace
+            )
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
@@ -218,6 +232,9 @@ class KubeCluster(Cluster):
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
             self.scheduler_comm = rpc(await self._get_scheduler_address())
+            self.forwarded_dashboard_port = await port_forward_dashboard(
+                f"{self.name}-cluster-service", self.namespace
+            )
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
