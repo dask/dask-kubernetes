@@ -36,6 +36,16 @@ def k8s_cluster(kind_cluster, docker_image):
     del os.environ["KUBECONFIG"]
 
 
+@pytest.fixture(scope="session", autouse=True)
+def install_istio(k8s_cluster):
+    if bool(os.environ.get("TEST_ISTIO", False)):
+        check_dependency("istioctl")
+        subprocess.check_output(["istioctl", "install", "--set", "profile=demo", "-y"])
+        k8s_cluster.kubectl(
+            "label", "namespace", "default", "istio-injection=enabled", "--overwrite"
+        )
+
+
 @pytest.fixture(scope="session")
 def ns(k8s_cluster):
     return "default"
