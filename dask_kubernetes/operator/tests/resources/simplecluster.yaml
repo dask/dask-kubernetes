@@ -13,7 +13,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-worker
-            - tcp://simple-cluster-service.default.svc.cluster.local:8786
+            - tcp://simple-cluster-scheduler-service.default.svc.cluster.local:8786
             - --no-nanny
             - --name
             - $(DASK_WORKER_NAME)
@@ -49,13 +49,15 @@ spec:
               containerPort: 8787
               protocol: TCP
           readinessProbe:
-            tcpSocket:
-              port: comm
+            httpGet:
+              path: /health
+              port: dashboard
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            tcpSocket:
-              port: comm
+            httpGet:
+              path: /health
+              port: dashboard
             initialDelaySeconds: 15
             periodSeconds: 20
           env:
