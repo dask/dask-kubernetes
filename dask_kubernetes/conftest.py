@@ -17,7 +17,7 @@ check_dependency("docker")
 
 
 @pytest.fixture()
-async def kopf_runner(k8s_cluster):
+def kopf_runner(k8s_cluster):
     yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
 
 

@@ -15,9 +15,7 @@ from distributed.deploy import Cluster
 from distributed.utils import (
     Log,
     Logs,
-    LoopRunner,
     TimeoutError,
-    LoopRunner,
     format_dashboard_link,
 )
 
@@ -128,8 +126,6 @@ class KubeCluster(Cluster):
         n_workers=3,
         resources={},
         env=[],
-        loop=None,
-        asynchronous=False,
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
         create_mode=CreateMode.CREATE_OR_CONNECT,
@@ -147,12 +143,10 @@ class KubeCluster(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self.create_mode = create_mode
         self.shutdown_on_close = shutdown_on_close
-        self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
-        self.loop = self._loop_runner.loop
 
         self._instances.add(self)
 
-        super().__init__(asynchronous=asynchronous, **kwargs)
+        super().__init__(**kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)

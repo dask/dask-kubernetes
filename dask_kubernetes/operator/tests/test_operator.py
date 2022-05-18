@@ -12,7 +12,7 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 
 @pytest.fixture()
-async def gen_cluster(k8s_cluster):
+def gen_cluster(k8s_cluster):
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
     @asynccontextmanager
