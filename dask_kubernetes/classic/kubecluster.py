@@ -353,7 +353,7 @@ class KubeCluster(SpecCluster):
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
     **kwargs: dict
-        Additional keyword arguments to pass to LocalCluster
+        Additional keyword arguments to pass to SpecCluster
 
     Examples
     --------
