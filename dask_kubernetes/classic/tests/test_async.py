@@ -1,3 +1,4 @@
+import pytest_asyncio
 import asyncio
 import base64
 import getpass
@@ -42,14 +43,6 @@ def pod_spec(docker_image):
     )
 
 
-@pytest.fixture(scope="module")
-def event_loop(request):
-    """Override function-scoped fixture in pytest-asyncio."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest.fixture
 def user_env():
     """The env var USER is not always set on non-linux systems."""
@@ -64,19 +57,19 @@ def user_env():
 cluster_kwargs = {"asynchronous": True}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def remote_cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, deploy_mode="remote", **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client

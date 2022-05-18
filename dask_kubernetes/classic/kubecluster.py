@@ -12,7 +12,7 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.utils import Log, Logs
+from distributed.utils import format_dashboard_link, Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 
@@ -30,7 +30,10 @@ from ..common.utils import (
     namespace_default,
     escape,
 )
-from ..common.networking import get_external_address_for_scheduler_service
+from ..common.networking import (
+    get_external_address_for_scheduler_service,
+    port_forward_dashboard,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -350,7 +353,7 @@ class KubeCluster(SpecCluster):
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
     **kwargs: dict
-        Additional keyword arguments to pass to LocalCluster
+        Additional keyword arguments to pass to SpecCluster
 
     Examples
     --------
@@ -495,6 +498,11 @@ class KubeCluster(SpecCluster):
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
 
+    @property
+    def dashboard_link(self):
+        host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
+        return format_dashboard_link(host, self.forwarded_dashboard_port)
+
     def _get_pod_template(self, pod_template, pod_type):
         if not pod_template and dask.config.get(
             "kubernetes.{}-template".format(pod_type), None
@@ -625,6 +633,10 @@ class KubeCluster(SpecCluster):
         self.name = self.pod_template.metadata.generate_name
 
         await super()._start()
+
+        self.forwarded_dashboard_port = await port_forward_dashboard(
+            self.name, self.namespace
+        )
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):

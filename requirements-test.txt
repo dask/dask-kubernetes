@@ -1,8 +1,8 @@
 flake8>=3.7
 black>=18.9b0
 dask-ctl>=2021.3.0
-pytest>=5.3
-pytest-asyncio>=0.10.0
+pytest>=7.1
+pytest-asyncio>=0.17
 git+https://codeberg.org/hjacobs/pytest-kind.git
 pytest-timeout
 pytest-rerunfailures

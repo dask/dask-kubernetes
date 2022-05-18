@@ -17,7 +17,7 @@ check_dependency("docker")
 
 
 @pytest.fixture()
-async def kopf_runner(k8s_cluster):
+def kopf_runner(k8s_cluster):
     yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
 
 
@@ -34,6 +34,16 @@ def k8s_cluster(kind_cluster, docker_image):
     kind_cluster.load_docker_image(docker_image)
     yield kind_cluster
     del os.environ["KUBECONFIG"]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def install_istio(k8s_cluster):
+    if bool(os.environ.get("TEST_ISTIO", False)):
+        check_dependency("istioctl")
+        subprocess.check_output(["istioctl", "install", "--set", "profile=demo", "-y"])
+        k8s_cluster.kubectl(
+            "label", "namespace", "default", "istio-injection=enabled", "--overwrite"
+        )
 
 
 @pytest.fixture(scope="session")
