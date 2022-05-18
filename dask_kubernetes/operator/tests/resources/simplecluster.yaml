@@ -11,8 +11,8 @@ spec:
         - name: worker
           image: "dask-kubernetes:dev"
           imagePullPolicy: "IfNotPresent"
-          command: ["dask-worker"]
           args:
+            - dask-worker
             - tcp://simple-cluster-service.default.svc.cluster.local:8786
             - --no-nanny
             - --name
