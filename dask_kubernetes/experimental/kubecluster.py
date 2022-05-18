@@ -16,7 +16,6 @@ from distributed.utils import (
     Log,
     Logs,
     TimeoutError,
-    LoopRunner,
     format_dashboard_link,
 )
 
