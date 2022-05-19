@@ -2,17 +2,12 @@ import asyncio
 import aiohttp
 import json
 
-from distributed.core import rpc
-
 import kopf
 import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.common.networking import (
-    get_scheduler_address,
-)
 
 
 def build_scheduler_pod_spec(name, spec):
@@ -204,6 +199,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 data["spec"]["containers"][0]["args"].append(
                     f"--name={data['metadata']['name']}"
                 )
+                logger.info("Creating worker with config {data}")
                 kopf.adopt(data)
                 await api.create_namespaced_pod(
                     namespace=namespace,
@@ -213,12 +209,6 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
             )
         if workers_needed < 0:
-            service_name = f"{name.split('-')[0]}-cluster-service"
-            address = await get_scheduler_address(service_name, namespace)
-            async with rpc(address) as scheduler:
-                worker_ids = await scheduler.workers_to_close(
-                    n=-workers_needed, attribute="name"
-                )
             async with aiohttp.ClientSession() as session:
                 params = {"n": -workers_needed}
                 async with session.post(
@@ -226,6 +216,10 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 ) as resp:
                     retired_workers = json.loads(await resp.text())["workers"]
                     logger.info(f"Retired workers API: {retired_workers}")
+            worker_ids = [
+                retired_workers[worker_address]["name"]
+                for worker_address in retired_workers.keys()
+            ]
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
