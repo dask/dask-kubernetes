@@ -14,6 +14,8 @@ spec:
           args:
             - dask-worker
             - tcp://simple-cluster-service.default.svc.cluster.local:8786
+            - --name
+            - $(DASK_WORKER_NAME)
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name
@@ -46,7 +48,7 @@ spec:
             - name: SCHEDULER_ENV
               value: hello-world
     service:
-      type: NodePort
+      type: ClusterIP
       selector:
         dask.org/cluster-name: simple-cluster
         dask.org/component: scheduler

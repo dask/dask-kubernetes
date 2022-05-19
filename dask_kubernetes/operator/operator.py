@@ -45,7 +45,7 @@ def build_scheduler_service_spec(name, spec):
 
 def build_worker_pod_spec(name, cluster_name, n, spec):
     worker_name = f"{name}-worker-{n}"
-    return {
+    pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
@@ -59,6 +59,11 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
         },
         "spec": spec,
     }
+    for i in range(len(pod_spec["spec"]["containers"])):
+        pod_spec["spec"]["containers"][i]["env"].append(
+            {"name": "DASK_WORKER_NAME", "value": worker_name}
+        )
+    return pod_spec
 
 
 def build_worker_group_spec(name, spec):
@@ -208,9 +213,13 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
             )
         if workers_needed < 0:
-            service_name = f"{name.split('-')[0]}-cluster-service"
-            address = await get_scheduler_address(service_name, namespace)
-            async with rpc(address) as scheduler:
+            service_address = await get_scheduler_address(
+                f"{spec['cluster']}-service", namespace
+            )
+            logger.info(
+                f"Asking scheduler to retire {-workers_needed} on {service_address}"
+            )
+            async with rpc(service_address) as scheduler:
                 worker_ids = await scheduler.workers_to_close(
                     n=-workers_needed, attribute="name"
                 )
@@ -222,5 +231,5 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                     namespace=namespace,
                 )
             logger.info(
-                f"Scaled worker group {name} down to {spec['replicas']} workers."
+                f"Scaled worker group {name} down to {spec['worker']['replicas']} workers."
             )
