@@ -61,7 +61,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - -scheduler
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-scheduler
@@ -83,7 +83,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - name: dask-worker
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-worker
