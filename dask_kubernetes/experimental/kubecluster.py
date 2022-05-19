@@ -536,6 +536,8 @@ class KubeCluster(Cluster):
                         "args": [
                             "dask-worker",
                             f"tcp://{service_name}.{self.namespace}.svc.cluster.local:8786",
+                            "--name",
+                            "$(DASK_WORKER_NAME)",
                         ],
                         "env": env,
                         "resources": self.resources,
