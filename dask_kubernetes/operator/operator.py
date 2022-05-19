@@ -1,6 +1,6 @@
 import asyncio
-import aiohttp
-import json
+
+from distributed.core import rpc
 
 import kopf
 import kubernetes_asyncio as kubernetes
@@ -8,6 +8,9 @@ import kubernetes_asyncio as kubernetes
 from uuid import uuid4
 
 from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.common.networking import (
+    get_scheduler_address,
+)
 
 
 def build_scheduler_pod_spec(name, spec):
@@ -42,7 +45,7 @@ def build_scheduler_service_spec(name, spec):
 
 def build_worker_pod_spec(name, cluster_name, n, spec):
     worker_name = f"{name}-worker-{n}"
-    return {
+    pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
@@ -56,6 +59,11 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
         },
         "spec": spec,
     }
+    for i in range(len(pod_spec["spec"]["containers"])):
+        pod_spec["spec"]["containers"][i]["env"].append(
+            {"name": "DASK_WORKER_NAME", "value": worker_name}
+        )
+    return pod_spec
 
 
 def build_worker_group_spec(name, spec):
@@ -209,17 +217,16 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
             )
         if workers_needed < 0:
-            async with aiohttp.ClientSession() as session:
-                params = {"n": -workers_needed}
-                async with session.post(
-                    "http://localhost:8787/api/v1/retire_workers", json=params
-                ) as resp:
-                    retired_workers = json.loads(await resp.text())["workers"]
-                    logger.info(f"Retired workers API: {retired_workers}")
-            worker_ids = [
-                retired_workers[worker_address]["name"]
-                for worker_address in retired_workers.keys()
-            ]
+            service_address = await get_scheduler_address(
+                f"{spec['cluster']}-service", namespace
+            )
+            logger.info(
+                f"Asking scheduler to retire {-workers_needed} on {service_address}"
+            )
+            async with rpc(service_address) as scheduler:
+                worker_ids = await scheduler.workers_to_close(
+                    n=-workers_needed, attribute="name"
+                )
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
@@ -228,5 +235,5 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                     namespace=namespace,
                 )
             logger.info(
-                f"Scaled worker group {name} down to {spec['replicas']} workers."
+                f"Scaled worker group {name} down to {spec['worker']['replicas']} workers."
             )

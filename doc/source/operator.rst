@@ -86,6 +86,8 @@ Let's create an example called ``cluster.yaml`` with the following configuration
               - dask-worker
               # Note the name of the cluster service, which adds "-service" to the end
               - tcp://simple-cluster-service.default.svc.cluster.local:8786
+              - --name
+              - $(DASK_WORKER_NAME)
       scheduler:
         spec:
           containers:
@@ -299,6 +301,8 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
               - dask-worker
               # Note the name of the cluster service, which adds "-service" to the end
               - tcp://simple-cluster-service.default.svc.cluster.local:8786
+              - --name
+              - $(DASK_WORKER_NAME)
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
 the workers to join that cluster.
