@@ -8,6 +8,9 @@ import kubernetes_asyncio as kubernetes
 from uuid import uuid4
 
 from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.common.networking import (
+    get_scheduler_address,
+)
 
 
 def build_scheduler_pod_spec(name, spec):
@@ -201,7 +204,6 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 data = build_worker_pod_spec(
                     name, spec["cluster"], uuid4().hex, spec["worker"]["spec"]
                 )
-                logger.info("Creating worker with config {data}")
                 kopf.adopt(data)
                 await api.create_namespaced_pod(
                     namespace=namespace,
@@ -211,10 +213,13 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
             )
         if workers_needed < 0:
+            service_address = await get_scheduler_address(
+                f"{spec['cluster']}-service", namespace, port_name="dashboard"
+            )
             async with aiohttp.ClientSession() as session:
                 params = {"n": -workers_needed}
                 async with session.post(
-                    "http://localhost:8787/api/v1/retire_workers", json=params
+                    f"{service_address}/api/v1/retire_workers", json=params
                 ) as resp:
                     retired_workers = json.loads(await resp.text())["workers"]
                     logger.info(f"Retired workers API: {retired_workers}")
