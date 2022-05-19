@@ -535,7 +535,6 @@ class KubeCluster(Cluster):
                         "image": self.image,
                         "args": [
                             "dask-worker",
-                            f"tcp://{service_name}.{self.namespace}.svc.cluster.local:8786",
                             "--name",
                             "$(DASK_WORKER_NAME)",
                         ],
