@@ -14,7 +14,6 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-worker
-            - tcp://simple-cluster-service.default.svc.cluster.local:8786
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name

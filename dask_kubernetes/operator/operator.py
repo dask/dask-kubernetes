@@ -43,8 +43,8 @@ def build_scheduler_service_spec(name, spec):
     }
 
 
-def build_worker_pod_spec(name, cluster_name, n, spec):
-    worker_name = f"{name}-worker-{n}"
+def build_worker_pod_spec(worker_group_name, namespace, cluster_name, uuid, spec):
+    worker_name = f"{worker_group_name}-worker-{uuid}"
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -52,7 +52,7 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
             "name": worker_name,
             "labels": {
                 "dask.org/cluster-name": cluster_name,
-                "dask.org/workergroup-name": name,
+                "dask.org/workergroup-name": worker_group_name,
                 "dask.org/component": "worker",
                 "sidecar.istio.io/inject": "false",
             },
@@ -60,8 +60,17 @@ def build_worker_pod_spec(name, cluster_name, n, spec):
         "spec": spec,
     }
     for i in range(len(pod_spec["spec"]["containers"])):
-        pod_spec["spec"]["containers"][i]["env"].append(
-            {"name": "DASK_WORKER_NAME", "value": worker_name}
+        pod_spec["spec"]["containers"][i]["env"].extend(
+            [
+                {
+                    "name": "DASK_WORKER_NAME",
+                    "value": worker_name,
+                },
+                {
+                    "name": "DASK_SCHEDULER_ADDRESS",
+                    "value": f"tcp://{cluster_name}-service.{namespace}.svc.cluster.local:8786",
+                },
+            ]
         )
     return pod_spec
 
@@ -202,7 +211,11 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed > 0:
             for _ in range(workers_needed):
                 data = build_worker_pod_spec(
-                    name, spec["cluster"], uuid4().hex, spec["worker"]["spec"]
+                    worker_group_name=name,
+                    namespace=namespace,
+                    cluster_name=spec["cluster"],
+                    uuid=uuid4().hex[:10],
+                    spec=spec["worker"]["spec"],
                 )
                 kopf.adopt(data)
                 await api.create_namespaced_pod(
