@@ -59,7 +59,7 @@ that will be used as a template.
       - image: ghcr.io/dask/dask:latest
         imagePullPolicy: IfNotPresent
         args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
-        name: dask
+        name: dask-worker
         env:
           - name: EXTRA_PIP_PACKAGES
             value: git+https://github.com/dask/distributed
