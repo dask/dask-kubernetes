@@ -201,6 +201,9 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 data = build_worker_pod_spec(
                     name, spec["cluster"], uuid4().hex, spec["worker"]["spec"]
                 )
+                data["spec"]["containers"][0]["args"].append(
+                    f"--name={data['metadata']['name']}"
+                )
                 kopf.adopt(data)
                 await api.create_namespaced_pod(
                     namespace=namespace,
@@ -219,10 +222,10 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             async with aiohttp.ClientSession() as session:
                 params = {"n": -workers_needed}
                 async with session.post(
-                    "http://localhost:8787/api/v1/workers_to_close", json=params
+                    "http://localhost:8787/api/v1/retire_workers", json=params
                 ) as resp:
-                    workers_to_close = json.loads(await resp.text())["workers"]
-                    logger.info(f"Workers to close API: {workers_to_close}")
+                    retired_workers = json.loads(await resp.text())["workers"]
+                    logger.info(f"Retired workers API: {retired_workers}")
             # TODO: Check that were deting workers in the right worker group
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
