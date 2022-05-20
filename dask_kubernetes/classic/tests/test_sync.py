@@ -249,6 +249,15 @@ def test_pod_template_from_conf(docker_image):
             )
 
 
+def test_pod_template_with_custom_container_name(docker_image):
+    container_name = "my-custom-container"
+    spec = {"spec": {"containers": [{"name": container_name, "image": docker_image}]}}
+
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        with KubeCluster() as cluster:
+            assert cluster.pod_template.spec.containers[0].name == container_name
+
+
 def test_bad_args():
     with pytest.raises(FileNotFoundError) as info:
         KubeCluster("myfile.yaml")

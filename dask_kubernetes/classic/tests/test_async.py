@@ -369,6 +369,16 @@ async def test_pod_template_from_conf(docker_image):
 
 
 @pytest.mark.asyncio
+async def test_pod_template_with_custom_container_name(docker_image):
+    container_name = "my-custom-container"
+    spec = {"spec": {"containers": [{"name": container_name, "image": docker_image}]}}
+
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        async with KubeCluster(**cluster_kwargs) as cluster:
+            assert cluster.pod_template.spec.containers[0].name == container_name
+
+
+@pytest.mark.asyncio
 async def test_constructor_parameters(k8s_cluster, pod_spec):
     env = {"FOO": "BAR", "A": 1}
     async with KubeCluster(
