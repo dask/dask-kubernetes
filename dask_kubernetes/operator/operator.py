@@ -1,6 +1,5 @@
 import asyncio
 import aiohttp
-import json
 
 import kopf
 import kubernetes_asyncio as kubernetes
@@ -234,8 +233,11 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                 async with session.post(
                     f"{service_address}/api/v1/retire_workers", json=params
                 ) as resp:
-                    retired_workers = json.loads(await resp.text())["workers"]
-                    logger.info(f"Retired workers API: {retired_workers}")
+                    # This try block can be removed after https://github.com/dask/distributed/pull/6397 is merged
+                    try:
+                        retired_workers = await resp.json()
+                    except aiohttp.client_exceptions.ContentTypeError:
+                        retired_workers = await resp.json(content_type="text/json")
             worker_ids = [
                 retired_workers[worker_address]["name"]
                 for worker_address in retired_workers.keys()
