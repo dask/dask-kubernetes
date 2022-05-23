@@ -16,7 +16,6 @@ from distributed.utils import format_dashboard_link, Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 
-from ..constants import KUBECLUSTER_WORKER_CONTAINER_NAME
 from ..common.objects import (
     make_pod_from_dict,
     make_service_from_dict,
@@ -112,7 +111,7 @@ class Pod(ProcessInterface):
             log = await self.core_api.read_namespaced_pod_log(
                 self._pod.metadata.name,
                 self.namespace,
-                container=KUBECLUSTER_WORKER_CONTAINER_NAME,
+                container=self.pod_template.spec.containers[0].name,
             )
         except ApiException as e:
             if "waiting to start" in str(e):

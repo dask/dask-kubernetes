@@ -8,7 +8,7 @@ import json
 
 from kubernetes.client.configuration import Configuration
 
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 _FakeResponse = namedtuple("_FakeResponse", ["data"])
 
@@ -193,7 +193,7 @@ def make_pod_spec(
             restart_policy="Never",
             containers=[
                 client.V1Container(
-                    name=KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    name=KUBECLUSTER_CONTAINER_NAME,
                     image=image,
                     args=args,
                     env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],

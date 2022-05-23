@@ -9,7 +9,7 @@ from distributed.utils_test import loop, captured_logger  # noqa: F401
 from dask.utils import tmpfile
 
 from dask_kubernetes import KubeCluster, make_pod_spec
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -100,7 +100,7 @@ def dont_test_pod_template_yaml(docker_image, loop):
                     ],
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -146,7 +146,7 @@ def test_pod_template_yaml_expand_env_vars(docker_image, loop):
                         ],
                         "image": "${FOO_IMAGE}",
                         "imagePullPolicy": "IfNotPresent",
-                        "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                        "name": KUBECLUSTER_CONTAINER_NAME,
                     }
                 ]
             },
@@ -179,7 +179,7 @@ def test_pod_template_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -218,7 +218,7 @@ def test_pod_template_minimal_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         }
@@ -235,9 +235,7 @@ def test_pod_template_minimal_dict(docker_image, loop):
 def test_pod_template_from_conf(docker_image):
     spec = {
         "spec": {
-            "containers": [
-                {"name": KUBECLUSTER_WORKER_CONTAINER_NAME, "image": docker_image}
-            ]
+            "containers": [{"name": KUBECLUSTER_CONTAINER_NAME, "image": docker_image}]
         }
     }
 
@@ -245,8 +243,17 @@ def test_pod_template_from_conf(docker_image):
         with KubeCluster() as cluster:
             assert (
                 cluster.pod_template.spec.containers[0].name
-                == KUBECLUSTER_WORKER_CONTAINER_NAME
+                == KUBECLUSTER_CONTAINER_NAME
             )
+
+
+def test_pod_template_with_custom_container_name(docker_image):
+    container_name = "my-custom-container"
+    spec = {"spec": {"containers": [{"name": container_name, "image": docker_image}]}}
+
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        with KubeCluster() as cluster:
+            assert cluster.pod_template.spec.containers[0].name == container_name
 
 
 def test_bad_args():
@@ -318,7 +325,7 @@ def test_automatic_startup(docker_image):
                         "1",
                     ],
                     "image": docker_image,
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
