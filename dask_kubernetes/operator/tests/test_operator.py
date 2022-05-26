@@ -36,9 +36,35 @@ def gen_cluster(k8s_cluster):
     yield cm
 
 
+@pytest.fixture()
+def gen_job(k8s_cluster):
+    """Yields an instantiated context manager for creating/deleting a simple job."""
+
+    @asynccontextmanager
+    async def cm():
+        job_path = os.path.join(DIR, "resources", "simplejob.yaml")
+        job_name = "simple-job"
+
+        # Create cluster resource
+        k8s_cluster.kubectl("apply", "-f", job_path)
+        while job_name not in k8s_cluster.kubectl("get", "daskjobs"):
+            await asyncio.sleep(0.1)
+
+        try:
+            yield job_name
+        finally:
+            # Test: remove the wait=True, because I think this is blocking the operator
+            k8s_cluster.kubectl("delete", "-f", job_path)
+            while job_name in k8s_cluster.kubectl("get", "daskjobs"):
+                await asyncio.sleep(0.1)
+
+    yield cm
+
+
 def test_customresources(k8s_cluster):
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
+    assert "daskjobs.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
 
 def test_operator_runs(kopf_runner):
@@ -138,3 +164,32 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     assert "A DaskCluster has been created" in runner.stdout
     assert "A scheduler pod has been created" in runner.stdout
     assert "A worker group has been created" in runner.stdout
+
+
+@pytest.mark.asyncio
+async def test_job(k8s_cluster, kopf_runner, gen_job):
+    with kopf_runner as runner:
+        async with gen_job() as job:
+            assert job
+
+            cluster_name = f"{job}-cluster"
+            runner_name = f"{job}-runner"
+
+            # Assert that cluster is created
+            while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+            # Assert job pod is created
+            while runner_name not in k8s_cluster.kubectl("get", "po"):
+                await asyncio.sleep(0.1)
+
+            # Assert job pod runs to completion (will fail if doesn't connect to cluster)
+            while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):
+                await asyncio.sleep(0.1)
+
+            # Assert cluster is removed on completion
+            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+    assert "A DaskJob has been created" in runner.stdout
+    assert "Job succeeded, deleting Dask cluster." in runner.stdout
