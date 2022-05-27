@@ -65,8 +65,6 @@ Let's create an example called ``cluster.yaml`` with the following configuration
             imagePullPolicy: "IfNotPresent"
             args:
               - dask-worker
-              # Note the name of the cluster service, which adds "-service" to the end
-              - tcp://simple-cluster-service.default.svc.cluster.local:8786
               - --name
               - $(DASK_WORKER_NAME)
       scheduler:
