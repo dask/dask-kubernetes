@@ -11,13 +11,17 @@ from .utils import check_dependency
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None, service_name_resolution_retries=20
+    core_api,
+    service,
+    port_forward_cluster_ip=None,
+    service_name_resolution_retries=20,
+    port_name="comm",
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
         port.port
         for port in service.spec.ports
-        if port.name == service.metadata.name or port.name == "comm"
+        if port.name == service.metadata.name or port.name == port_name
     ]
     if service.spec.type == "LoadBalancer":
         lb = service.status.load_balancer.ingress[0]
@@ -104,13 +108,16 @@ async def port_forward_dashboard(service_name, namespace):
     return port
 
 
-async def get_scheduler_address(service_name, namespace):
+async def get_scheduler_address(service_name, namespace, port_name="comm"):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)
         port_forward_cluster_ip = None
         address = await get_external_address_for_scheduler_service(
-            api, service, port_forward_cluster_ip=port_forward_cluster_ip
+            api,
+            service,
+            port_forward_cluster_ip=port_forward_cluster_ip,
+            port_name=port_name,
         )
         return address
 
