@@ -65,16 +65,12 @@ def customresources(k8s_cluster):
     temp_dir = tempfile.TemporaryDirectory()
     crd_path = os.path.join(DIR, "operator", "customresources")
 
-    run_generate(
-        os.path.join(crd_path, "daskcluster.yaml"),
-        os.path.join(crd_path, "daskcluster.patch.yaml"),
-        os.path.join(temp_dir.name, "daskcluster.yaml"),
-    )
-    run_generate(
-        os.path.join(crd_path, "daskworkergroup.yaml"),
-        os.path.join(crd_path, "daskworkergroup.patch.yaml"),
-        os.path.join(temp_dir.name, "daskworkergroup.yaml"),
-    )
+    for crd in ["daskcluster", "daskworkergroup", "daskjob"]:
+        run_generate(
+            os.path.join(crd_path, f"{crd}.yaml"),
+            os.path.join(crd_path, f"{crd}.patch.yaml"),
+            os.path.join(temp_dir.name, f"{crd}.yaml"),
+        )
 
     k8s_cluster.kubectl("apply", "-f", temp_dir.name)
     yield

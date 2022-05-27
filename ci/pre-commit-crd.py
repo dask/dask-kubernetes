@@ -82,6 +82,7 @@ def main(version, *args):
             # TODO: Not sure how to do this other than hard-code the template names
             run_action("daskcluster.yaml", temp_dir, crd_path, output_paths)
             run_action("daskworkergroup.yaml", temp_dir, crd_path, output_paths)
+            run_action("daskjob.yaml", temp_dir, crd_path, output_paths)
 
         else:
             run_action(changed_file, temp_dir, crd_path, output_paths)

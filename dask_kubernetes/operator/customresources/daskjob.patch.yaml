@@ -1,0 +1,10 @@
+[
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/job/properties/spec/properties/containers/items/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/job/properties/spec/properties/initContainers/items/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/job/properties/spec/properties/restartPolicy/default", "value": "OnFailure"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/cluster/properties/spec/properties/worker/properties/spec/properties/initContainers/items/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/cluster/properties/spec/properties/worker/properties/spec/properties/containers/items/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/cluster/properties/spec/properties/scheduler/properties/service/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/cluster/properties/spec/properties/scheduler/properties/spec/properties/containers/items/properties/ports/items/properties/protocol/default", "value": "TCP"},
+  {"op": "add", "path": "/spec/versions/0/schema/openAPIV3Schema/properties/spec/properties/cluster/properties/spec/properties/scheduler/properties/spec/properties/initContainers/items/properties/ports/items/properties/protocol/default", "value": "TCP"}
+]
