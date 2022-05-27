@@ -30,14 +30,6 @@ spec:
                 job:
                   type: object
                   properties:
-                    completions:
-                      type: integer
-                      default: 1
-                      description: Number of times the job pod should run to completion
-                    parallelism:
-                      type: integer
-                      default: 1
-                      description: Number of instances of the job pod to run at once
                     spec:
                       $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
                 cluster:

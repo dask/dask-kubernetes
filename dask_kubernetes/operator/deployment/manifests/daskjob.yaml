@@ -5903,14 +5903,6 @@ spec:
                 type: object
               job:
                 properties:
-                  completions:
-                    default: 1
-                    description: Number of times the job pod should run to completion
-                    type: integer
-                  parallelism:
-                    default: 1
-                    description: Number of instances of the job pod to run at once
-                    type: integer
                   spec:
                     properties:
                       activeDeadlineSeconds:
