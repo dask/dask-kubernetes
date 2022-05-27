@@ -8,7 +8,7 @@ KubeCluster (experimental)
 Cluster manager
 ---------------
 
-The operator has a new cluster manager called :class:`dask_kubernetes.experimental.KubeCluster` that you can use to conveniently create and manage a Dask cluster in Python. Then connect a :class:`dask.distributed.Client` object to it directly and perform your work.
+The operator has a new cluster manager called :class:`dask_kubernetes.experimental.KubeCluster` that you can use to conveniently create and manage a Dask cluster in Python. Then connect a Dask :class:`distributed.Client` object to it directly and perform your work.
 
 The goal of the cluster manager is to abstract away the complexity of the Kubernetes resources and provide a clean and simple Python API to manager clusters while still getting all the benefits of the operator.
 
