@@ -137,6 +137,5 @@ async def wait_for_scheduler(cluster_name, namespace):
                     c.type: c.status for c in event["object"].status.conditions
                 }
                 if "Ready" in conditions and conditions["Ready"] == "True":
-                    print(event["object"].status)
                     watch.stop()
             await asyncio.sleep(0.1)
