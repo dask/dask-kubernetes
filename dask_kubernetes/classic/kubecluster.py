@@ -351,6 +351,9 @@ class KubeCluster(SpecCluster):
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
+    apply_default_affinity: str (optional)
+        Apply a default affinity to pods: "required", "preferred" or "none"
+        Defaults to ``"preferred"``.
     **kwargs: dict
         Additional keyword arguments to pass to SpecCluster
 
@@ -435,6 +438,7 @@ class KubeCluster(SpecCluster):
         scheduler_service_wait_timeout=None,
         scheduler_service_name_resolution_retries=None,
         scheduler_pod_template=None,
+        apply_default_affinity="preferred",
         **kwargs
     ):
         if isinstance(pod_template, str):
@@ -455,6 +459,7 @@ class KubeCluster(SpecCluster):
 
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
+        self.apply_default_affinity = apply_default_affinity
         self._generate_name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = dask.config.get(
             "kubernetes.namespace", override_with=namespace
@@ -558,14 +563,20 @@ class KubeCluster(SpecCluster):
             raise ValueError(msg)
 
         base_pod_template = self.pod_template
-        self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
+        self.pod_template = clean_pod_template(
+            self.pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="worker",
+        )
 
         if not self.scheduler_pod_template:
             self.scheduler_pod_template = base_pod_template
         self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
 
         self.scheduler_pod_template = clean_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
+            self.scheduler_pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="scheduler",
         )
 
         await ClusterAuth.load_first(self.auth)
