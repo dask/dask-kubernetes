@@ -465,9 +465,7 @@ class KubeCluster(Cluster):
                     {
                         "name": "scheduler",
                         "image": self.image,
-                        "args": [
-                            "dask-scheduler",
-                        ],
+                        "args": ["dask-scheduler", "--host", "0.0.0.0"],
                         "env": env,
                         "resources": self.resources,
                         "ports": [
