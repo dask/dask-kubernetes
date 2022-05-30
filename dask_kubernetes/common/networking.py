@@ -132,6 +132,11 @@ async def wait_for_scheduler(cluster_name, namespace):
             label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
             timeout_seconds=60,
         ):
-            if event["object"].status.phase == "Running":
-                watch.stop()
+            if event["object"].status.conditions:
+                conditions = {
+                    c.type: c.status for c in event["object"].status.conditions
+                }
+                if "Ready" in conditions and conditions["Ready"] == "True":
+                    print(event["object"].status)
+                    watch.stop()
             await asyncio.sleep(0.1)
