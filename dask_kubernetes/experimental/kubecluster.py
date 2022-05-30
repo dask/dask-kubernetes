@@ -481,12 +481,12 @@ class KubeCluster(Cluster):
                             },
                         ],
                         "readinessProbe": {
-                            "tcpSocket": {"port": "comm"},
+                            "httpGet": {"port": "dashboard", "path": "/health"},
                             "initialDelaySeconds": 5,
                             "periodSeconds": 10,
                         },
                         "livenessProbe": {
-                            "tcpSocket": {"port": "comm"},
+                            "httpGet": {"port": "dashboard", "path": "/health"},
                             "initialDelaySeconds": 15,
                             "periodSeconds": 20,
                         },

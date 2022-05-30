@@ -83,15 +83,17 @@ Let's create an example called ``cluster.yaml`` with the following configuration
                 containerPort: 8787
                 protocol: TCP
             readinessProbe:
-              tcpSocket:
-                port: comm
-                initialDelaySeconds: 5
-                periodSeconds: 10
+              httpGet:
+                port: dashboard
+                path: /health
+              initialDelaySeconds: 5
+              periodSeconds: 10
             livenessProbe:
-              tcpSocket:
-                port: comm
-                initialDelaySeconds: 15
-                periodSeconds: 20
+              httpGet:
+                port: dashboard
+                path: /health
+              initialDelaySeconds: 15
+              periodSeconds: 20
         service:
           type: NodePort
           selector:
@@ -388,13 +390,15 @@ Let's create an example called ``job.yaml`` with the following configuration:
                       containerPort: 8787
                       protocol: TCP
                   readinessProbe:
-                    tcpSocket:
-                      port: comm
+                    httpGet:
+                      port: dashboard
+                      path: /health
                     initialDelaySeconds: 5
                     periodSeconds: 10
                   livenessProbe:
-                    tcpSocket:
-                      port: comm
+                    httpGet:
+                      port: dashboard
+                      path: /health
                     initialDelaySeconds: 15
                     periodSeconds: 20
                   env:
