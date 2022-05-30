@@ -20,6 +20,7 @@ from distributed.utils import (
 )
 
 from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.common.utils import namespace_default
 from dask_kubernetes.operator import (
     build_cluster_spec,
     wait_for_service,
@@ -121,7 +122,7 @@ class KubeCluster(Cluster):
     def __init__(
         self,
         name,
-        namespace="default",
+        namespace=None,
         image="ghcr.io/dask/dask:latest",
         n_workers=3,
         resources={},
@@ -133,8 +134,7 @@ class KubeCluster(Cluster):
         **kwargs,
     ):
         self.name = name
-        # TODO: Set namespace to None and get default namespace from user's context
-        self.namespace = namespace
+        self.namespace = namespace or namespace_default()
         self.image = image
         self.n_workers = n_workers
         self.resources = resources

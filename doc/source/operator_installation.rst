@@ -34,8 +34,8 @@ This will create the appropriate roles, service accounts and a deployment for th
 .. code-block:: console
 
    $ kubectl get pods -A -l application=dask-kubernetes-operator
-   NAMESPACE     NAME                                        READY   STATUS    RESTARTS   AGE
-   kube-system   dask-kubernetes-operator-775b8bbbd5-zdrf7   1/1     Running   0          74s
+   NAMESPACE       NAME                                        READY   STATUS    RESTARTS   AGE
+   dask-operator   dask-kubernetes-operator-775b8bbbd5-zdrf7   1/1     Running   0          74s
 
 
 Installing with Helm
@@ -55,3 +55,18 @@ This will install the custom resource definitions, service account, roles, and t
 .. warning::
     Please note that `Helm does not support updating or deleting CRDs. <https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations>`_ If updates
     are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs.
+
+Kubeflow
+--------
+
+In order to use the Dask Operator with `Kubeflow <https://www.kubeflow.org/>`_ you need to perform some extra installation steps.
+
+User permissions
+^^^^^^^^^^^^^^^^
+
+Kubeflow doesn't know anything about our Dask custom resource definitions so we need to update the ``kubeflow-kubernetes-edit`` cluster role. This role
+allows users with cluster edit permissions to create pods, jobs and other resources and we need to add the Dask custom resources to that list.
+
+.. code-block:: console
+
+    $ kubectl patch clusterrole kubeflow-kubernetes-edit --patch '{"rules": [{"apiGroups": ["kubernetes.dask.org"],"resources": ["*"],"verbs": ["*"]}]}'

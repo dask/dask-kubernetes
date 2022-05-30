@@ -1,7 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: dask-operator
+    name: dask-operator
+  name: dask-operator
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: "kube-system"
+  namespace: dask-operator
   name: dask-kubernetes-operator
 spec:
   replicas: 1
@@ -24,7 +32,7 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: "kube-system"
+  namespace: dask-operator
   name: dask-kubernetes-operator
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -61,7 +69,7 @@ rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [create, delete, get, watch, list]
-  
+
   - apiGroups: [""]
     resources: [services]
     verbs: [create, delete, get, watch, list]
@@ -77,4 +85,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: dask-kubernetes-operator
-    namespace: "kube-system"
+    namespace: dask-operator
