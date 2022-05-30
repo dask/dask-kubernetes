@@ -15,7 +15,7 @@ async def get_external_address_for_scheduler_service(
     service,
     port_forward_cluster_ip=None,
     service_name_resolution_retries=20,
-    port_name="comm",
+    port_name="tcp-comm",
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -108,7 +108,7 @@ async def port_forward_dashboard(service_name, namespace):
     return port
 
 
-async def get_scheduler_address(service_name, namespace, port_name="comm"):
+async def get_scheduler_address(service_name, namespace, port_name="tcp-comm"):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)

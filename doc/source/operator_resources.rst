@@ -76,21 +76,21 @@ Let's create an example called ``cluster.yaml`` with the following configuration
             args:
               - dask-scheduler
             ports:
-              - name: comm
+              - name: tcp-comm
                 containerPort: 8786
                 protocol: TCP
-              - name: dashboard
+              - name: http-dashboard
                 containerPort: 8787
                 protocol: TCP
             readinessProbe:
               httpGet:
-                port: dashboard
+                port: http-dashboard
                 path: /health
               initialDelaySeconds: 5
               periodSeconds: 10
             livenessProbe:
               httpGet:
-                port: dashboard
+                port: http-dashboard
                 path: /health
               initialDelaySeconds: 15
               periodSeconds: 20
@@ -100,14 +100,14 @@ Let's create an example called ``cluster.yaml`` with the following configuration
             dask.org/cluster-name: simple-cluster
             dask.org/component: scheduler
           ports:
-          - name: comm
+          - name: tcp-comm
             protocol: TCP
             port: 8786
-            targetPort: "comm"
-          - name: dashboard
+            targetPort: "tcp-comm"
+          - name: http-dashboard
             protocol: TCP
             port: 8787
-            targetPort: "dashboard"
+            targetPort: "http-dashboard"
 
 Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now apply ``cluster.yaml``
 
@@ -383,21 +383,21 @@ Let's create an example called ``job.yaml`` with the following configuration:
                   args:
                     - dask-scheduler
                   ports:
-                    - name: comm
+                    - name: tcp-comm
                       containerPort: 8786
                       protocol: TCP
-                    - name: dashboard
+                    - name: http-dashboard
                       containerPort: 8787
                       protocol: TCP
                   readinessProbe:
                     httpGet:
-                      port: dashboard
+                      port: http-dashboard
                       path: /health
                     initialDelaySeconds: 5
                     periodSeconds: 10
                   livenessProbe:
                     httpGet:
-                      port: dashboard
+                      port: http-dashboard
                       path: /health
                     initialDelaySeconds: 15
                     periodSeconds: 20
@@ -410,14 +410,14 @@ Let's create an example called ``job.yaml`` with the following configuration:
                 dask.org/cluster-name: simple-job-cluster
                 dask.org/component: scheduler
               ports:
-                - name: comm
+                - name: tcp-comm
                   protocol: TCP
                   port: 8786
-                  targetPort: "comm"
-                - name: dashboard
+                  targetPort: "tcp-comm"
+                - name: http-dashboard
                   protocol: TCP
                   port: 8787
-                  targetPort: "dashboard"
+                  targetPort: "http-dashboard"
 
 
 Editing this file will change the default configuration of you Dask job. See the :ref:`config`. Now apply ``job.yaml``

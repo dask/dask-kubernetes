@@ -470,23 +470,23 @@ class KubeCluster(Cluster):
                         "resources": self.resources,
                         "ports": [
                             {
-                                "name": "comm",
+                                "name": "tcp-comm",
                                 "containerPort": 8786,
                                 "protocol": "TCP",
                             },
                             {
-                                "name": "dashboard",
+                                "name": "http-dashboard",
                                 "containerPort": 8787,
                                 "protocol": "TCP",
                             },
                         ],
                         "readinessProbe": {
-                            "httpGet": {"port": "dashboard", "path": "/health"},
+                            "httpGet": {"port": "http-dashboard", "path": "/health"},
                             "initialDelaySeconds": 5,
                             "periodSeconds": 10,
                         },
                         "livenessProbe": {
-                            "httpGet": {"port": "dashboard", "path": "/health"},
+                            "httpGet": {"port": "http-dashboard", "path": "/health"},
                             "initialDelaySeconds": 15,
                             "periodSeconds": 20,
                         },
@@ -501,16 +501,16 @@ class KubeCluster(Cluster):
                 },
                 "ports": [
                     {
-                        "name": "comm",
+                        "name": "tcp-comm",
                         "protocol": "TCP",
                         "port": 8786,
-                        "targetPort": "comm",
+                        "targetPort": "tcp-comm",
                     },
                     {
-                        "name": "dashboard",
+                        "name": "http-dashboard",
                         "protocol": "TCP",
                         "port": 8787,
-                        "targetPort": "dashboard",
+                        "targetPort": "http-dashboard",
                     },
                 ],
             },
