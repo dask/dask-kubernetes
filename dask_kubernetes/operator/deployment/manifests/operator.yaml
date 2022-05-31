@@ -61,18 +61,18 @@ rules:
 
   # Application: watching & handling for the custom resource we declare.
   - apiGroups: [kubernetes.dask.org]
-    resources: [daskclusters, daskworkergroups]
+    resources: [daskclusters, daskworkergroups, daskjobs]
     verbs: [get, list, watch, patch, create, delete]
 
   # Application: other resources it produces and manipulates.
   # Here, we create/delete Pods.
   - apiGroups: [""]
-    resources: [pods]
-    verbs: [create, delete, get, watch, list]
+    resources: [pods, pods/status]
+    verbs: ["*"]
 
   - apiGroups: [""]
     resources: [services]
-    verbs: [create, delete, get, watch, list]
+    verbs: ["*"]
 
   - apiGroups: ["", events.k8s.io]
     resources: [events]
