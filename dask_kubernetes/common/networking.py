@@ -6,6 +6,9 @@ import time
 from weakref import finalize
 
 import kubernetes_asyncio as kubernetes
+from tornado.iostream import StreamClosedError
+
+from distributed.core import rpc
 
 from .utils import check_dependency
 
@@ -139,3 +142,14 @@ async def wait_for_scheduler(cluster_name, namespace):
                 if "Ready" in conditions and conditions["Ready"] == "True":
                     watch.stop()
             await asyncio.sleep(0.1)
+
+
+async def wait_for_scheduler_comm(address):
+    while True:
+        try:
+            async with rpc(address) as scheduler_comm:
+                print(await scheduler_comm.versions())
+        except (StreamClosedError, OSError):
+            await asyncio.sleep(0.1)
+            continue
+        break

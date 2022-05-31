@@ -28,8 +28,8 @@ from dask_kubernetes.operator import (
 
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
-    port_forward_dashboard,
     wait_for_scheduler,
+    wait_for_scheduler_comm,
 )
 
 
@@ -208,10 +208,15 @@ class KubeCluster(Cluster):
                 ) from e
             await wait_for_scheduler(cluster_name, self.namespace)
             await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
-            self.forwarded_dashboard_port = await port_forward_dashboard(
-                f"{self.name}-cluster-service", self.namespace
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                f"{self.name}-cluster-service",
+                self.namespace,
+                port_name="http-dashboard",
             )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
@@ -230,10 +235,15 @@ class KubeCluster(Cluster):
             service_name = f'{cluster_spec["metadata"]["name"]}-service'
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
-            self.forwarded_dashboard_port = await port_forward_dashboard(
-                f"{self.name}-cluster-service", self.namespace
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                service_name,
+                self.namespace,
+                port_name="http-dashboard",
             )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
