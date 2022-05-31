@@ -148,7 +148,7 @@ async def wait_for_scheduler_comm(address):
     while True:
         try:
             async with rpc(address) as scheduler_comm:
-                print(await scheduler_comm.versions())
+                await scheduler_comm.versions()
         except (StreamClosedError, OSError):
             await asyncio.sleep(0.1)
             continue
