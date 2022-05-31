@@ -451,7 +451,7 @@ class KubeCluster(Cluster):
                 plural="daskworkergroups",
                 namespace=self.namespace,
                 name=f"{self.name}-cluster-{worker_group}-worker-group",
-                body={"spec": {"worker": {"replicas": n}}},
+                body={"spec": {"replicas": n}},
             )
 
     def adapt(self, *args, **kwargs):
