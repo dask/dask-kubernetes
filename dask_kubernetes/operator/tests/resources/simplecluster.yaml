@@ -27,20 +27,22 @@ spec:
           args:
             - dask-scheduler
           ports:
-            - name: comm
+            - name: tcp-comm
               containerPort: 8786
               protocol: TCP
-            - name: dashboard
+            - name: http-dashboard
               containerPort: 8787
               protocol: TCP
           readinessProbe:
-            tcpSocket:
-              port: comm
+            httpGet:
+              port: http-dashboard
+              path: /health
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            tcpSocket:
-              port: comm
+            httpGet:
+              port: http-dashboard
+              path: /health
             initialDelaySeconds: 15
             periodSeconds: 20
           env:
@@ -52,11 +54,11 @@ spec:
         dask.org/cluster-name: simple-cluster
         dask.org/component: scheduler
       ports:
-        - name: comm
+        - name: tcp-comm
           protocol: TCP
           port: 8786
-          targetPort: "comm"
-        - name: dashboard
+          targetPort: "tcp-comm"
+        - name: http-dashboard
           protocol: TCP
           port: 8787
-          targetPort: "dashboard"
+          targetPort: "http-dashboard"

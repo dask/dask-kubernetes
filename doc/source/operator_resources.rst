@@ -76,36 +76,38 @@ Let's create an example called ``cluster.yaml`` with the following configuration
             args:
               - dask-scheduler
             ports:
-              - name: comm
+              - name: tcp-comm
                 containerPort: 8786
                 protocol: TCP
-              - name: dashboard
+              - name: http-dashboard
                 containerPort: 8787
                 protocol: TCP
             readinessProbe:
-              tcpSocket:
-                port: comm
-                initialDelaySeconds: 5
-                periodSeconds: 10
+              httpGet:
+                port: http-dashboard
+                path: /health
+              initialDelaySeconds: 5
+              periodSeconds: 10
             livenessProbe:
-              tcpSocket:
-                port: comm
-                initialDelaySeconds: 15
-                periodSeconds: 20
+              httpGet:
+                port: http-dashboard
+                path: /health
+              initialDelaySeconds: 15
+              periodSeconds: 20
         service:
           type: NodePort
           selector:
             dask.org/cluster-name: simple-cluster
             dask.org/component: scheduler
           ports:
-          - name: comm
+          - name: tcp-comm
             protocol: TCP
             port: 8786
-            targetPort: "comm"
-          - name: dashboard
+            targetPort: "tcp-comm"
+          - name: http-dashboard
             protocol: TCP
             port: 8787
-            targetPort: "dashboard"
+            targetPort: "http-dashboard"
 
 Editing this file will change the default configuration of you Dask cluster. See the Configuration Reference :ref:`config`. Now apply ``cluster.yaml``
 
@@ -256,18 +258,20 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
             imagePullPolicy: "IfNotPresent"
             resources:
               requests:
-                memory: "2Gi"
+                memory: "32Gi"
               limits:
                 memory: "32Gi"
             args:
               - dask-worker
               - --name
               - $(DASK_WORKER_NAME)
+              - --resources
+              - MEMORY=32e9
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
 the workers to join that cluster.
 
-See the Configuration Reference :ref:`config`. Now apply ``highmemworkers.yaml``
+See the :ref:`config`. Now apply ``highmemworkers.yaml``
 
 .. code-block:: console
 
@@ -379,20 +383,22 @@ Let's create an example called ``job.yaml`` with the following configuration:
                   args:
                     - dask-scheduler
                   ports:
-                    - name: comm
+                    - name: tcp-comm
                       containerPort: 8786
                       protocol: TCP
-                    - name: dashboard
+                    - name: http-dashboard
                       containerPort: 8787
                       protocol: TCP
                   readinessProbe:
-                    tcpSocket:
-                      port: comm
+                    httpGet:
+                      port: http-dashboard
+                      path: /health
                     initialDelaySeconds: 5
                     periodSeconds: 10
                   livenessProbe:
-                    tcpSocket:
-                      port: comm
+                    httpGet:
+                      port: http-dashboard
+                      path: /health
                     initialDelaySeconds: 15
                     periodSeconds: 20
                   env:
@@ -404,17 +410,17 @@ Let's create an example called ``job.yaml`` with the following configuration:
                 dask.org/cluster-name: simple-job-cluster
                 dask.org/component: scheduler
               ports:
-                - name: comm
+                - name: tcp-comm
                   protocol: TCP
                   port: 8786
-                  targetPort: "comm"
-                - name: dashboard
+                  targetPort: "tcp-comm"
+                - name: http-dashboard
                   protocol: TCP
                   port: 8787
-                  targetPort: "dashboard"
+                  targetPort: "http-dashboard"
 
 
-Editing this file will change the default configuration of you Dask job. See the Configuration Reference :ref:`config`. Now apply ``job.yaml``
+Editing this file will change the default configuration of you Dask job. See the :ref:`config`. Now apply ``job.yaml``
 
 .. code-block:: console
 
