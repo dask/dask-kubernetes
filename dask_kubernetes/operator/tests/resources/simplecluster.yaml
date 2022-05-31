@@ -24,10 +24,10 @@ spec:
             - --contact-address
             - tcp://$(DASK_WORKER_NAME)-service.default.svc.cluster.local:8788
           ports:
-            - name: comm
+            - name: tcp-comm
               containerPort: 8788
               protocol: TCP
-            - name: dashboard
+            - name: http-dashboard
               containerPort: 8787
               protocol: TCP
           env:

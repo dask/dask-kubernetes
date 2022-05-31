@@ -163,16 +163,16 @@ def build_worker_service_spec(cluster_name, worker_name):
             },
             "ports": [
                 {
-                    "name": "comm",
+                    "name": "tcp-comm",
                     "protocol": "TCP",
                     "port": 8788,
-                    "targetPort": "comm",
+                    "targetPort": "tcp-comm",
                 },
                 {
-                    "name": "dashboard",
+                    "name": "http-dashboard",
                     "protocol": "TCP",
                     "port": 8787,
-                    "targetPort": "dashboard",
+                    "targetPort": "http-dashboard",
                 },
             ],
         },
