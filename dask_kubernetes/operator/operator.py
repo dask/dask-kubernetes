@@ -234,7 +234,7 @@ async def retire_workers(
     dashboard_address = await get_scheduler_address(
         scheduler_service_name,
         namespace,
-        port_name="dashboard",
+        port_name="http-dashboard",
     )
     async with aiohttp.ClientSession() as session:
         url = f"{dashboard_address}/api/v1/retire_workers"

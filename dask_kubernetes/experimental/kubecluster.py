@@ -20,6 +20,7 @@ from distributed.utils import (
 )
 
 from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.common.utils import namespace_default
 from dask_kubernetes.operator import (
     build_cluster_spec,
     wait_for_service,
@@ -27,8 +28,8 @@ from dask_kubernetes.operator import (
 
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
-    port_forward_dashboard,
     wait_for_scheduler,
+    wait_for_scheduler_comm,
 )
 
 
@@ -121,7 +122,7 @@ class KubeCluster(Cluster):
     def __init__(
         self,
         name,
-        namespace="default",
+        namespace=None,
         image="ghcr.io/dask/dask:latest",
         n_workers=3,
         resources={},
@@ -133,8 +134,7 @@ class KubeCluster(Cluster):
         **kwargs,
     ):
         self.name = name
-        # TODO: Set namespace to None and get default namespace from user's context
-        self.namespace = namespace
+        self.namespace = namespace or namespace_default()
         self.image = image
         self.n_workers = n_workers
         self.resources = resources
@@ -208,10 +208,15 @@ class KubeCluster(Cluster):
                 ) from e
             await wait_for_scheduler(cluster_name, self.namespace)
             await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
-            self.forwarded_dashboard_port = await port_forward_dashboard(
-                f"{self.name}-cluster-service", self.namespace
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                f"{self.name}-cluster-service",
+                self.namespace,
+                port_name="http-dashboard",
             )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
@@ -230,10 +235,15 @@ class KubeCluster(Cluster):
             service_name = f'{cluster_spec["metadata"]["name"]}-service'
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
-            self.forwarded_dashboard_port = await port_forward_dashboard(
-                f"{self.name}-cluster-service", self.namespace
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                service_name,
+                self.namespace,
+                port_name="http-dashboard",
             )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -465,30 +475,28 @@ class KubeCluster(Cluster):
                     {
                         "name": "scheduler",
                         "image": self.image,
-                        "args": [
-                            "dask-scheduler",
-                        ],
+                        "args": ["dask-scheduler", "--host", "0.0.0.0"],
                         "env": env,
                         "resources": self.resources,
                         "ports": [
                             {
-                                "name": "comm",
+                                "name": "tcp-comm",
                                 "containerPort": 8786,
                                 "protocol": "TCP",
                             },
                             {
-                                "name": "dashboard",
+                                "name": "http-dashboard",
                                 "containerPort": 8787,
                                 "protocol": "TCP",
                             },
                         ],
                         "readinessProbe": {
-                            "tcpSocket": {"port": "comm"},
+                            "httpGet": {"port": "http-dashboard", "path": "/health"},
                             "initialDelaySeconds": 5,
                             "periodSeconds": 10,
                         },
                         "livenessProbe": {
-                            "tcpSocket": {"port": "comm"},
+                            "httpGet": {"port": "http-dashboard", "path": "/health"},
                             "initialDelaySeconds": 15,
                             "periodSeconds": 20,
                         },
@@ -503,16 +511,16 @@ class KubeCluster(Cluster):
                 },
                 "ports": [
                     {
-                        "name": "comm",
+                        "name": "tcp-comm",
                         "protocol": "TCP",
                         "port": 8786,
-                        "targetPort": "comm",
+                        "targetPort": "tcp-comm",
                     },
                     {
-                        "name": "dashboard",
+                        "name": "http-dashboard",
                         "protocol": "TCP",
                         "port": 8787,
-                        "targetPort": "dashboard",
+                        "targetPort": "http-dashboard",
                     },
                 ],
             },
