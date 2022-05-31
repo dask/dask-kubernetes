@@ -224,14 +224,17 @@ class KubeCluster(Cluster):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             core_api = kubernetes.client.CoreV1Api(api_client)
             cluster_spec = await self._get_cluster()
-            self.image = cluster_spec["spec"]["worker"]["spec"]["containers"][0][
-                "image"
-            ]
+            container_spec = cluster_spec["spec"]["worker"]["spec"]["containers"][0]
+            self.image = container_spec["image"]
             self.n_workers = cluster_spec["spec"]["worker"]["replicas"]
-            self.resources = cluster_spec["spec"]["worker"]["spec"]["containers"][0][
-                "resources"
-            ]
-            self.env = cluster_spec["spec"]["worker"]["spec"]["containers"][0]["env"]
+            if "resources" in container_spec:
+                self.resources = container_spec["resources"]
+            else:
+                self.resources = None
+            if "env" in container_spec:
+                self.env = container_spec["env"]
+            else:
+                self.env = {}
             service_name = f'{cluster_spec["metadata"]["name"]}-service'
             await wait_for_scheduler(self.cluster_name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
