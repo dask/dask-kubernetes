@@ -5,11 +5,11 @@ import yaml
 import dask
 import pytest
 from dask.distributed import Client, wait
-from distributed.utils_test import loop, captured_logger  # noqa: F401
+from distributed.utils_test import captured_logger
 from dask.utils import tmpfile
 
 from dask_kubernetes import KubeCluster, make_pod_spec
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -75,17 +75,17 @@ def test_ipython_display(cluster):
         sleep(0.5)
 
 
-def test_env(pod_spec, loop):
-    with KubeCluster(pod_spec, env={"ABC": "DEF"}, loop=loop) as cluster:
+def test_env(pod_spec):
+    with KubeCluster(pod_spec, env={"ABC": "DEF"}) as cluster:
         cluster.scale(1)
-        with Client(cluster, loop=loop) as client:
+        with Client(cluster) as client:
             while not cluster.scheduler_info["workers"]:
                 sleep(0.1)
             env = client.run(lambda: dict(os.environ))
             assert all(v["ABC"] == "DEF" for v in env.values())
 
 
-def dont_test_pod_template_yaml(docker_image, loop):
+def dont_test_pod_template_yaml(docker_image):
     test_yaml = {
         "kind": "Pod",
         "metadata": {"labels": {"app": "dask", "component": "dask-worker"}},
@@ -100,7 +100,7 @@ def dont_test_pod_template_yaml(docker_image, loop):
                     ],
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -109,9 +109,9 @@ def dont_test_pod_template_yaml(docker_image, loop):
     with tmpfile(extension="yaml") as fn:
         with open(fn, mode="w") as f:
             yaml.dump(test_yaml, f)
-        with KubeCluster(f.name, loop=loop) as cluster:
+        with KubeCluster(f.name) as cluster:
             cluster.scale(2)
-            with Client(cluster, loop=loop) as client:
+            with Client(cluster) as client:
                 future = client.submit(lambda x: x + 1, 10)
                 result = future.result(timeout=10)
                 assert result == 11
@@ -128,7 +128,7 @@ def dont_test_pod_template_yaml(docker_image, loop):
                 assert all(client.has_what().values())
 
 
-def test_pod_template_yaml_expand_env_vars(docker_image, loop):
+def test_pod_template_yaml_expand_env_vars(docker_image):
     try:
         os.environ["FOO_IMAGE"] = docker_image
 
@@ -146,7 +146,7 @@ def test_pod_template_yaml_expand_env_vars(docker_image, loop):
                         ],
                         "image": "${FOO_IMAGE}",
                         "imagePullPolicy": "IfNotPresent",
-                        "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                        "name": KUBECLUSTER_CONTAINER_NAME,
                     }
                 ]
             },
@@ -155,13 +155,13 @@ def test_pod_template_yaml_expand_env_vars(docker_image, loop):
         with tmpfile(extension="yaml") as fn:
             with open(fn, mode="w") as f:
                 yaml.dump(test_yaml, f)
-            with KubeCluster(f.name, loop=loop) as cluster:
+            with KubeCluster(f.name) as cluster:
                 assert cluster.pod_template.spec.containers[0].image == docker_image
     finally:
         del os.environ["FOO_IMAGE"]
 
 
-def test_pod_template_dict(docker_image, loop):
+def test_pod_template_dict(docker_image):
     spec = {
         "metadata": {},
         "restartPolicy": "Never",
@@ -179,15 +179,15 @@ def test_pod_template_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
     }
 
-    with KubeCluster(spec, loop=loop) as cluster:
+    with KubeCluster(spec) as cluster:
         cluster.scale(2)
-        with Client(cluster, loop=loop) as client:
+        with Client(cluster) as client:
             future = client.submit(lambda x: x + 1, 10)
             result = future.result()
             assert result == 11
@@ -202,7 +202,7 @@ def test_pod_template_dict(docker_image, loop):
             assert all(client.has_what().values())
 
 
-def test_pod_template_minimal_dict(docker_image, loop):
+def test_pod_template_minimal_dict(docker_image):
     spec = {
         "spec": {
             "containers": [
@@ -218,15 +218,15 @@ def test_pod_template_minimal_dict(docker_image, loop):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         }
     }
 
-    with KubeCluster(spec, loop=loop) as cluster:
+    with KubeCluster(spec) as cluster:
         cluster.adapt()
-        with Client(cluster, loop=loop) as client:
+        with Client(cluster) as client:
             future = client.submit(lambda x: x + 1, 10)
             result = future.result()
             assert result == 11
@@ -235,9 +235,7 @@ def test_pod_template_minimal_dict(docker_image, loop):
 def test_pod_template_from_conf(docker_image):
     spec = {
         "spec": {
-            "containers": [
-                {"name": KUBECLUSTER_WORKER_CONTAINER_NAME, "image": docker_image}
-            ]
+            "containers": [{"name": KUBECLUSTER_CONTAINER_NAME, "image": docker_image}]
         }
     }
 
@@ -245,8 +243,17 @@ def test_pod_template_from_conf(docker_image):
         with KubeCluster() as cluster:
             assert (
                 cluster.pod_template.spec.containers[0].name
-                == KUBECLUSTER_WORKER_CONTAINER_NAME
+                == KUBECLUSTER_CONTAINER_NAME
             )
+
+
+def test_pod_template_with_custom_container_name(docker_image):
+    container_name = "my-custom-container"
+    spec = {"spec": {"containers": [{"name": container_name, "image": docker_image}]}}
+
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        with KubeCluster() as cluster:
+            assert cluster.pod_template.spec.containers[0].name == container_name
 
 
 def test_bad_args():
@@ -257,9 +264,9 @@ def test_bad_args():
         KubeCluster({"kind": "Pod"})
 
 
-def test_constructor_parameters(pod_spec, loop):
+def test_constructor_parameters(pod_spec):
     env = {"FOO": "BAR", "A": 1}
-    with KubeCluster(pod_spec, name="myname", loop=loop, env=env) as cluster:
+    with KubeCluster(pod_spec, name="myname", env=env) as cluster:
         pod = cluster.pod_template
 
         var = [v for v in pod.spec.containers[0].env if v.name == "FOO"]
@@ -318,7 +325,7 @@ def test_automatic_startup(docker_image):
                         "1",
                     ],
                     "image": docker_image,
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -373,7 +380,7 @@ def test_maximum(cluster):
         assert "scale beyond maximum number of workers" in result.lower()
 
 
-def test_extra_pod_config(docker_image, loop):
+def test_extra_pod_config(docker_image):
     """
     Test that our pod config merging process works fine
     """
@@ -381,7 +388,6 @@ def test_extra_pod_config(docker_image, loop):
         make_pod_spec(
             docker_image, extra_pod_config={"automountServiceAccountToken": False}
         ),
-        loop=loop,
         n_workers=0,
     ) as cluster:
 
@@ -390,7 +396,7 @@ def test_extra_pod_config(docker_image, loop):
         assert pod.spec.automount_service_account_token is False
 
 
-def test_extra_container_config(docker_image, loop):
+def test_extra_container_config(docker_image):
     """
     Test that our container config merging process works fine
     """
@@ -402,7 +408,6 @@ def test_extra_container_config(docker_image, loop):
                 "securityContext": {"runAsUser": 0},
             },
         ),
-        loop=loop,
         n_workers=0,
     ) as cluster:
 
@@ -412,7 +417,7 @@ def test_extra_container_config(docker_image, loop):
         assert pod.spec.containers[0].security_context == {"runAsUser": 0}
 
 
-def test_container_resources_config(docker_image, loop):
+def test_container_resources_config(docker_image):
     """
     Test container resource requests / limits being set properly
     """
@@ -420,7 +425,6 @@ def test_container_resources_config(docker_image, loop):
         make_pod_spec(
             docker_image, memory_request="0.5G", memory_limit="1G", cpu_limit="1"
         ),
-        loop=loop,
         n_workers=0,
     ) as cluster:
 
@@ -432,7 +436,7 @@ def test_container_resources_config(docker_image, loop):
         assert "cpu" not in pod.spec.containers[0].resources.requests
 
 
-def test_extra_container_config_merge(docker_image, loop):
+def test_extra_container_config_merge(docker_image):
     """
     Test that our container config merging process works recursively fine
     """
@@ -445,7 +449,6 @@ def test_extra_container_config_merge(docker_image, loop):
                 "args": ["last-item"],
             },
         ),
-        loop=loop,
         n_workers=0,
     ) as cluster:
 
@@ -457,7 +460,7 @@ def test_extra_container_config_merge(docker_image, loop):
         assert pod.spec.containers[0].args[-1] == "last-item"
 
 
-def test_worker_args(docker_image, loop):
+def test_worker_args(docker_image):
     """
     Test that dask-worker arguments are added to the container args
     """
@@ -467,7 +470,6 @@ def test_worker_args(docker_image, loop):
             memory_limit="5000M",
             resources="FOO=1 BAR=2",
         ),
-        loop=loop,
         n_workers=0,
     ) as cluster:
 

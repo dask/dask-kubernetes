@@ -30,11 +30,11 @@ kubernetes:
         dask.org/cluster-name: "" # Cluster name will be added automatically
         dask.org/component: scheduler
       ports:
-        - name: comm
+        - name: tcp-comm
           protocol: TCP
           port: 8786
           targetPort: 8786
-        - name: dashboard
+        - name: http-dashboard
           protocol: TCP
           port: 8787
           targetPort: 8787
@@ -61,7 +61,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - -scheduler
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-scheduler
@@ -83,7 +83,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - name: dask-worker
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-worker

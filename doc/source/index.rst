@@ -62,6 +62,9 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :caption: Operator
 
    operator
+   operator_installation
+   operator_resources
+   operator_kubecluster
 
 .. toctree::
    :maxdepth: 2

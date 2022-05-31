@@ -8,7 +8,7 @@ import json
 
 from kubernetes.client.configuration import Configuration
 
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 _FakeResponse = namedtuple("_FakeResponse", ["data"])
 
@@ -193,7 +193,7 @@ def make_pod_spec(
             restart_policy="Never",
             containers=[
                 client.V1Container(
-                    name=KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    name=KUBECLUSTER_CONTAINER_NAME,
                     image=image,
                     args=args,
                     env=[client.V1EnvVar(name=k, value=v) for k, v in env.items()],
@@ -243,7 +243,9 @@ def make_pdb_from_dict(dict_):
     )
 
 
-def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="worker"):
+def clean_pod_template(
+    pod_template, apply_default_affinity="preferred", pod_type="worker"
+):
     """Normalize pod template"""
     pod_template = copy.deepcopy(pod_template)
 
@@ -281,7 +283,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
         pod_template.spec.tolerations.extend(tolerations)
 
     # add default node affinity to k8s.dask.org/node-purpose=worker
-    if match_node_purpose != "ignore":
+    if apply_default_affinity != "none":
         # for readability
         affinity = pod_template.spec.affinity
 
@@ -299,7 +301,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
             ]
         )
 
-        if match_node_purpose == "require":
+        if apply_default_affinity == "required":
             if (
                 affinity.node_affinity.required_during_scheduling_ignored_during_execution
                 is None
@@ -310,7 +312,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
             affinity.node_affinity.required_during_scheduling_ignored_during_execution.node_selector_terms.append(
                 node_selector_term
             )
-        elif match_node_purpose == "prefer":
+        elif apply_default_affinity == "preferred":
             if (
                 affinity.node_affinity.preferred_during_scheduling_ignored_during_execution
                 is None
@@ -328,7 +330,7 @@ def clean_pod_template(pod_template, match_node_purpose="prefer", pod_type="work
             )
         else:
             raise ValueError(
-                'Attribute must be one of "ignore", "prefer", or "require".'
+                'Attribute apply_default_affinity must be one of "none", "preferred", or "required".'
             )
         pod_template.spec.affinity = affinity
 

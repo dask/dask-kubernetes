@@ -12,11 +12,10 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.utils import Log, Logs
+from distributed.utils import format_dashboard_link, Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 
-from ..constants import KUBECLUSTER_WORKER_CONTAINER_NAME
 from ..common.objects import (
     make_pod_from_dict,
     make_service_from_dict,
@@ -30,7 +29,10 @@ from ..common.utils import (
     namespace_default,
     escape,
 )
-from ..common.networking import get_external_address_for_scheduler_service
+from ..common.networking import (
+    get_external_address_for_scheduler_service,
+    port_forward_dashboard,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,7 @@ class Pod(ProcessInterface):
             log = await self.core_api.read_namespaced_pod_log(
                 self._pod.metadata.name,
                 self.namespace,
-                container=KUBECLUSTER_WORKER_CONTAINER_NAME,
+                container=self.pod_template.spec.containers[0].name,
             )
         except ApiException as e:
             if "waiting to start" in str(e):
@@ -349,8 +351,11 @@ class KubeCluster(SpecCluster):
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
+    apply_default_affinity: str (optional)
+        Apply a default affinity to pods: "required", "preferred" or "none"
+        Defaults to ``"preferred"``.
     **kwargs: dict
-        Additional keyword arguments to pass to LocalCluster
+        Additional keyword arguments to pass to SpecCluster
 
     Examples
     --------
@@ -433,6 +438,7 @@ class KubeCluster(SpecCluster):
         scheduler_service_wait_timeout=None,
         scheduler_service_name_resolution_retries=None,
         scheduler_pod_template=None,
+        apply_default_affinity="preferred",
         **kwargs
     ):
         if isinstance(pod_template, str):
@@ -453,6 +459,7 @@ class KubeCluster(SpecCluster):
 
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
+        self.apply_default_affinity = apply_default_affinity
         self._generate_name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = dask.config.get(
             "kubernetes.namespace", override_with=namespace
@@ -494,6 +501,11 @@ class KubeCluster(SpecCluster):
         self.auth = auth
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
+
+    @property
+    def dashboard_link(self):
+        host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
+        return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     def _get_pod_template(self, pod_template, pod_type):
         if not pod_template and dask.config.get(
@@ -551,14 +563,20 @@ class KubeCluster(SpecCluster):
             raise ValueError(msg)
 
         base_pod_template = self.pod_template
-        self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
+        self.pod_template = clean_pod_template(
+            self.pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="worker",
+        )
 
         if not self.scheduler_pod_template:
             self.scheduler_pod_template = base_pod_template
         self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
 
         self.scheduler_pod_template = clean_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
+            self.scheduler_pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="scheduler",
         )
 
         await ClusterAuth.load_first(self.auth)
@@ -625,6 +643,10 @@ class KubeCluster(SpecCluster):
         self.name = self.pod_template.metadata.generate_name
 
         await super()._start()
+
+        self.forwarded_dashboard_port = await port_forward_dashboard(
+            self.name, self.namespace
+        )
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):

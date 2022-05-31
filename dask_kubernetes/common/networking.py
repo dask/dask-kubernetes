@@ -5,20 +5,26 @@ import subprocess
 import time
 from weakref import finalize
 
-from dask.distributed import Client
 import kubernetes_asyncio as kubernetes
+from tornado.iostream import StreamClosedError
+
+from distributed.core import rpc
 
 from .utils import check_dependency
 
 
 async def get_external_address_for_scheduler_service(
-    core_api, service, port_forward_cluster_ip=None, service_name_resolution_retries=20
+    core_api,
+    service,
+    port_forward_cluster_ip=None,
+    service_name_resolution_retries=20,
+    port_name="tcp-comm",
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
         port.port
         for port in service.spec.ports
-        if port.name == service.metadata.name or port.name == "comm"
+        if port.name == service.metadata.name or port.name == port_name
     ]
     if service.spec.type == "LoadBalancer":
         lb = service.status.load_balancer.ingress[0]
@@ -89,23 +95,32 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
 
 
 async def is_comm_open(ip, port, retries=10):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while retries > 0:
-        try:
-            async with Client(f"tcp://{ip}:{port}", asynchronous=True, timeout=2):
-                return True
-        except Exception:
-            time.sleep(0.5)
+        result = sock.connect_ex((ip, port))
+        if result == 0:
+            return True
+        else:
+            time.sleep(2)
             retries -= 1
     return False
 
 
-async def get_scheduler_address(service_name, namespace):
+async def port_forward_dashboard(service_name, namespace):
+    port = await port_forward_service(service_name, namespace, 8787)
+    return port
+
+
+async def get_scheduler_address(service_name, namespace, port_name="tcp-comm"):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)
         port_forward_cluster_ip = None
         address = await get_external_address_for_scheduler_service(
-            api, service, port_forward_cluster_ip=port_forward_cluster_ip
+            api,
+            service,
+            port_forward_cluster_ip=port_forward_cluster_ip,
+            port_name=port_name,
         )
         return address
 
@@ -120,6 +135,21 @@ async def wait_for_scheduler(cluster_name, namespace):
             label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
             timeout_seconds=60,
         ):
-            if event["object"].status.phase == "Running":
-                watch.stop()
+            if event["object"].status.conditions:
+                conditions = {
+                    c.type: c.status for c in event["object"].status.conditions
+                }
+                if "Ready" in conditions and conditions["Ready"] == "True":
+                    watch.stop()
             await asyncio.sleep(0.1)
+
+
+async def wait_for_scheduler_comm(address):
+    while True:
+        try:
+            async with rpc(address) as scheduler_comm:
+                await scheduler_comm.versions()
+        except (StreamClosedError, OSError):
+            await asyncio.sleep(0.1)
+            continue
+        break

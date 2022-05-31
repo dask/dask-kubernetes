@@ -1,3 +1,4 @@
+import pytest_asyncio
 import asyncio
 import base64
 import getpass
@@ -23,7 +24,7 @@ from dask_kubernetes import (
 from dask.utils import tmpfile
 from distributed.utils_test import captured_logger
 
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")
@@ -42,14 +43,6 @@ def pod_spec(docker_image):
     )
 
 
-@pytest.fixture(scope="module")
-def event_loop(request):
-    """Override function-scoped fixture in pytest-asyncio."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest.fixture
 def user_env():
     """The env var USER is not always set on non-linux systems."""
@@ -64,19 +57,19 @@ def user_env():
 cluster_kwargs = {"asynchronous": True}
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def remote_cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, deploy_mode="remote", **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
@@ -224,7 +217,7 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
                     ],
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -269,7 +262,7 @@ async def test_pod_expand_env_vars(k8s_cluster, docker_image):
                         ],
                         "image": "${FOO_IMAGE}",
                         "imagePullPolicy": "IfNotPresent",
-                        "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                        "name": KUBECLUSTER_CONTAINER_NAME,
                     }
                 ]
             },
@@ -303,7 +296,7 @@ async def test_pod_template_dict(docker_image):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
@@ -343,7 +336,7 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
                     "command": None,
                     "image": docker_image,
                     "imagePullPolicy": "IfNotPresent",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         }
@@ -361,9 +354,7 @@ async def test_pod_template_minimal_dict(k8s_cluster, docker_image):
 async def test_pod_template_from_conf(docker_image):
     spec = {
         "spec": {
-            "containers": [
-                {"name": KUBECLUSTER_WORKER_CONTAINER_NAME, "image": docker_image}
-            ]
+            "containers": [{"name": KUBECLUSTER_CONTAINER_NAME, "image": docker_image}]
         }
     }
 
@@ -371,8 +362,18 @@ async def test_pod_template_from_conf(docker_image):
         async with KubeCluster(**cluster_kwargs) as cluster:
             assert (
                 cluster.pod_template.spec.containers[0].name
-                == KUBECLUSTER_WORKER_CONTAINER_NAME
+                == KUBECLUSTER_CONTAINER_NAME
             )
+
+
+@pytest.mark.asyncio
+async def test_pod_template_with_custom_container_name(docker_image):
+    container_name = "my-custom-container"
+    spec = {"spec": {"containers": [{"name": container_name, "image": docker_image}]}}
+
+    with dask.config.set({"kubernetes.worker-template": spec}):
+        async with KubeCluster(**cluster_kwargs) as cluster:
+            assert cluster.pod_template.spec.containers[0].name == container_name
 
 
 @pytest.mark.asyncio
@@ -574,7 +575,7 @@ async def test_automatic_startup(k8s_cluster, docker_image):
                         "1",
                     ],
                     "image": docker_image,
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                 }
             ]
         },
