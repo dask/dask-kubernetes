@@ -133,7 +133,6 @@ class KubeCluster(Cluster):
         shutdown_on_close=None,
         **kwargs,
     ):
-        self.name = name
         self.namespace = namespace or namespace_default()
         self.image = image
         self.n_workers = n_workers
@@ -146,7 +145,7 @@ class KubeCluster(Cluster):
 
         self._instances.add(self)
 
-        super().__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
