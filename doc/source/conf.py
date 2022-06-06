@@ -86,7 +86,9 @@ language = None
 exclude_patterns = []
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "default"
+# Commenting this out for now, if we register dask pygments,
+# then eventually this line can be:
+# pygments_style = "dask"
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False

@@ -2,4 +2,4 @@ numpydoc
 sphinx
 sphinx-reredirects
 sphinxcontrib-mermaid
-dask_sphinx_theme>=2
+dask-sphinx-theme>=3.0.0
