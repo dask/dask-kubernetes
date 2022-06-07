@@ -31,7 +31,7 @@ from ..common.utils import (
 )
 from ..common.networking import (
     get_external_address_for_scheduler_service,
-    port_forward_dashboard,
+    get_scheduler_address,
 )
 
 logger = logging.getLogger(__name__)
@@ -644,9 +644,12 @@ class KubeCluster(SpecCluster):
 
         await super()._start()
 
-        self.forwarded_dashboard_port = await port_forward_dashboard(
-            self.name, self.namespace
+        dashboard_address = await get_scheduler_address(
+            self.scheduler.service.metadata.name,
+            self.namespace,
+            port_name="http-dashboard",
         )
+        self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
