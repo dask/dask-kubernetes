@@ -89,11 +89,13 @@ class HelmCluster(Cluster):
         worker_name="worker",
         node_host=None,
         node_port=None,
+        name=None,
         **kwargs,
     ):
         self.release_name = release_name
         self.namespace = namespace or namespace_default()
-        self.name = self.release_name + "." + self.namespace
+        if name is None:
+            name = self.release_name + "." + self.namespace
         check_dependency("helm")
         check_dependency("kubectl")
         status = subprocess.run(
@@ -113,7 +115,7 @@ class HelmCluster(Cluster):
         self.node_host = node_host
         self.node_port = node_port
 
-        super().__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)

@@ -21,10 +21,10 @@ from dask_ctl.discovery import (
 @pytest.fixture(scope="session")
 def chart_repo():
     repo_name = "dask"
-    subprocess.check_output(
-        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"]
+    subprocess.run(
+        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"], check=True
     )
-    subprocess.check_output(["helm", "repo", "update"])
+    subprocess.run(["helm", "repo", "update"], check=True)
     return repo_name
 
 
@@ -51,7 +51,7 @@ def test_namespace():
 
 @pytest.fixture(scope="session")  # Creating this fixture is slow so we should reuse it.
 def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
-    subprocess.check_output(
+    subprocess.run(
         [
             "helm",
             "install",
@@ -63,10 +63,11 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
             "--wait",
             "-f",
             config_path,
-        ]
+        ],
+        check=True,
     )
     # Scale back the additional workers group for now
-    subprocess.check_output(
+    subprocess.run(
         [
             "kubectl",
             "scale",
@@ -75,10 +76,11 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
             "deployment",
             f"{release_name}-dask-worker-foo",
             "--replicas=0",
-        ]
+        ],
+        check=True,
     )
     yield release_name
-    subprocess.check_output(["helm", "delete", "-n", test_namespace, release_name])
+    subprocess.run(["helm", "delete", "-n", test_namespace, release_name], check=True)
 
 
 @pytest_asyncio.fixture
