@@ -26,3 +26,5 @@ charts:
         imageName: ghcr.io/dask/dask-kubernetes-operator
         dockerfilePath: ../Dockerfile
         contextPath: ../../../../
+        valuesPath:
+          - image
