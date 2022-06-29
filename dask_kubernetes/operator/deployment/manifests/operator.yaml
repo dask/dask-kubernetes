@@ -24,6 +24,7 @@ spec:
         application: dask-kubernetes-operator
     spec:
       serviceAccountName: dask-kubernetes-operator
+      hostNetwork: true
       containers:
         - name: operator
           image: ghcr.io/dask/dask-kubernetes-operator:latest
