@@ -3,6 +3,3 @@ distributed>=2021.02.0
 kubernetes>=12.0.1
 kubernetes-asyncio>=12.0.1
 kopf>=1.35.3
-bokeh>=2.4.3
-ipywidgets>=7.7.1
-numpy==1.23.0

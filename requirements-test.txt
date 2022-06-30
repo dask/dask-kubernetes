@@ -7,3 +7,6 @@ git+https://codeberg.org/hjacobs/pytest-kind.git
 pytest-timeout
 pytest-rerunfailures
 git+http://github.com/elemental-lf/k8s-crd-resolver
+bokeh>=2.4.3
+ipywidgets>=7.7.1
+numpy>=1.23.0
