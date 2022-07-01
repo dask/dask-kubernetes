@@ -23,6 +23,7 @@ from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.utils import namespace_default
 from dask_kubernetes.operator import (
     build_cluster_spec,
+    build_autoscaler_spec,
     wait_for_service,
 )
 
@@ -593,3 +594,30 @@ def reap_clusters():
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_reap_clusters())
+
+    def adapt(self, minimum, maximum):
+        """Turn on adaptivity
+        Parameters
+        ----------
+        minimum : int
+            Minimum number of workers
+        maximum : int
+            Maximum number of workers
+        Examples
+        --------
+        >>> cluster.adapt(30, 50)  # adaptively scale between 30 and 50 workers
+        """
+
+        return self.sync(self._adapt, minimum, maximum)
+
+    async def _adapt(self, minimum, maximum):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            data = build_autoscaler_spec(minimum, maximum)
+            await custom_objects_api.create_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskautoscalers",
+                namespace=self.namespace,
+                body=data,
+            )
