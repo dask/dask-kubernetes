@@ -28,6 +28,10 @@ Tests are run using `pytest <https://docs.pytest.org/en/stable/>`_::
     ...
     ================= 56 passed, 1 skipped, 6 xfailed, 1 xpassed, 53 warnings in 404.19s (0:06:44) ==================
 
+
+.. note::
+    Running ``pytest``, installs the `Custom Resource Definitions from the manifests <https://kubernetes.dask.org/en/latest/operator_installation.html#installing-with-manifests>`_,  tests against them and then uninstalls them. You may have to install them again manually.
+
 Kind
 ----
 
