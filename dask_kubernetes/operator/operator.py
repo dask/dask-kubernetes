@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 from contextlib import suppress
+import pkg_resources
 
 import kopf
 import kubernetes_asyncio as kubernetes
@@ -13,6 +14,12 @@ from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
 )
+
+# Load operator plugins from other packages
+PLUGINS = []
+for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
+    with suppress(AttributeError, ImportError):
+        PLUGINS.append(ep.load())
 
 
 def build_scheduler_pod_spec(name, spec):
