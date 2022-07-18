@@ -95,8 +95,8 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
 
 
 async def is_comm_open(ip, port, retries=10):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     while retries > 0:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex((ip, port))
         if result == 0:
             return True
