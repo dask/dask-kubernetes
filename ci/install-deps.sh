@@ -5,5 +5,5 @@ mv istio-*/bin/istioctl /usr/local/bin/istioctl
 
 pip install -e .
 pip install -r requirements-test.txt
-pip install git+https://github.com/dask/distributed@main
-pip install git+https://github.com/dask/dask@main
+pip install git+https://github.com/dask/distributed@2022.7.0
+pip install git+https://github.com/dask/dask@2022.7.0
