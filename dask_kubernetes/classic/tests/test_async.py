@@ -144,7 +144,7 @@ async def test_diagnostics_link_env_variable(k8s_cluster, pod_spec, user_env):
         async with KubeCluster(pod_spec, asynchronous=True) as cluster:
             port = cluster.scheduler_info["services"]["dashboard"]
 
-            assert port in cluster.dashboard_link
+            assert str(port) in cluster.dashboard_link
 
             assert (
                 "foo-" + getpass.getuser() + "-" + str(port) in cluster.dashboard_link
