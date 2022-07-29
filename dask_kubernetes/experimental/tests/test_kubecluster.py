@@ -19,6 +19,17 @@ def test_kubecluster(cluster):
         assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
+def test_custom_worker_command(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="customworker",
+            docker_image=docker_image,
+            worker_command=["python", "-m", "distributed.cli.dask_worker"],
+        ) as cluster:
+            with Client(cluster) as client:
+                assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
 def test_multiple_clusters(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(name="bar", image=docker_image) as cluster1:
