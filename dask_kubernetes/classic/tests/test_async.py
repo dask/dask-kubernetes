@@ -142,9 +142,7 @@ async def test_diagnostics_link_env_variable(k8s_cluster, pod_spec, user_env):
     pytest.importorskip("bokeh")
     with dask.config.set({"distributed.dashboard.link": "foo-{USER}-{port}"}):
         async with KubeCluster(pod_spec, asynchronous=True) as cluster:
-            port = cluster.scheduler_info["services"]["dashboard"]
-
-            assert str(port) in cluster.dashboard_link
+            port = cluster.forwarded_dashboard_port
 
             assert (
                 "foo-" + getpass.getuser() + "-" + str(port) in cluster.dashboard_link
