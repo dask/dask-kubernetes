@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 curl -L https://istio.io/downloadIstio | sh -
 mv istio-*/bin/istioctl /usr/local/bin/istioctl
 

@@ -64,6 +64,10 @@ class KubeCluster(Cluster):
         List of environment variables to pass to worker pod.
         Can be a list of dicts using the same structure as k8s envs
         or a single dictionary of key/value pairs
+    worker_command: List[str] | str
+        The command to use when starting the worker.
+        If command consists of multiple words it should be passed as a list of strings.
+        Defaults to ``"dask-worker"``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -127,6 +131,7 @@ class KubeCluster(Cluster):
         n_workers=3,
         resources={},
         env=[],
+        worker_command="dask-worker",
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
         create_mode=CreateMode.CREATE_OR_CONNECT,
@@ -138,6 +143,9 @@ class KubeCluster(Cluster):
         self.n_workers = n_workers
         self.resources = resources
         self.env = env
+        self.worker_command = worker_command
+        if isinstance(self.worker_command, str):
+            self.worker_command = self.worker_command.split(" ")
         self.auth = auth
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self.create_mode = create_mode
@@ -535,6 +543,8 @@ class KubeCluster(Cluster):
             # If they gave us a list, assume its a list of dicts and already ready to go
             env = self.env
 
+        args = self.worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+
         return {
             "cluster": self.cluster_name,
             "replicas": self.n_workers,
@@ -543,11 +553,7 @@ class KubeCluster(Cluster):
                     {
                         "name": "worker",
                         "image": self.image,
-                        "args": [
-                            "dask-worker",
-                            "--name",
-                            "$(DASK_WORKER_NAME)",
-                        ],
+                        "args": args,
                         "env": env,
                         "resources": self.resources,
                     }
