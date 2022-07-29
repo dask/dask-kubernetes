@@ -23,7 +23,7 @@ def test_custom_worker_command(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
             name="customworker",
-            docker_image=docker_image,
+            image=docker_image,
             worker_command=["python", "-m", "distributed.cli.dask_worker"],
         ) as cluster:
             with Client(cluster) as client:
