@@ -3,6 +3,7 @@ import pytest
 import asyncio
 from contextlib import asynccontextmanager
 import pathlib
+import re
 
 import os.path
 
@@ -161,9 +162,9 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert "WORKER_ENV" in worker_env
             assert cluster_name
 
-    assert "A DaskCluster has been created" in runner.stdout
-    assert "A scheduler pod has been created" in runner.stdout
-    assert "A worker group has been created" in runner.stdout
+    assert re.match("DaskCluster .+ created", runner.stdout)
+    assert re.match("Scheduler pod .+ created", runner.stdout)
+    assert re.match("Worker group .+ created", runner.stdout)
 
 
 @pytest.mark.asyncio
