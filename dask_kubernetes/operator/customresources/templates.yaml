@@ -33,6 +33,10 @@ definitions:
     properties:
       status:
         type: object
+        properties:
+          phase:
+            type: string
+            description: Status of the Dask cluster
       spec:
         type: object
         required:
