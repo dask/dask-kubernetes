@@ -5897,6 +5897,9 @@ spec:
                     - worker
                     type: object
                   status:
+                    properties:
+                      phase:
+                        type: string
                     type: object
                 required:
                 - spec
