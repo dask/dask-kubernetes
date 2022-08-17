@@ -162,9 +162,9 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert "WORKER_ENV" in worker_env
             assert cluster_name
 
-    assert re.match("DaskCluster .+ created", runner.stdout)
-    assert re.match("Scheduler pod .+ created", runner.stdout)
-    assert re.match("Worker group .+ created", runner.stdout)
+    assert re.match(".*DaskCluster .+ created.*", runner.stdout)
+    assert re.match(".*Scheduler pod .+ created.*", runner.stdout)
+    assert re.match(".*Worker group .+ created.*", runner.stdout)
 
 
 @pytest.mark.asyncio
