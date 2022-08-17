@@ -83,4 +83,4 @@ def test_additional_worker_groups(kopf_runner, docker_image):
 
 def test_cluster_without_operator(docker_image):
     with pytest.raises(TimeoutError, match="is the Dask Operator running"):
-        KubeCluster(name="noop", n_workers=1, image=docker_image, operator_timeout=1)
+        KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)

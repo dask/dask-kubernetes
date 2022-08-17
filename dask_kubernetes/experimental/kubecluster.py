@@ -85,8 +85,11 @@ class KubeCluster(Cluster):
     shutdown_on_close: bool (optional)
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
-    operator_timeout: int (optional)
-        Time in seconds to wait for the operator to create cluster resources before giving up.
+    resource_timeout: int (optional)
+        Time in seconds to wait for the controller to take action before giving up.
+        If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase`` by the controller
+        then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
+        useful error.
         Defaults to ``60`` seconds.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
@@ -139,7 +142,7 @@ class KubeCluster(Cluster):
         port_forward_cluster_ip=None,
         create_mode=CreateMode.CREATE_OR_CONNECT,
         shutdown_on_close=None,
-        operator_timeout=60,
+        resource_timeout=60,
         **kwargs,
     ):
         self.namespace = namespace or namespace_default()
@@ -154,7 +157,7 @@ class KubeCluster(Cluster):
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self.create_mode = create_mode
         self.shutdown_on_close = shutdown_on_close
-        self._operator_timeout = operator_timeout
+        self._resource_timeout = resource_timeout
 
         self._instances.add(self)
 
@@ -220,7 +223,7 @@ class KubeCluster(Cluster):
                 ) from e
 
             try:
-                await self._wait_for_operator()
+                await self._wait_for_controller()
             except TimeoutError as e:
                 await self._close()
                 raise e
@@ -285,7 +288,7 @@ class KubeCluster(Cluster):
         address = await get_scheduler_address(service_name, self.namespace)
         return address
 
-    async def _wait_for_operator(self):
+    async def _wait_for_controller(self):
         """Wait for the operator to set the status.phase."""
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
@@ -297,14 +300,14 @@ class KubeCluster(Cluster):
                 plural="daskclusters",
                 namespace=self.namespace,
                 field_selector=f"metadata.name={self.cluster_name}",
-                timeout_seconds=self._operator_timeout,
+                timeout_seconds=self._resource_timeout,
             ):
                 cluster = event["object"]
                 if "status" in cluster and "phase" in cluster["status"]:
                     return
                 await asyncio.sleep(0.1)
         raise TimeoutError(
-            f"Dask Cluster resource not actioned after {self._operator_timeout} seconds, is the Dask Operator running?"
+            f"Dask Cluster resource not actioned after {self._resource_timeout} seconds, is the Dask Operator running?"
         )
 
     def get_logs(self):
