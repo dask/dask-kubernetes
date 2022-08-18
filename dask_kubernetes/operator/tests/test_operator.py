@@ -112,7 +112,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     await client.wait_for_workers(3)
 
 
-@pytest.mark.timeout(180)
+@pytest.mark.timeout(300)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:

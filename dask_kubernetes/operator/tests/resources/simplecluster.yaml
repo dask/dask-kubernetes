@@ -13,8 +13,23 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - dask-worker
+            - tcp://simple-cluster-scheduler-service.default.svc.cluster.local:8786
+            - --no-nanny
             - --name
             - $(DASK_WORKER_NAME)
+            - --dashboard-address
+            - 0.0.0.0:8787
+            - --listen-address
+            - tcp://0.0.0.0:8788
+            - --contact-address
+            - tcp://$(DASK_WORKER_NAME)-service.default.svc.cluster.local:8788
+          ports:
+            - name: tcp-comm
+              containerPort: 8788
+              protocol: TCP
+            - name: http-dashboard
+              containerPort: 8787
+              protocol: TCP
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name
