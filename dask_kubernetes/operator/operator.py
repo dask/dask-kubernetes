@@ -1,13 +1,14 @@
 import asyncio
 import aiohttp
 from contextlib import suppress
-import pkg_resources
+from importlib.metadata import entry_points
 
 import kopf
 import kubernetes_asyncio as kubernetes
 
 from uuid import uuid4
 
+from dask.compatibility import entry_points
 from distributed.core import rpc
 
 from dask_kubernetes.common.auth import ClusterAuth
@@ -17,7 +18,7 @@ from dask_kubernetes.common.networking import (
 
 # Load operator plugins from other packages
 PLUGINS = []
-for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
+for ep in entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
