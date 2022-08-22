@@ -1,7 +1,6 @@
 import asyncio
 import aiohttp
 from contextlib import suppress
-from importlib.metadata import entry_points
 
 import kopf
 import kubernetes_asyncio as kubernetes
