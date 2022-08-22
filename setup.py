@@ -23,6 +23,6 @@ setup(
         [dask_cluster_discovery]
         helmcluster=dask_kubernetes.helm:discover
         [dask_operator_plugin]
-        foo=dask_kubernetes.operator.plugins.noop
+        noop=dask_kubernetes.operator.plugins.noop
       """,
 )
