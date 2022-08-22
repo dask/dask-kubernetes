@@ -81,7 +81,7 @@ def test_operator_plugins(kopf_runner):
 
     assert runner.exit_code == 0
     assert runner.exception is None
-    assert "Plugin 'foo' running." in runner.stdout
+    assert "Plugin 'noop' running." in runner.stdout
 
 
 @pytest.mark.asyncio
