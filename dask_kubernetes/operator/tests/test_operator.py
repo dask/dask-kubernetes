@@ -75,6 +75,15 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
+def test_operator_plugins(kopf_runner):
+    with kopf_runner as runner:
+        pass
+
+    assert runner.exit_code == 0
+    assert runner.exception is None
+    assert "Plugin 'noop' running." in runner.stdout
+
+
 @pytest.mark.asyncio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
