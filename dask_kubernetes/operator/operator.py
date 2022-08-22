@@ -22,6 +22,12 @@ for ep in entry_points(group="dask_operator_plugin"):
         PLUGINS.append(ep.load())
 
 
+class SchedulerCommError(Exception):
+    """Raised when unable to communicate with a scheduler."""
+
+    pass
+
+
 def build_scheduler_pod_spec(name, spec):
     return {
         "apiVersion": "v1",
@@ -296,6 +302,35 @@ async def retire_workers(
         return [w["metadata"]["name"] for w in workers.items[:-n_workers]]
 
 
+async def get_desired_workers(scheduler_service_name, namespace, logger):
+    # Try gracefully retiring via the HTTP API
+    dashboard_address = await get_scheduler_address(
+        scheduler_service_name,
+        namespace,
+        port_name="http-dashboard",
+    )
+    async with aiohttp.ClientSession() as session:
+        url = f"{dashboard_address}/api/v1/adaptive_target"
+        async with session.get(url) as resp:
+            if resp.status <= 300:
+                desired_workers = await resp.json()
+                return desired_workers["workers"]
+
+    # Otherwise try gracefully retiring via the RPC
+    # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
+    try:
+        comm_address = await get_scheduler_address(
+            scheduler_service_name,
+            namespace,
+        )
+        async with rpc(comm_address) as scheduler_comm:
+            return await scheduler_comm.adaptive_target()
+    except Exception as e:
+        raise SchedulerCommError(
+            "Unable to get number of desired workers from scheduler"
+        ) from e
+
+
 @kopf.on.update("daskworkergroup")
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -399,6 +434,62 @@ async def handle_runner_status_change(meta, new, namespace, logger, **kwargs):
             )
 
 
+@kopf.on.create("daskdaskautoscalerorkergroup")
+async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
+    """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        api = kubernetes.client.CustomObjectsApi(api_client)
+        cluster = await api.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=spec["cluster"],
+        )
+        new_spec = dict(spec)
+        kopf.adopt(new_spec, owner=cluster)
+        api.api_client.set_default_header(
+            "content-type", "application/merge-patch+json"
+        )
+        await api.patch_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskautoscalers",
+            namespace=namespace,
+            name=name,
+            body=new_spec,
+        )
+        logger.info(f"Successfully adopted by {spec['cluster']}")
+
+
 @kopf.timer("daskautoscaler", interval=5.0)
-async def adapt(spec, name, namespace, logger, **kwargs):
-    pass
+async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
+    # Ask the scheduler for the desired number of worker
+    try:
+        desired_workers = get_desired_workers(
+            scheduler_service_name=f"{spec['cluster']}-service",
+            namespace=namespace,
+            logger=logger,
+        )
+    except SchedulerCommError:
+        logger.error("Unable to get desired number of workers from scheduler.")
+        return
+
+    # Ensure the desired number is within the min and max
+    desired_workers = max(spec["minimum"], desired_workers)
+    desired_workers = min(spec["maximum"], desired_workers)
+
+    # Update the defautl DaskWorkerGroup
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        customobjectsapi.api_client.set_default_header(
+            "content-type", "application/merge-patch+json"
+        )
+        await customobjectsapi.patch_namespaced_custom_object_scale(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskworkergroups",
+            namespace=namespace,
+            name=f"{spec['cluster']}-cluster-default-worker-group",
+            body={"spec": {"replicas": desired_workers}},
+        )

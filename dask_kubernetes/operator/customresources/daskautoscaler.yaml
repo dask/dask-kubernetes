@@ -9,8 +9,6 @@ spec:
     kind: DaskAutoscaler
     plural: daskautoscalers
     singular: daskautoscaler
-    shortNames:
-      - as
   versions:
     - name: v1
       served: true
@@ -21,7 +19,14 @@ spec:
           properties:
             spec:
               type: object
+              required:
+              - cluster
+              - minimum
+              - maximum
               properties:
+                cluster:
+                  type: string
+                  description: Name of the cluster to associate this worker group with
                 minimum:
                   type: integer
                   description: Minimum number of workers
