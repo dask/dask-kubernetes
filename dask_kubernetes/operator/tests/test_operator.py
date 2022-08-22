@@ -170,10 +170,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert "WORKER_ENV" in worker_env
             assert cluster_name
 
-    assert "A DaskCluster has been created" in runner.stdout
-    assert "A scheduler pod has been created" in runner.stdout
-    assert "A worker group has been created" in runner.stdout
-
 
 @pytest.mark.asyncio
 async def test_job(k8s_cluster, kopf_runner, gen_job):

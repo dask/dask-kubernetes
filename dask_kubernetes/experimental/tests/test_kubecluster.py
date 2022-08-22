@@ -1,6 +1,7 @@
 import pytest
 
 from dask.distributed import Client
+from distributed.utils import TimeoutError
 
 from dask_kubernetes.experimental import KubeCluster
 
@@ -17,6 +18,17 @@ def test_kubecluster(cluster):
         client.scheduler_info()
         cluster.scale(1)
         assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
+def test_custom_worker_command(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="customworker",
+            image=docker_image,
+            worker_command=["python", "-m", "distributed.cli.dask_worker"],
+        ) as cluster:
+            with Client(cluster) as client:
+                assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
 def test_multiple_clusters(kopf_runner, docker_image):
@@ -67,3 +79,8 @@ def test_additional_worker_groups(kopf_runner, docker_image):
                 client.wait_for_workers(2)
                 assert client.submit(lambda x: x + 1, 10).result() == 11
             cluster.delete_worker_group(name="more")
+
+
+def test_cluster_without_operator(docker_image):
+    with pytest.raises(TimeoutError, match="is the Dask Operator running"):
+        KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)

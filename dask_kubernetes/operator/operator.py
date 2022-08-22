@@ -152,12 +152,22 @@ async def startup(**kwargs):
 
 
 @kopf.on.create("daskcluster")
-async def daskcluster_create(spec, name, namespace, logger, **kwargs):
-    logger.info(
-        f"A DaskCluster has been created called {name} in {namespace} with the following config: {spec}"
-    )
+async def daskcluster_create(name, namespace, logger, patch, **kwargs):
+    """When DaskCluster resource is created set the status.phase.
+
+    This allows us to track that the operator is running.
+    """
+    logger.info(f"DaskCluster {name} created in {namespace}.")
+    patch.status["phase"] = "Created"
+
+
+@kopf.on.field("daskcluster", field="status.phase", new="Created")
+async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
+    """When the DaskCluster status.phase goes into Pending create the cluster components."""
+    logger.info("Creating Dask cluster components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
+        custom_api = kubernetes.client.CustomObjectsApi(api_client)
 
         # TODO Check for existing scheduler pod
         scheduler_spec = spec.get("scheduler", {})
@@ -168,10 +178,7 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
             body=data,
         )
         # await wait_for_scheduler(name, namespace)
-        logger.info(
-            f"A scheduler pod has been created called {data['metadata']['name']} in {namespace} \
-            with the following config: {data['spec']}"
-        )
+        logger.info(f"Scheduler pod {data['metadata']['name']} created in {namespace}.")
 
         # TODO Check for existing scheduler service
         data = build_scheduler_service_spec(name, scheduler_spec.get("service"))
@@ -182,26 +189,23 @@ async def daskcluster_create(spec, name, namespace, logger, **kwargs):
         )
         await wait_for_service(api, data["metadata"]["name"], namespace)
         logger.info(
-            f"A scheduler service has been created called {data['metadata']['name']} in {namespace} \
-            with the following config: {data['spec']}"
+            f"Scheduler service {data['metadata']['name']} created in {namespace}."
         )
 
         worker_spec = spec.get("worker", {})
         data = build_worker_group_spec(name, worker_spec)
         # TODO: Next line is not needed if we can get worker groups adopted by the cluster
         kopf.adopt(data)
-        api = kubernetes.client.CustomObjectsApi(api_client)
-        await api.create_namespaced_custom_object(
+        await custom_api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
             plural="daskworkergroups",
             namespace=namespace,
             body=data,
         )
-        logger.info(
-            f"A worker group has been created called {data['metadata']['name']} in {namespace} \
-            with the following config: {data['spec']}"
-        )
+        logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
+    # TODO Set to "Pending" here and track scheduler readiness before finally setting to "Running"
+    patch.status["phase"] = "Running"
 
 
 @kopf.on.create("daskworkergroup")
@@ -352,7 +356,7 @@ async def daskjob_create(spec, name, namespace, logger, **kwargs):
             body=cluster_spec,
         )
         logger.info(
-            f"A cluster for the job {name} has been created called {cluster_spec['metadata']['name']} in {namespace}"
+            f"Cluster {cluster_spec['metadata']['name']} for job {name} created in {namespace}."
         )
 
         job_pod_spec = build_job_pod_spec(
