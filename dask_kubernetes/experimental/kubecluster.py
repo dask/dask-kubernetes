@@ -65,6 +65,10 @@ class KubeCluster(Cluster):
         List of environment variables to pass to worker pod.
         Can be a list of dicts using the same structure as k8s envs
         or a single dictionary of key/value pairs
+    worker_command: List[str] | str
+        The command to use when starting the worker.
+        If command consists of multiple words it should be passed as a list of strings.
+        Defaults to ``"dask-worker"``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -82,6 +86,12 @@ class KubeCluster(Cluster):
     shutdown_on_close: bool (optional)
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
+    resource_timeout: int (optional)
+        Time in seconds to wait for the controller to take action before giving up.
+        If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase`` by the controller
+        then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
+        useful error.
+        Defaults to ``60`` seconds.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -128,10 +138,12 @@ class KubeCluster(Cluster):
         n_workers=3,
         resources={},
         env=[],
+        worker_command="dask-worker",
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
         create_mode=CreateMode.CREATE_OR_CONNECT,
         shutdown_on_close=None,
+        resource_timeout=60,
         **kwargs,
     ):
         self.namespace = namespace or namespace_default()
@@ -139,10 +151,14 @@ class KubeCluster(Cluster):
         self.n_workers = n_workers
         self.resources = resources
         self.env = env
+        self.worker_command = worker_command
+        if isinstance(self.worker_command, str):
+            self.worker_command = self.worker_command.split(" ")
         self.auth = auth
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self.create_mode = create_mode
         self.shutdown_on_close = shutdown_on_close
+        self._resource_timeout = resource_timeout
 
         self._instances.add(self)
 
@@ -206,6 +222,12 @@ class KubeCluster(Cluster):
                     "Are the Dask Custom Resource Definitions installed? "
                     "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
                 ) from e
+
+            try:
+                await self._wait_for_controller()
+            except TimeoutError as e:
+                await self._close()
+                raise e
             await wait_for_scheduler(cluster_name, self.namespace)
             await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
             scheduler_address = await self._get_scheduler_address()
@@ -266,6 +288,28 @@ class KubeCluster(Cluster):
         service_name = f"{self.name}-cluster-service"
         address = await get_scheduler_address(service_name, self.namespace)
         return address
+
+    async def _wait_for_controller(self):
+        """Wait for the operator to set the status.phase."""
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            watch = kubernetes.watch.Watch()
+            async for event in watch.stream(
+                func=custom_objects_api.list_namespaced_custom_object,
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskclusters",
+                namespace=self.namespace,
+                field_selector=f"metadata.name={self.cluster_name}",
+                timeout_seconds=self._resource_timeout,
+            ):
+                cluster = event["object"]
+                if "status" in cluster and "phase" in cluster["status"]:
+                    return
+                await asyncio.sleep(0.1)
+        raise TimeoutError(
+            f"Dask Cluster resource not actioned after {self._resource_timeout} seconds, is the Dask Operator running?"
+        )
 
     def get_logs(self):
         """Get logs for Dask scheduler and workers.
@@ -536,6 +580,8 @@ class KubeCluster(Cluster):
             # If they gave us a list, assume its a list of dicts and already ready to go
             env = self.env
 
+        args = self.worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+
         return {
             "cluster": self.cluster_name,
             "replicas": self.n_workers,
@@ -544,11 +590,7 @@ class KubeCluster(Cluster):
                     {
                         "name": "worker",
                         "image": self.image,
-                        "args": [
-                            "dask-worker",
-                            "--name",
-                            "$(DASK_WORKER_NAME)",
-                        ],
+                        "args": args,
                         "env": env,
                         "resources": self.resources,
                     }

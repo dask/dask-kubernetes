@@ -75,6 +75,15 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
+def test_operator_plugins(kopf_runner):
+    with kopf_runner as runner:
+        pass
+
+    assert runner.exit_code == 0
+    assert runner.exception is None
+    assert "Plugin 'noop' running." in runner.stdout
+
+
 @pytest.mark.asyncio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
@@ -160,10 +169,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             # Just check if its in the string, no need to parse the json
             assert "WORKER_ENV" in worker_env
             assert cluster_name
-
-    assert "A DaskCluster has been created" in runner.stdout
-    assert "A scheduler pod has been created" in runner.stdout
-    assert "A worker group has been created" in runner.stdout
 
 
 @pytest.mark.asyncio
