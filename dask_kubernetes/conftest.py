@@ -67,7 +67,7 @@ def customresources(k8s_cluster):
     temp_dir = tempfile.TemporaryDirectory()
     crd_path = os.path.join(DIR, "operator", "customresources")
 
-    for crd in ["daskcluster", "daskworkergroup", "daskjob"]:
+    for crd in ["daskcluster", "daskworkergroup", "daskjob", "daskautoscaler"]:
         run_generate(
             os.path.join(crd_path, f"{crd}.yaml"),
             os.path.join(crd_path, f"{crd}.patch.yaml"),
