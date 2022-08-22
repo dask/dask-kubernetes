@@ -538,7 +538,7 @@ class KubeCluster(Cluster):
                 await custom_objects_api.patch_namespaced_custom_object_scale(
                     group="kubernetes.dask.org",
                     version="v1",
-                    plural="daskworkergroups",
+                    plural="daskautoscalers",
                     namespace=self.namespace,
                     name=self.name,
                     body={"spec": {"minimum": minimum, "maximim": maximum}},
@@ -547,11 +547,11 @@ class KubeCluster(Cluster):
                 await custom_objects_api.create_namespaced_custom_object(
                     group="kubernetes.dask.org",
                     version="v1",
-                    plural="daskworkergroups",
+                    plural="daskautoscalers",
                     namespace=self.namespace,
                     body={
                         "apiVersion": "kubernetes.dask.org/v1",
-                        "kind": "DaskWorkerGroup",
+                        "kind": "DaskAutoscaler",
                         "metadata": {
                             "name": self.name,
                             "spec": {
