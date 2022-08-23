@@ -552,9 +552,11 @@ class KubeCluster(Cluster):
                         "kind": "DaskAutoscaler",
                         "metadata": {
                             "name": self.name,
+                            "dask.org/cluster-name": self.cluster_name,
+                            "dask.org/component": "autoscaler",
                         },
                         "spec": {
-                            "cluster": f"{self.name}-cluster",
+                            "cluster": self.cluster_name,
                             "minimum": minimum,
                             "maximum": maximum,
                         },
