@@ -141,18 +141,6 @@ def build_cluster_spec(name, worker_spec, scheduler_spec):
     }
 
 
-def build_autoscaler_spec(minimum, maximum):
-    return {
-        "apiVersion": "kubernetes.dask.org/v1",
-        "kind": "DaskWorkerGroup",
-        "metadata": {"name": "dask-autoscaler"},
-        "spec": {
-            "replicas": minimum,
-            "resources": maximum,
-        },
-    }
-
-
 async def wait_for_service(api, service_name, namespace):
     """Block until service is available."""
     while True:
