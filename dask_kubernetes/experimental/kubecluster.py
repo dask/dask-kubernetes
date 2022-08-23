@@ -528,7 +528,7 @@ class KubeCluster(Cluster):
         """
         return self.sync(self._adapt, minimum, maximum)
 
-    async def adapt(self, minimum=None, maximum=None):
+    async def _adapt(self, minimum=None, maximum=None):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
             custom_objects_api.api_client.set_default_header(
@@ -554,11 +554,11 @@ class KubeCluster(Cluster):
                         "kind": "DaskAutoscaler",
                         "metadata": {
                             "name": self.name,
-                            "spec": {
-                                "cluster": f"{self.name}-cluster",
-                                "minimum": minimum,
-                                "maximim": maximum,
-                            },
+                        },
+                        "spec": {
+                            "cluster": f"{self.name}-cluster",
+                            "minimum": minimum,
+                            "maximum": maximum,
                         },
                     },
                 )

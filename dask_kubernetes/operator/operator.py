@@ -466,7 +466,7 @@ async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
 async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     # Ask the scheduler for the desired number of worker
     try:
-        desired_workers = get_desired_workers(
+        desired_workers = await get_desired_workers(
             scheduler_service_name=f"{spec['cluster']}-service",
             namespace=namespace,
             logger=logger,
@@ -479,7 +479,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     desired_workers = max(spec["minimum"], desired_workers)
     desired_workers = min(spec["maximum"], desired_workers)
 
-    # Update the defautl DaskWorkerGroup
+    # Update the default DaskWorkerGroup
     async with kubernetes.client.api_client.ApiClient() as api_client:
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         customobjectsapi.api_client.set_default_header(
@@ -490,6 +490,6 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
             version="v1",
             plural="daskworkergroups",
             namespace=namespace,
-            name=f"{spec['cluster']}-cluster-default-worker-group",
+            name=f"{spec['cluster']}-default-worker-group",
             body={"spec": {"replicas": desired_workers}},
         )
