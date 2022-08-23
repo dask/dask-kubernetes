@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import atexit
 from contextlib import suppress
-import contextlib
 from enum import Enum
 import time
 from typing import ClassVar
@@ -493,7 +492,7 @@ class KubeCluster(Cluster):
                 "content-type", "application/merge-patch+json"
             )
             # Disable adaptivity if enabled
-            with contextlib.suppress(kubernetes.client.ApiException):
+            with suppress(kubernetes.client.ApiException):
                 await custom_objects_api.delete_namespaced_custom_object(
                     group="kubernetes.dask.org",
                     version="v1",

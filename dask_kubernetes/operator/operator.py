@@ -468,6 +468,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     desired_workers = min(spec["maximum"], desired_workers)
 
     # Update the default DaskWorkerGroup
+    # TODO Only update if the value has changed
     async with kubernetes.client.api_client.ApiClient() as api_client:
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         customobjectsapi.api_client.set_default_header(
