@@ -434,7 +434,7 @@ async def handle_runner_status_change(meta, new, namespace, logger, **kwargs):
             )
 
 
-@kopf.on.create("daskdaskautoscalerorkergroup")
+@kopf.on.create("daskautoscaler")
 async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
     async with kubernetes.client.api_client.ApiClient() as api_client:
