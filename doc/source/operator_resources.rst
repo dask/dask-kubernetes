@@ -484,6 +484,42 @@ By creating the resource the operator controller will periodically poll the sche
 The scheduler calculates this number by profiling the tasks it is processing and then extrapolating how many workers it would need
 to complete the current graph within 5 seconds.
 
+.. mermaid::
+
+    graph TD
+      DaskCluster(DaskCluster)
+      DaskAutoscaler(DaskAutoscaler)
+      SchedulerPod(Scheduler Pod)
+      DaskWorkerGroup(Default DaskWorkerGroup)
+      WorkerPod1(Worker Pod 1)
+      WorkerPod2(Worker Pod 2)
+      WorkerPodDot(...)
+      WorkerPod10(Worker Pod 10)
+
+      SchedulerPod -. I need 10 workers .-> DaskAutoscaler
+      DaskAutoscaler -. Scale to 10 workers .-> DaskWorkerGroup
+      DaskCluster --> SchedulerPod
+      DaskCluster --> DaskAutoscaler
+      DaskCluster --> DaskWorkerGroup
+      DaskWorkerGroup --> WorkerPod1
+      DaskWorkerGroup --> WorkerPod2
+      DaskWorkerGroup --> WorkerPodDot
+      DaskWorkerGroup --> WorkerPod10
+
+      classDef dask stroke:#FDA061,stroke-width:4px
+      classDef dashed stroke-dasharray: 5 5
+
+      class DaskCluster dask
+      class DaskCluster dashed
+      class DaskWorkerGroup dask
+      class DaskAutoscaler dask
+      class DaskWorkerGroup dashed
+      class SchedulerPod dashed
+      class WorkerPod1 dashed
+      class WorkerPod2 dashed
+      class WorkerPodDot dashed
+      class WorkerPod10 dashed
+
 The controller will constrain this number between the ``minimum`` and ``maximum`` values configured in the ``DaskAutoscaler`` resource
 and then update the number of replicas in the default ``DaskWorkerGroup``.
 
