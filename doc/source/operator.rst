@@ -83,3 +83,8 @@ Jobs
 A ``DaskJob`` is a batch style resource that creates a ``Pod`` to perform some specific task from start to finish alongside a ``DaskCluster`` that can be leveraged to perform the work.
 
 Once the job ``Pod`` runs to completion the cluster is removed automatically to save resources. This is great for workflows like training a distributed machine learning model with Dask.
+
+Autoscalers
+^^^^^^^^^^^
+
+A ``DaskAutoscaler`` resource will communicate with the scheduler periodically and auto scale the default ``DaskWorkerGroup`` to the desired number of workers.
