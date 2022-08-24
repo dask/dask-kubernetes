@@ -37,5 +37,5 @@ jobs:
           TEST_ISTIO: "true"
         run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/experimental/tests
       - name: Debug k8s resources
-        if: always()
+        if: success() || failure()
         run: kubectl get all -A

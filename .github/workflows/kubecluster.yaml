@@ -34,5 +34,5 @@ jobs:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
         run: pytest dask_kubernetes/common/tests dask_kubernetes/classic/tests
       - name: Debug k8s resources
-        if: always()
+        if: success() || failure()
         run: kubectl get all -A
