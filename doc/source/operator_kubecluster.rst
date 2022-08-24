@@ -35,6 +35,17 @@ You can scale the cluster
    # Scale down the cluster
    cluster.scale(1)
 
+
+You can autoscale the cluster
+
+.. code-block:: python
+
+   # Allow cluster to autoscale between 1 and 10 workers
+   cluster.adapt(minimum=1, maximum=10)
+
+   # Disable autoscaling by explicitly scaling to your desired number of workers
+   cluster.scale(1)
+
 You can connect to the client
 
 .. code-block:: python
@@ -89,6 +100,7 @@ API
 .. autosummary::
    KubeCluster
    KubeCluster.scale
+   KubeCluster.adapt
    KubeCluster.get_logs
    KubeCluster.add_worker_group
    KubeCluster.delete_worker_group

@@ -96,4 +96,7 @@ def test_adapt(kopf_runner, docker_image):
             cluster.adapt(minimum=0, maximum=1)
             with Client(cluster) as client:
                 assert client.submit(lambda x: x + 1, 10).result() == 11
+
+            # Need to clean up the DaskAutoscaler object
+            # See https://github.com/dask/dask-kubernetes/issues/546
             cluster.scale(0)
