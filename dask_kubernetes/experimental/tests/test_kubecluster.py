@@ -84,3 +84,19 @@ def test_additional_worker_groups(kopf_runner, docker_image):
 def test_cluster_without_operator(docker_image):
     with pytest.raises(TimeoutError, match="is the Dask Operator running"):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
+
+
+def test_adapt(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="adaptive",
+            image=docker_image,
+            n_workers=0,
+        ) as cluster:
+            cluster.adapt(minimum=0, maximum=1)
+            with Client(cluster) as client:
+                assert client.submit(lambda x: x + 1, 10).result() == 11
+
+            # Need to clean up the DaskAutoscaler object
+            # See https://github.com/dask/dask-kubernetes/issues/546
+            cluster.scale(0)

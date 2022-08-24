@@ -491,6 +491,15 @@ class KubeCluster(Cluster):
             custom_objects_api.api_client.set_default_header(
                 "content-type", "application/merge-patch+json"
             )
+            # Disable adaptivity if enabled
+            with suppress(kubernetes.client.ApiException):
+                await custom_objects_api.delete_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    name=self.name,
+                )
             await custom_objects_api.patch_namespaced_custom_object_scale(
                 group="kubernetes.dask.org",
                 version="v1",
@@ -500,11 +509,59 @@ class KubeCluster(Cluster):
                 body={"spec": {"replicas": n}},
             )
 
-    def adapt(self, *args, **kwargs):
-        """Turn on adaptivity"""
-        raise NotImplementedError(
-            "Adaptive mode is not supported yet for this KubeCluster."
-        )
+    def adapt(self, minimum=None, maximum=None):
+        """Turn on adaptivity
+
+        Parameters
+        ----------
+        minimum : int
+            Minimum number of workers
+        minimum : int
+            Maximum number of workers
+
+        Examples
+        --------
+        >>> cluster.adapt()  # Allow scheduler to add/remove workers within k8s cluster resource limits
+        >>> cluster.adapt(minimum=1, maximum=10) # Allow scheduler to add/remove workers within 1-10 range
+        """
+        return self.sync(self._adapt, minimum, maximum)
+
+    async def _adapt(self, minimum=None, maximum=None):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            custom_objects_api.api_client.set_default_header(
+                "content-type", "application/merge-patch+json"
+            )
+            try:
+                await custom_objects_api.patch_namespaced_custom_object_scale(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    name=self.name,
+                    body={"spec": {"minimum": minimum, "maximum": maximum}},
+                )
+            except kubernetes.client.ApiException:
+                await custom_objects_api.create_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    body={
+                        "apiVersion": "kubernetes.dask.org/v1",
+                        "kind": "DaskAutoscaler",
+                        "metadata": {
+                            "name": self.name,
+                            "dask.org/cluster-name": self.cluster_name,
+                            "dask.org/component": "autoscaler",
+                        },
+                        "spec": {
+                            "cluster": self.cluster_name,
+                            "minimum": minimum,
+                            "maximum": maximum,
+                        },
+                    },
+                )
 
     def _build_scheduler_spec(self, cluster_name):
         # TODO: Take the values provided in the current class constructor

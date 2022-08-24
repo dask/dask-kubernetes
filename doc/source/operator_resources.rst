@@ -474,6 +474,86 @@ When you delete the ``DaskJob`` resource everything is delete automatically, whe
 
 .. _config:
 
+DaskAutoscaler
+--------------
+
+The ``DaskAutoscaler`` resource allows the scheduler to scale up and down the number of workers
+using dask's adaptive mode.
+
+By creating the resource the operator controller will periodically poll the scheduler and request the desired number of workers.
+The scheduler calculates this number by profiling the tasks it is processing and then extrapolating how many workers it would need
+to complete the current graph within 5 seconds.
+
+.. mermaid::
+
+    graph TD
+      DaskCluster(DaskCluster)
+      DaskAutoscaler(DaskAutoscaler)
+      SchedulerPod(Scheduler Pod)
+      DaskWorkerGroup(Default DaskWorkerGroup)
+      WorkerPod1(Worker Pod 1)
+      WorkerPod2(Worker Pod 2)
+      WorkerPodDot(...)
+      WorkerPod10(Worker Pod 10)
+
+      SchedulerPod -. I need 10 workers .-> DaskAutoscaler
+      DaskAutoscaler -. Scale to 10 workers .-> DaskWorkerGroup
+      DaskCluster --> SchedulerPod
+      DaskCluster --> DaskAutoscaler
+      DaskCluster --> DaskWorkerGroup
+      DaskWorkerGroup --> WorkerPod1
+      DaskWorkerGroup --> WorkerPod2
+      DaskWorkerGroup --> WorkerPodDot
+      DaskWorkerGroup --> WorkerPod10
+
+      classDef dask stroke:#FDA061,stroke-width:4px
+      classDef dashed stroke-dasharray: 5 5
+
+      class DaskCluster dask
+      class DaskCluster dashed
+      class DaskWorkerGroup dask
+      class DaskAutoscaler dask
+      class DaskWorkerGroup dashed
+      class SchedulerPod dashed
+      class WorkerPod1 dashed
+      class WorkerPod2 dashed
+      class WorkerPodDot dashed
+      class WorkerPod10 dashed
+
+The controller will constrain this number between the ``minimum`` and ``maximum`` values configured in the ``DaskAutoscaler`` resource
+and then update the number of replicas in the default ``DaskWorkerGroup``.
+
+
+.. code-block:: yaml
+
+    # autoscaler.yaml
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskAutoscaler
+    metadata:
+      name: simple-cluster-autoscaler
+    spec:
+      cluster: "simple-cluster"
+      minimum: 1  # we recommend always having a minimum of 1 worker so that an idle cluster can start working on tasks immediately
+      maximum: 10 # you can place a hard limit on the number of workers regardless of what the scheduler requests
+
+.. code-block:: console
+
+    $ kubectl apply -f autoscaler.yaml
+    daskautoscaler.kubernetes.dask.org/simple-cluster-autoscaler created
+
+You can end the autoscaling at any time by deleting the resource. The number of workers will remain at whatever the autoscaler last
+set it to.
+
+.. code-block:: console
+
+    $ kubectl delete -f autoscaler.yaml
+    daskautoscaler.kubernetes.dask.org/simple-cluster-autoscaler deleted
+
+.. note::
+
+    The autoscaler will only scale the default ``WorkerGroup``. If you have additional worker groups configured they
+    will not be taken into account.
+
 Full Configuration Reference
 ----------------------------
 
@@ -520,3 +600,16 @@ Full ``DaskJob`` spec reference.
         spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
       cluster:
         spec: ... # ClusterSpec, DaskCluster resource spec
+
+Full ``DaskAutoscaler`` spec reference.
+
+.. code-block:: yaml
+
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskAutoscaler
+    metadata:
+      name: example
+    spec:
+      cluster: "name of DaskCluster to autoscale"
+      minimum: 0  # minimum number of workers to create
+      maximum: 10 # maximum number of workers to create

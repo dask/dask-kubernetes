@@ -24,6 +24,7 @@ The operator manages a hierarchy of resources, some custom resources to represen
     graph TD
       DaskJob(DaskJob)
       DaskCluster(DaskCluster)
+      DaskAutoscaler(DaskAutoscaler)
       SchedulerService(Scheduler Service)
       SchedulerPod(Scheduler Pod)
       DaskWorkerGroup(DaskWorkerGroup)
@@ -35,6 +36,7 @@ The operator manages a hierarchy of resources, some custom resources to represen
       DaskJob --> DaskCluster
       DaskJob --> JobPod
       DaskCluster --> SchedulerService
+      DaskCluster --> DaskAutoscaler
       SchedulerService --> SchedulerPod
       DaskCluster --> DaskWorkerGroup
       DaskWorkerGroup --> WorkerPodA
@@ -46,6 +48,8 @@ The operator manages a hierarchy of resources, some custom resources to represen
       class DaskJob dask
       class DaskCluster dask
       class DaskWorkerGroup dask
+      class DaskAutoscaler dask
+      class DaskAutoscaler dashed
       class SchedulerService dashed
       class SchedulerPod dashed
       class WorkerPodA dashed
@@ -79,3 +83,8 @@ Jobs
 A ``DaskJob`` is a batch style resource that creates a ``Pod`` to perform some specific task from start to finish alongside a ``DaskCluster`` that can be leveraged to perform the work.
 
 Once the job ``Pod`` runs to completion the cluster is removed automatically to save resources. This is great for workflows like training a distributed machine learning model with Dask.
+
+Autoscalers
+^^^^^^^^^^^
+
+A ``DaskAutoscaler`` resource will communicate with the scheduler periodically and auto scale the default ``DaskWorkerGroup`` to the desired number of workers.
