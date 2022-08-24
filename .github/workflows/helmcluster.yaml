@@ -22,6 +22,9 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
 
+    env:
+      KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
+
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -30,8 +33,6 @@ jobs:
       - name: Install deps
         run: ./ci/install-deps.sh
       - name: Run tests
-        env:
-          KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
         run: pytest dask_kubernetes/common/tests dask_kubernetes/helm/tests
       - name: Debug k8s resources
         if: success() || failure()
