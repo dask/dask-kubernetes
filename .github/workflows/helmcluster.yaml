@@ -33,3 +33,6 @@ jobs:
         env:
           KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
         run: pytest dask_kubernetes/common/tests dask_kubernetes/helm/tests
+      - name: Debug k8s resources
+        if: always()
+        run: kubectl get all -A
