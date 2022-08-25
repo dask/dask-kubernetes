@@ -126,9 +126,9 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
-            scheduler_pod_name = "simple"
+            scheduler_pod_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
-            service_name = "simple"
+            service_name = "simple-scheduler"
 
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)

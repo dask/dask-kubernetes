@@ -236,12 +236,12 @@ class KubeCluster(Cluster):
                 await self._close()
                 raise e
             await wait_for_scheduler(self.name, self.namespace)
-            await wait_for_service(core_api, self.name, self.namespace)
+            await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
             dashboard_address = await get_scheduler_address(
-                self.name,
+                f"{self.name}-scheduler",
                 self.namespace,
                 port_name="http-dashboard",
             )
@@ -292,7 +292,7 @@ class KubeCluster(Cluster):
                 return None
 
     async def _get_scheduler_address(self):
-        address = await get_scheduler_address(self.name, self.namespace)
+        address = await get_scheduler_address(f"{self.name}-scheduler", self.namespace)
         return address
 
     async def _wait_for_controller(self):

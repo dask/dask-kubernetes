@@ -192,7 +192,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
             namespace=namespace,
             body=data,
         )
-        await wait_for_service(api, data["metadata"]["name"], namespace)
+        await wait_for_service(api, f"{data['metadata']['name']}-scheduler", namespace)
         logger.info(
             f"Scheduler service {data['metadata']['name']} created in {namespace}."
         )
@@ -352,7 +352,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed < 0:
             worker_ids = await retire_workers(
                 n_workers=-workers_needed,
-                scheduler_service_name=spec["cluster"],
+                scheduler_service_name=f"{spec['cluster']}-scheduler",
                 worker_group_name=name,
                 namespace=namespace,
                 logger=logger,
@@ -455,7 +455,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     # Ask the scheduler for the desired number of worker
     try:
         desired_workers = await get_desired_workers(
-            scheduler_service_name=spec["cluster"],
+            scheduler_service_name=f"{spec['cluster']}-scheduler",
             namespace=namespace,
             logger=logger,
         )
