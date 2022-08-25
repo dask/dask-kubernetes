@@ -49,7 +49,7 @@ def build_scheduler_service_spec(name, spec):
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
-            "name": name,
+            "name": f"{name}-scheduler",
             "labels": {
                 "dask.org/cluster-name": name,
             },
@@ -81,7 +81,7 @@ def build_worker_pod_spec(worker_group_name, namespace, cluster_name, uuid, spec
         },
         {
             "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}.{namespace}.svc.cluster.local:8786",
+            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
     for i in range(len(pod_spec["spec"]["containers"])):
