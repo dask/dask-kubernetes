@@ -92,7 +92,7 @@ Custom cluster spec
 -------------------
 
 The ``KubeCluster`` class can take a selection of keyword arguments to make it quick and easy to get started, however the underlying :doc:`DaskCluster <operator_resources>` resource can be much more complex and configured in many ways.
-Rather than exposing every posibility via keyword arguments instead you can pass a valid ``DaskCluster`` resource spec which will be used when creating the cluster.
+Rather than exposing every possibility via keyword arguments instead you can pass a valid ``DaskCluster`` resource spec which will be used when creating the cluster.
 You can also generate a spec with :func:`make_cluster_spec` which ``KubeCluster`` uses internally and then modify it with your custom options.
 
 
@@ -129,7 +129,7 @@ The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`
 
    cluster = KubeCluster(name="example")
 
-   worker_spec = make_worker_spec(cluster_name=cluster.name, n_workers=2, resources={"limits"{"nvidia.com/gpu": 1}})
+   worker_spec = make_worker_spec(cluster_name=cluster.name, n_workers=2, resources={"limits": {"nvidia.com/gpu": 1}})
    worker_spec["spec"]["nodeSelector"] = {"cloud.google.com/gke-nodepool": "gpu-node-pool"}
 
    cluster.add_worker_group(custom_spec=worker_spec)
