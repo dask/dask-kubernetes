@@ -22,7 +22,6 @@ from distributed.utils import (
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.utils import namespace_default
 from dask_kubernetes.operator import (
-    build_cluster_spec,
     wait_for_service,
 )
 
@@ -91,6 +90,9 @@ class KubeCluster(Cluster):
         then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
         useful error.
         Defaults to ``60`` seconds.
+    custom_cluster_spec: dict (optional)
+        A dictionary representation of a ``DaskCluster`` resource object which will be used to create
+        the cluster instead of generating one from the other keyword arguments.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -131,7 +133,7 @@ class KubeCluster(Cluster):
 
     def __init__(
         self,
-        name,
+        name=None,
         namespace=None,
         image="ghcr.io/dask/dask:latest",
         n_workers=3,
@@ -143,6 +145,7 @@ class KubeCluster(Cluster):
         create_mode=CreateMode.CREATE_OR_CONNECT,
         shutdown_on_close=None,
         resource_timeout=60,
+        custom_cluster_spec=None,
         **kwargs,
     ):
         self.namespace = namespace or namespace_default()
@@ -158,6 +161,10 @@ class KubeCluster(Cluster):
         self.create_mode = create_mode
         self.shutdown_on_close = shutdown_on_close
         self._resource_timeout = resource_timeout
+        self._custom_cluster_spec = custom_cluster_spec
+
+        if self._custom_cluster_spec:
+            name = self._custom_cluster_spec["metadata"]["name"]
 
         self._instances.add(self)
 
@@ -165,10 +172,6 @@ class KubeCluster(Cluster):
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
-
-    @property
-    def cluster_name(self):
-        return f"{self.name}-cluster"
 
     @property
     def dashboard_link(self):
@@ -181,13 +184,13 @@ class KubeCluster(Cluster):
 
         if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
             raise ValueError(
-                f"Cluster {self.cluster_name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
+                f"Cluster {self.name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
             )
         elif cluster_exists:
             await self._connect_cluster()
         elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
             raise ValueError(
-                f"Cluster {self.cluster_name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
+                f"Cluster {self.name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
             )
         else:
             await self._create_cluster()
@@ -201,12 +204,17 @@ class KubeCluster(Cluster):
             core_api = kubernetes.client.CoreV1Api(api_client)
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
 
-            service_name = f"{self.name}-cluster-service"
-            cluster_name = f"{self.name}-cluster"
-            worker_spec = self._build_worker_spec(service_name)
-            scheduler_spec = self._build_scheduler_spec(cluster_name)
-
-            data = build_cluster_spec(cluster_name, worker_spec, scheduler_spec)
+            if not self._custom_cluster_spec:
+                data = make_cluster_spec(
+                    name=self.name,
+                    env=self.env,
+                    resources=self.resources,
+                    worker_command=self.worker_command,
+                    n_workers=self.n_workers,
+                    image=self.image,
+                )
+            else:
+                data = self._custom_cluster_spec
             try:
                 await custom_objects_api.create_namespaced_custom_object(
                     group="kubernetes.dask.org",
@@ -227,13 +235,13 @@ class KubeCluster(Cluster):
             except TimeoutError as e:
                 await self._close()
                 raise e
-            await wait_for_scheduler(cluster_name, self.namespace)
-            await wait_for_service(core_api, f"{cluster_name}-service", self.namespace)
+            await wait_for_scheduler(self.name, self.namespace)
+            await wait_for_service(core_api, self.name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
             dashboard_address = await get_scheduler_address(
-                f"{self.name}-cluster-service",
+                self.name,
                 self.namespace,
                 port_name="http-dashboard",
             )
@@ -256,8 +264,8 @@ class KubeCluster(Cluster):
                 self.env = container_spec["env"]
             else:
                 self.env = {}
-            service_name = f'{cluster_spec["metadata"]["name"]}-service'
-            await wait_for_scheduler(self.cluster_name, self.namespace)
+            service_name = cluster_spec["metadata"]["name"]
+            await wait_for_scheduler(self.name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
@@ -278,14 +286,13 @@ class KubeCluster(Cluster):
                     version="v1",
                     plural="daskclusters",
                     namespace=self.namespace,
-                    name=self.cluster_name,
+                    name=self.name,
                 )
             except kubernetes.client.exceptions.ApiException as e:
                 return None
 
     async def _get_scheduler_address(self):
-        service_name = f"{self.name}-cluster-service"
-        address = await get_scheduler_address(service_name, self.namespace)
+        address = await get_scheduler_address(self.name, self.namespace)
         return address
 
     async def _wait_for_controller(self):
@@ -299,7 +306,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskclusters",
                 namespace=self.namespace,
-                field_selector=f"metadata.name={self.cluster_name}",
+                field_selector=f"metadata.name={self.name}",
                 timeout_seconds=self._resource_timeout,
             ):
                 cluster = event["object"]
@@ -316,10 +323,10 @@ class KubeCluster(Cluster):
         Examples
         --------
         >>> cluster.get_logs()
-        {'foo-cluster-scheduler': ...,
-        'foo-cluster-default-worker-group-worker-0269dbfa0cfd4a22bcd9d92ae032f4d2': ...,
-        'foo-cluster-default-worker-group-worker-7c1ccb04cd0e498fb21babaedd00e5d4': ...,
-        'foo-cluster-default-worker-group-worker-d65bee23bdae423b8d40c5da7a1065b6': ...}
+        {'foo': ...,
+        'foo-default-worker-0269dbfa0cfd4a22bcd9d92ae032f4d2': ...,
+        'foo-default-worker-7c1ccb04cd0e498fb21babaedd00e5d4': ...,
+        'foo-default-worker-d65bee23bdae423b8d40c5da7a1065b6': ...}
         Each log will be a string of all logs for that container. To view
         it is recommeded that you print each log.
         >>> print(cluster.get_logs()["testdask-scheduler-5c8ffb6b7b-sjgrg"])
@@ -339,7 +346,7 @@ class KubeCluster(Cluster):
 
             pods = await core_api.list_namespaced_pod(
                 namespace=self.namespace,
-                label_selector=f"dask.org/cluster-name={self.name}-cluster",
+                label_selector=f"dask.org/cluster-name={self.name}",
             )
 
             for pod in pods.items:
@@ -360,7 +367,16 @@ class KubeCluster(Cluster):
 
         return logs
 
-    def add_worker_group(self, name, n_workers=3, image=None, resources=None, env=None):
+    def add_worker_group(
+        self,
+        name,
+        n_workers=3,
+        image=None,
+        resources=None,
+        worker_command=None,
+        env=None,
+        custom_spec=None,
+    ):
         """Create a dask worker group by name
 
         Parameters
@@ -379,6 +395,9 @@ class KubeCluster(Cluster):
         env: List[dict]
             List of environment variables to pass to worker pod.
             If ommitted will use the cluster default.
+        custom_spec: dict (optional)
+            A dictionary representation of a worker spec which will be used to create the ``DaskWorkerGroup`` instead
+            of generating one from the other keyword arguments.
 
         Examples
         --------
@@ -390,20 +409,38 @@ class KubeCluster(Cluster):
             n_workers=n_workers,
             image=image,
             resources=resources,
+            worker_command=worker_command,
             env=env,
+            custom_spec=custom_spec,
         )
 
     async def _add_worker_group(
-        self, name, n_workers=3, image=None, resources=None, env=None
+        self,
+        name,
+        n_workers=3,
+        image=None,
+        resources=None,
+        worker_command=None,
+        env=None,
+        custom_spec=None,
     ):
-        service_name = f"{self.cluster_name}-service"
-        spec = self._build_worker_spec(service_name)
+        if custom_spec is not None:
+            spec = custom_spec
+        else:
+            spec = make_worker_spec(
+                cluster_name=self.name,
+                env=env or self.env,
+                resources=resources or self.resources,
+                worker_command=worker_command or self.worker_command,
+                n_workers=n_workers or self.n_workers,
+                image=image or self.image,
+            )
         data = {
             "apiVersion": "kubernetes.dask.org/v1",
             "kind": "DaskWorkerGroup",
-            "metadata": {"name": f"{self.name}-cluster-{name}"},
+            "metadata": {"name": f"{self.name}-{name}"},
             "spec": {
-                "cluster": f"{self.name}-cluster",
+                "cluster": f"{self.name}",
                 "worker": spec,
             },
         }
@@ -440,7 +477,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.name}-cluster-{name}",
+                name=f"{self.name}-{name}",
             )
 
     def close(self, timeout=3600):
@@ -457,13 +494,13 @@ class KubeCluster(Cluster):
                     version="v1",
                     plural="daskclusters",
                     namespace=self.namespace,
-                    name=self.cluster_name,
+                    name=self.name,
                 )
             start = time.time()
             while (await self._get_cluster()) is not None:
                 if time.time() > start + timeout:
                     raise TimeoutError(
-                        f"Timed out deleting cluster resource {self.cluster_name}"
+                        f"Timed out deleting cluster resource {self.name}"
                     )
                 await asyncio.sleep(1)
 
@@ -505,7 +542,7 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.name}-cluster-{worker_group}-worker-group",
+                name=f"{self.name}-{worker_group}",
                 body={"spec": {"replicas": n}},
             )
 
@@ -552,107 +589,16 @@ class KubeCluster(Cluster):
                         "kind": "DaskAutoscaler",
                         "metadata": {
                             "name": self.name,
-                            "dask.org/cluster-name": self.cluster_name,
+                            "dask.org/cluster-name": self.name,
                             "dask.org/component": "autoscaler",
                         },
                         "spec": {
-                            "cluster": self.cluster_name,
+                            "cluster": self.name,
                             "minimum": minimum,
                             "maximum": maximum,
                         },
                     },
                 )
-
-    def _build_scheduler_spec(self, cluster_name):
-        # TODO: Take the values provided in the current class constructor
-        # and build a DaskWorker compatible dict
-        if isinstance(self.env, dict):
-            env = [{"name": key, "value": value} for key, value in self.env.items()]
-        else:
-            # If they gave us a list, assume its a list of dicts and already ready to go
-            env = self.env
-
-        return {
-            "spec": {
-                "containers": [
-                    {
-                        "name": "scheduler",
-                        "image": self.image,
-                        "args": ["dask-scheduler", "--host", "0.0.0.0"],
-                        "env": env,
-                        "resources": self.resources,
-                        "ports": [
-                            {
-                                "name": "tcp-comm",
-                                "containerPort": 8786,
-                                "protocol": "TCP",
-                            },
-                            {
-                                "name": "http-dashboard",
-                                "containerPort": 8787,
-                                "protocol": "TCP",
-                            },
-                        ],
-                        "readinessProbe": {
-                            "httpGet": {"port": "http-dashboard", "path": "/health"},
-                            "initialDelaySeconds": 5,
-                            "periodSeconds": 10,
-                        },
-                        "livenessProbe": {
-                            "httpGet": {"port": "http-dashboard", "path": "/health"},
-                            "initialDelaySeconds": 15,
-                            "periodSeconds": 20,
-                        },
-                    }
-                ]
-            },
-            "service": {
-                "type": "ClusterIP",
-                "selector": {
-                    "dask.org/cluster-name": cluster_name,
-                    "dask.org/component": "scheduler",
-                },
-                "ports": [
-                    {
-                        "name": "tcp-comm",
-                        "protocol": "TCP",
-                        "port": 8786,
-                        "targetPort": "tcp-comm",
-                    },
-                    {
-                        "name": "http-dashboard",
-                        "protocol": "TCP",
-                        "port": 8787,
-                        "targetPort": "http-dashboard",
-                    },
-                ],
-            },
-        }
-
-    def _build_worker_spec(self, service_name):
-        if isinstance(self.env, dict):
-            env = [{"name": key, "value": value} for key, value in self.env.items()]
-        else:
-            # If they gave us a list, assume its a list of dicts and already ready to go
-            env = self.env
-
-        args = self.worker_command + ["--name", "$(DASK_WORKER_NAME)"]
-
-        return {
-            "cluster": self.cluster_name,
-            "replicas": self.n_workers,
-            "spec": {
-                "containers": [
-                    {
-                        "name": "worker",
-                        "image": self.image,
-                        "args": args,
-                        "env": env,
-                        "resources": self.resources,
-                    }
-                ]
-            },
-        }
 
     def __enter__(self):
         return self
@@ -676,6 +622,164 @@ class KubeCluster(Cluster):
         >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
         return cls(name=name, create_mode=CreateMode.CONNECT_ONLY, **kwargs)
+
+
+def make_cluster_spec(
+    name,
+    image="ghcr.io/dask/dask:latest",
+    n_workers=None,
+    resources=None,
+    env=None,
+    worker_command="dask-worker",
+):
+    """Generate a ``DaskCluster`` kubernetes resource.
+
+    Populate a template with some common options to generate a ``DaskCluster`` kubernetes resource.
+
+    Parameters
+    ----------
+    name: str
+        Name of the cluster
+    image: str (optional)
+        Container image to use for the scheduler and workers
+    n_workers: int (optional)
+        Number of workers in the default worker group
+    resources: dict (optional)
+        Resource limits to set on scheduler and workers
+    env: dict (optional)
+        Environment variables to set on scheduler and workers
+    worker_command: str (optional)
+        Worker command to use when starting the workers
+    """
+    return {
+        "apiVersion": "kubernetes.dask.org/v1",
+        "kind": "DaskCluster",
+        "metadata": {"name": name},
+        "spec": {
+            "worker": make_worker_spec(
+                cluster_name=name,
+                env=env,
+                resources=resources,
+                worker_command=worker_command,
+                n_workers=n_workers,
+                image=image,
+            ),
+            "scheduler": make_scheduler_spec(
+                cluster_name=name,
+                env=env,
+                resources=resources,
+                image=image,
+            ),
+        },
+    }
+
+
+def make_worker_spec(
+    cluster_name,
+    image="ghcr.io/dask/dask:latest",
+    n_workers=3,
+    resources=None,
+    env=None,
+    worker_command="dask-worker",
+):
+    if isinstance(env, dict):
+        env = [{"name": key, "value": value} for key, value in env.items()]
+    else:
+        # If they gave us a list, assume its a list of dicts and already ready to go
+        env = env
+
+    if isinstance(worker_command, str):
+        worker_command = worker_command.split(" ")
+
+    args = worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+
+    return {
+        "cluster": cluster_name,
+        "replicas": n_workers,
+        "spec": {
+            "containers": [
+                {
+                    "name": "worker",
+                    "image": image,
+                    "args": args,
+                    "env": env,
+                    "resources": resources,
+                }
+            ]
+        },
+    }
+
+
+def make_scheduler_spec(
+    cluster_name,
+    env=None,
+    resources=None,
+    image="ghcr.io/dask/dask:latest",
+):
+    # TODO: Take the values provided in the current class constructor
+    # and build a DaskWorker compatible dict
+    if isinstance(env, dict):
+        env = [{"name": key, "value": value} for key, value in env.items()]
+    else:
+        # If they gave us a list, assume its a list of dicts and already ready to go
+        env = env
+
+    return {
+        "spec": {
+            "containers": [
+                {
+                    "name": "scheduler",
+                    "image": image,
+                    "args": ["dask-scheduler", "--host", "0.0.0.0"],
+                    "env": env,
+                    "resources": resources,
+                    "ports": [
+                        {
+                            "name": "tcp-comm",
+                            "containerPort": 8786,
+                            "protocol": "TCP",
+                        },
+                        {
+                            "name": "http-dashboard",
+                            "containerPort": 8787,
+                            "protocol": "TCP",
+                        },
+                    ],
+                    "readinessProbe": {
+                        "httpGet": {"port": "http-dashboard", "path": "/health"},
+                        "initialDelaySeconds": 5,
+                        "periodSeconds": 10,
+                    },
+                    "livenessProbe": {
+                        "httpGet": {"port": "http-dashboard", "path": "/health"},
+                        "initialDelaySeconds": 15,
+                        "periodSeconds": 20,
+                    },
+                }
+            ]
+        },
+        "service": {
+            "type": "ClusterIP",
+            "selector": {
+                "dask.org/cluster-name": cluster_name,
+                "dask.org/component": "scheduler",
+            },
+            "ports": [
+                {
+                    "name": "tcp-comm",
+                    "protocol": "TCP",
+                    "port": 8786,
+                    "targetPort": "tcp-comm",
+                },
+                {
+                    "name": "http-dashboard",
+                    "protocol": "TCP",
+                    "port": 8787,
+                    "targetPort": "http-dashboard",
+                },
+            ],
+        },
+    }
 
 
 @atexit.register

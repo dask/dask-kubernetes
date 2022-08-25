@@ -88,6 +88,51 @@ Additional worker groups can also be deleted in Python.
 
 Any additional worker groups you create will be deleted when the cluster is deleted.
 
+Custom cluster spec
+-------------------
+
+The ``KubeCluster`` class can take a selection of keyword arguments to make it quick and easy to get started, however the underlying :doc:`DaskCluster <operator_resources>` resource can be much more complex and configured in many ways.
+Rather than exposing every posibility via keyword arguments instead you can pass a valid ``DaskCluster`` resource spec which will be used when creating the cluster.
+You can also generate a spec with :func:`make_cluster_spec` which ``KubeCluster`` uses internally and then modify it with your custom options.
+
+
+.. code-block:: python
+
+   from dask_kubernetes.experimental import KubeCluster, make_cluster_spec
+
+   config = {
+      "name": "foo",
+      "n_workers": 2,
+      "resources":{"requests": {"memory": "2Gi"}, "limits": {"memory": "64Gi"}}
+   }
+
+   cluster = KubeCluster(**config)
+   # is equivalent to
+   cluster = KubeCluster(custom_cluster_spec=make_cluster_spec(**config))
+
+You can also modify the spec before passing it to ``KubeCluster``, for example if you want to set ``nodeSelector`` on your worker pods you could do it like this:
+
+.. code-block:: python
+
+   from dask_kubernetes.experimental import KubeCluster, make_cluster_spec
+
+   spec = make_cluster_spec(name="selector-example", n_workers=2)
+   spec["spec"]["worker"]["spec"]["nodeSelector"] = {"disktype": "ssd"}
+
+   cluster = KubeCluster(custom_cluster_spec=spec)
+
+The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`` keyword argument which can be generated with :func:`make_worker_spec`.
+
+.. code-block:: python
+
+   from dask_kubernetes.experimental import KubeCluster, make_worker_spec
+
+   cluster = KubeCluster(name="example")
+
+   worker_spec = make_worker_spec(cluster_name=cluster.name, n_workers=2, resources={"limits"{"nvidia.com/gpu": 1}})
+   worker_spec["spec"]["nodeSelector"] = {"cloud.google.com/gke-nodepool": "gpu-node-pool"}
+
+   cluster.add_worker_group(custom_spec=worker_spec)
 
 
 .. _api:
@@ -108,3 +153,6 @@ API
 
 .. autoclass:: KubeCluster
    :members:
+
+.. autofunction:: make_cluster_spec
+.. autofunction:: make_worker_spec

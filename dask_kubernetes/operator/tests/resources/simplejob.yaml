@@ -64,7 +64,7 @@ spec:
         service:
           type: ClusterIP
           selector:
-            dask.org/cluster-name: simple-job-cluster
+            dask.org/cluster-name: simple-job
             dask.org/component: scheduler
           ports:
             - name: tcp-comm

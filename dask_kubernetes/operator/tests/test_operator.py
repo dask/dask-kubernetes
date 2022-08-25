@@ -18,7 +18,7 @@ def gen_cluster(k8s_cluster):
     @asynccontextmanager
     async def cm():
         cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
-        cluster_name = "simple-cluster"
+        cluster_name = "simple"
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", cluster_path)
@@ -88,9 +88,9 @@ def test_operator_plugins(kopf_runner):
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
-            scheduler_pod_name = "simple-cluster-scheduler"
-            worker_pod_name = "simple-cluster-default-worker-group-worker"
-            service_name = "simple-cluster-service"
+            scheduler_pod_name = "simple"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple"
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
             while service_name not in k8s_cluster.kubectl("get", "svc"):
@@ -109,14 +109,14 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "scale",
                         "--replicas=5",
                         "daskworkergroup",
-                        "simple-cluster-default-worker-group",
+                        "simple-default",
                     )
                     await client.wait_for_workers(5)
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=3",
                         "daskworkergroup",
-                        "simple-cluster-default-worker-group",
+                        "simple-default",
                     )
                     await client.wait_for_workers(3)
 
@@ -126,9 +126,9 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
-            scheduler_pod_name = "simple-cluster-scheduler"
-            worker_pod_name = "simple-cluster-default-worker-group-worker"
-            service_name = "simple-cluster-service"
+            scheduler_pod_name = "simple"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple"
 
             while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
@@ -177,15 +177,14 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
         async with gen_job() as job:
             assert job
 
-            cluster_name = f"{job}-cluster"
             runner_name = f"{job}-runner"
 
             # Assert that cluster is created
-            while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+            while job not in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
             # Assert job pod is created
-            while runner_name not in k8s_cluster.kubectl("get", "po"):
+            while job not in k8s_cluster.kubectl("get", "po"):
                 await asyncio.sleep(0.1)
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
@@ -193,7 +192,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+            while job in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
     assert "A DaskJob has been created" in runner.stdout
