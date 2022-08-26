@@ -264,7 +264,7 @@ class KubeCluster(Cluster):
                 self.env = container_spec["env"]
             else:
                 self.env = {}
-            service_name = cluster_spec["metadata"]["name"]
+            service_name = f"{cluster_spec['metadata']['name']}-scheduler"
             await wait_for_scheduler(self.name, self.namespace)
             await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
