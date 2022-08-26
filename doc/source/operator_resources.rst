@@ -54,7 +54,7 @@ Let's create an example called ``cluster.yaml`` with the following configuration
     apiVersion: kubernetes.dask.org/v1
     kind: DaskCluster
     metadata:
-      name: simple-cluster
+      name: simple
     spec:
       worker:
         replicas: 2
@@ -97,7 +97,7 @@ Let's create an example called ``cluster.yaml`` with the following configuration
         service:
           type: NodePort
           selector:
-            dask.org/cluster-name: simple-cluster
+            dask.org/cluster-name: simple
             dask.org/component: scheduler
           ports:
           - name: tcp-comm
@@ -114,7 +114,7 @@ Editing this file will change the default configuration of you Dask cluster. See
 .. code-block:: console
 
    $ kubectl apply -f cluster.yaml
-   daskcluster.kubernetes.dask.org/simple-cluster created
+   daskcluster.kubernetes.dask.org/simple created
 
 We can list our clusters:
 
@@ -122,15 +122,15 @@ We can list our clusters:
 
    $ kubectl get daskclusters
    NAME             AGE
-   simple-cluster   47s
+   simple   47s
 
 To connect to this Dask cluster we can use the service that was created for us.
 
 .. code-block:: console
 
-   $ kubectl get svc -l dask.org/cluster-name=simple-cluster
+   $ kubectl get svc -l dask.org/cluster-name=simple
    NAME                     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)             AGE
-   simple-cluster-service   ClusterIP   10.96.85.120   <none>        8786/TCP,8787/TCP   86s
+   simple                   ClusterIP   10.96.85.120   <none>        8786/TCP,8787/TCP   86s
 
 We can see here that port ``8786`` has been exposed for the Dask communication along with ``8787`` for the Dashboard.
 
@@ -139,7 +139,7 @@ For this quick example we could use ``kubectl`` to port forward the service to y
 
 .. code-block:: console
 
-   $ kubectl port-forward svc/simple-cluster-service 8786:8786
+   $ kubectl port-forward svc/simple 8786:8786
    Forwarding from 127.0.0.1:8786 -> 8786
    Forwarding from [::1]:8786 -> 8786
 
@@ -156,12 +156,12 @@ We can also list all of the pods created by the operator to run our cluster.
 
 .. code-block:: console
 
-   $ kubectl get po -l dask.org/cluster-name=simple-cluster
+   $ kubectl get po -l dask.org/cluster-name=simple
    NAME                                                                          READY   STATUS    RESTARTS   AGE
-   simple-cluster-default-worker-group-worker-13f4f0d13bbc40a58cfb81eb374f26c3   1/1     Running   0          104s
-   simple-cluster-default-worker-group-worker-aa79dfae83264321a79f1f0ffe91f700   1/1     Running   0          104s
-   simple-cluster-default-worker-group-worker-f13c4f2103e14c2d86c1b272cd138fe6   1/1     Running   0          104s
-   simple-cluster-scheduler                                                      1/1     Running   0          104s
+   simple-default-worker-13f4f0d13bbc40a58cfb81eb374f26c3                        1/1     Running   0          104s
+   simple-default-worker-aa79dfae83264321a79f1f0ffe91f700                        1/1     Running   0          104s
+   simple-default-worker-f13c4f2103e14c2d86c1b272cd138fe6                        1/1     Running   0          104s
+   simple-scheduler                                                              1/1     Running   0          104s
 
 The workers we see here are created by our clusters default ``workergroup`` resource that was also created by the operator.
 
@@ -169,31 +169,31 @@ You can scale the ``workergroup`` like you would a ``Deployment`` or ``ReplicaSe
 
 .. code-block:: console
 
-   $ kubectl scale --replicas=5 daskworkergroup simple-cluster-default-worker-group
-   daskworkergroup.kubernetes.dask.org/simple-cluster-default-worker-group scaled
+   $ kubectl scale --replicas=5 daskworkergroup simple-default
+   daskworkergroup.kubernetes.dask.org/simple-default
 
 We can verify that new pods have been created.
 
 .. code-block:: console
 
-   $ kubectl get po -l dask.org/cluster-name=simple-cluster
+   $ kubectl get po -l dask.org/cluster-name=simple
    NAME                                                                          READY   STATUS    RESTARTS   AGE
-   simple-cluster-default-worker-group-worker-13f4f0d13bbc40a58cfb81eb374f26c3   1/1     Running   0          5m26s
-   simple-cluster-default-worker-group-worker-a52bf313590f432d9dc7395875583b52   1/1     Running   0          27s
-   simple-cluster-default-worker-group-worker-aa79dfae83264321a79f1f0ffe91f700   1/1     Running   0          5m26s
-   simple-cluster-default-worker-group-worker-f13c4f2103e14c2d86c1b272cd138fe6   1/1     Running   0          5m26s
-   simple-cluster-default-worker-group-worker-f4223a45b49d49288195c540c32f0fc0   1/1     Running   0          27s
-   simple-cluster-scheduler                                                      1/1     Running   0          5m26s
+   simple-default-worker-13f4f0d13bbc40a58cfb81eb374f26c3                        1/1     Running   0          5m26s
+   simple-default-worker-a52bf313590f432d9dc7395875583b52                        1/1     Running   0          27s
+   simple-default-worker-aa79dfae83264321a79f1f0ffe91f700                        1/1     Running   0          5m26s
+   simple-default-worker-f13c4f2103e14c2d86c1b272cd138fe6                        1/1     Running   0          5m26s
+   simple-default-worker-f4223a45b49d49288195c540c32f0fc0                        1/1     Running   0          27s
+   simple-scheduler                                                              1/1     Running   0          5m26s
 
 Finally we can delete the cluster either by deleting the manifest we applied before, or directly by name:
 
 .. code-block:: console
 
    $ kubectl delete -f cluster.yaml
-   daskcluster.kubernetes.dask.org "simple-cluster" deleted
+   daskcluster.kubernetes.dask.org "simple" deleted
 
-   $ kubectl delete daskcluster simple-cluster
-   daskcluster.kubernetes.dask.org "simple-cluster" deleted
+   $ kubectl delete daskcluster simple
+   daskcluster.kubernetes.dask.org "simple" deleted
 
 DaskWorkerGroup
 ---------------
@@ -246,9 +246,9 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
     apiVersion: kubernetes.dask.org/v1
     kind: DaskWorkerGroup
     metadata:
-      name: simple-cluster-highmem-worker-group
+      name: simple-highmem
     spec:
-      cluster: simple-cluster
+      cluster: simple
       worker:
         replicas: 2
         spec:
@@ -276,16 +276,16 @@ See the :ref:`config`. Now apply ``highmemworkers.yaml``
 .. code-block:: console
 
    $ kubectl apply -f highmemworkers.yaml
-   daskworkergroup.kubernetes.dask.org/simple-cluster-highmem-worker-group created
+   daskworkergroup.kubernetes.dask.org/simple-highmem created
 
 We can list our clusters:
 
 .. code-block:: console
 
    $ kubectl get daskworkergroups
-   NAME                                  AGE
-   simple-cluster-default-worker-group   2 hours
-   simple-cluster-highmem-worker-group   47s
+   NAME                 AGE
+   simple-default       2 hours
+   simple-highmem       47s
 
 We don't need to worry about deleting this worker group seperately, because it has joined the existing cluster Kubernetes will delete it
 when the ``DaskCluster`` resource is deleted.
@@ -407,7 +407,7 @@ Let's create an example called ``job.yaml`` with the following configuration:
             service:
               type: ClusterIP
               selector:
-                dask.org/cluster-name: simple-job-cluster
+                dask.org/cluster-name: simple-job
                 dask.org/component: scheduler
               ports:
                 - name: tcp-comm
@@ -433,10 +433,10 @@ Now if we check our cluster resources we should see our job and cluster pods bei
 
     $ kubectl get pods
     NAME                                                        READY   STATUS              RESTARTS   AGE
-    simple-job-cluster-scheduler                                1/1     Running             0          8s
+    simple-job-scheduler                                        1/1     Running             0          8s
     simple-job-runner                                           1/1     Running             0          8s
-    simple-job-cluster-default-worker-group-worker-1f6c670fba   1/1     Running             0          8s
-    simple-job-cluster-default-worker-group-worker-791f93d9ec   1/1     Running             0          8s
+    simple-job-default-worker-1f6c670fba                        1/1     Running             0          8s
+    simple-job-default-worker-791f93d9ec                        1/1     Running             0          8s
 
 Our runner pod will be doing whatever we configured it to do. In our example you can see we just create a simple ``dask.distributed.Client`` object like this:
 
@@ -461,9 +461,9 @@ go into a ``Completed`` state and the Dask cluster will be cleaned up automatica
     $ kubectl get pods
     NAME                                                        READY   STATUS              RESTARTS   AGE
     simple-job-runner                                           0/1     Completed           0          14s
-    simple-job-cluster-scheduler                                1/1     Terminating         0          14s
-    simple-job-cluster-default-worker-group-worker-1f6c670fba   1/1     Terminating         0          14s
-    simple-job-cluster-default-worker-group-worker-791f93d9ec   1/1     Terminating         0          14s
+    simple-job-scheduler                                        1/1     Terminating         0          14s
+    simple-job-default-worker-1f6c670fba                        1/1     Terminating         0          14s
+    simple-job-default-worker-791f93d9ec                        1/1     Terminating         0          14s
 
 When you delete the ``DaskJob`` resource everything is delete automatically, whether that's just the ``Completed`` runner pod left over after a successful run or a full Dask cluster and runner that is still running.
 
@@ -530,16 +530,16 @@ and then update the number of replicas in the default ``DaskWorkerGroup``.
     apiVersion: kubernetes.dask.org/v1
     kind: DaskAutoscaler
     metadata:
-      name: simple-cluster-autoscaler
+      name: simple
     spec:
-      cluster: "simple-cluster"
+      cluster: "simple"
       minimum: 1  # we recommend always having a minimum of 1 worker so that an idle cluster can start working on tasks immediately
       maximum: 10 # you can place a hard limit on the number of workers regardless of what the scheduler requests
 
 .. code-block:: console
 
     $ kubectl apply -f autoscaler.yaml
-    daskautoscaler.kubernetes.dask.org/simple-cluster-autoscaler created
+    daskautoscaler.kubernetes.dask.org/simple created
 
 You can end the autoscaling at any time by deleting the resource. The number of workers will remain at whatever the autoscaler last
 set it to.
@@ -547,7 +547,7 @@ set it to.
 .. code-block:: console
 
     $ kubectl delete -f autoscaler.yaml
-    daskautoscaler.kubernetes.dask.org/simple-cluster-autoscaler deleted
+    daskautoscaler.kubernetes.dask.org/simple deleted
 
 .. note::
 

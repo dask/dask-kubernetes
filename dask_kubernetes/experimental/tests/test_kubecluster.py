@@ -3,7 +3,7 @@ import pytest
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
-from dask_kubernetes.experimental import KubeCluster
+from dask_kubernetes.experimental import KubeCluster, make_cluster_spec
 
 
 @pytest.fixture
@@ -100,3 +100,13 @@ def test_adapt(kopf_runner, docker_image):
             # Need to clean up the DaskAutoscaler object
             # See https://github.com/dask/dask-kubernetes/issues/546
             cluster.scale(0)
+
+
+def test_custom_spec(kopf_runner, docker_image):
+    with kopf_runner:
+        spec = make_cluster_spec("customspec", image=docker_image)
+        with KubeCluster(
+            custom_cluster_spec=spec,
+        ) as cluster:
+            with Client(cluster) as client:
+                assert client.submit(lambda x: x + 1, 10).result() == 11

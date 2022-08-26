@@ -28,14 +28,14 @@ class SchedulerCommError(Exception):
     pass
 
 
-def build_scheduler_pod_spec(name, spec):
+def build_scheduler_pod_spec(cluster_name, spec):
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
-            "name": f"{name}-scheduler",
+            "name": f"{cluster_name}-scheduler",
             "labels": {
-                "dask.org/cluster-name": name,
+                "dask.org/cluster-name": cluster_name,
                 "dask.org/component": "scheduler",
                 "sidecar.istio.io/inject": "false",
             },
@@ -44,14 +44,14 @@ def build_scheduler_pod_spec(name, spec):
     }
 
 
-def build_scheduler_service_spec(name, spec):
+def build_scheduler_service_spec(cluster_name, spec):
     return {
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
-            "name": f"{name}-service",
+            "name": f"{cluster_name}-scheduler",
             "labels": {
-                "dask.org/cluster-name": name,
+                "dask.org/cluster-name": cluster_name,
             },
         },
         "spec": spec,
@@ -81,7 +81,7 @@ def build_worker_pod_spec(worker_group_name, namespace, cluster_name, uuid, spec
         },
         {
             "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-service.{namespace}.svc.cluster.local:8786",
+            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
     for i in range(len(pod_spec["spec"]["containers"])):
@@ -109,7 +109,7 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec):
     env = [
         {
             "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-service.{namespace}.svc.cluster.local:8786",
+            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
     for i in range(len(pod_spec["spec"]["containers"])):
@@ -120,13 +120,19 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec):
     return pod_spec
 
 
-def build_worker_group_spec(name, spec):
+def build_default_worker_group_spec(cluster_name, spec):
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
-        "metadata": {"name": f"{name}-default-worker-group"},
+        "metadata": {
+            "name": f"{cluster_name}-default",
+            "labels": {
+                "dask.org/cluster-name": cluster_name,
+                "dask.org/component": "workergroup",
+            },
+        },
         "spec": {
-            "cluster": name,
+            "cluster": cluster_name,
             "worker": spec,
         },
     }
@@ -136,7 +142,12 @@ def build_cluster_spec(name, worker_spec, scheduler_spec):
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
-        "metadata": {"name": name},
+        "metadata": {
+            "name": name,
+            "labels": {
+                "dask.org/cluster-name": name,
+            },
+        },
         "spec": {"worker": worker_spec, "scheduler": scheduler_spec},
     }
 
@@ -198,9 +209,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
         )
 
         worker_spec = spec.get("worker", {})
-        data = build_worker_group_spec(name, worker_spec)
-        # TODO: Next line is not needed if we can get worker groups adopted by the cluster
-        kopf.adopt(data)
+        data = build_default_worker_group_spec(name, worker_spec)
         await custom_api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
@@ -352,7 +361,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
         if workers_needed < 0:
             worker_ids = await retire_workers(
                 n_workers=-workers_needed,
-                scheduler_service_name=f"{spec['cluster']}-service",
+                scheduler_service_name=f"{spec['cluster']}-scheduler",
                 worker_group_name=name,
                 namespace=namespace,
                 logger=logger,
@@ -375,7 +384,7 @@ async def daskjob_create(spec, name, namespace, logger, **kwargs):
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         corev1api = kubernetes.client.CoreV1Api(api_client)
 
-        cluster_name = f"{name}-cluster"
+        cluster_name = f"{name}"
         cluster_spec = build_cluster_spec(
             cluster_name,
             spec["cluster"]["spec"]["worker"],
@@ -406,20 +415,23 @@ async def daskjob_create(spec, name, namespace, logger, **kwargs):
         )
 
 
-@kopf.on.field("pod", field="status.phase", labels={"dask.org/component": "job-runner"})
+@kopf.on.field(
+    "pod",
+    field="status.phase",
+    labels={"dask.org/component": "job-runner"},
+    new="Succeeded",
+)
 async def handle_runner_status_change(meta, new, namespace, logger, **kwargs):
-    logger.info(f"Job now in phase {new}.")
-    if new == "Succeeded":
-        logger.info("Job succeeded, deleting Dask cluster.")
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
-            await customobjectsapi.delete_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace=namespace,
-                name=meta["labels"]["dask.org/cluster-name"],
-            )
+    logger.info("Job succeeded, deleting Dask cluster.")
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        await customobjectsapi.delete_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+        )
 
 
 @kopf.on.create("daskautoscaler")
@@ -455,7 +467,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     # Ask the scheduler for the desired number of worker
     try:
         desired_workers = await get_desired_workers(
-            scheduler_service_name=f"{spec['cluster']}-service",
+            scheduler_service_name=f"{spec['cluster']}-scheduler",
             namespace=namespace,
             logger=logger,
         )
@@ -479,6 +491,6 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
             version="v1",
             plural="daskworkergroups",
             namespace=namespace,
-            name=f"{spec['cluster']}-default-worker-group",
+            name=f"{spec['cluster']}-default",
             body={"spec": {"replicas": desired_workers}},
         )
