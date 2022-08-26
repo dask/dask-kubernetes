@@ -644,12 +644,15 @@ class KubeCluster(SpecCluster):
 
         await super()._start()
 
-        dashboard_address = await get_scheduler_address(
-            self.scheduler.service.metadata.name,
-            self.namespace,
-            port_name="http-dashboard",
-        )
-        self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
+        if self._deploy_mode == "local":
+            self.forwarded_dashboard_port = self.scheduler.services["dashboard"].port
+        else:
+            dashboard_address = await get_scheduler_address(
+                self.scheduler.service.metadata.name,
+                self.namespace,
+                port_name="http-dashboard",
+            )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
