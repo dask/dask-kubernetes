@@ -19,7 +19,7 @@ def escape(s):
 
 def namespace_default():
     """
-    Get current namespace if running in a k8s cluster
+    Get current namespace if running  in a k8s cluster
 
     If not in a k8s cluster with service accounts enabled, default to
     'default'
