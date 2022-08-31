@@ -1,0 +1,30 @@
+# This is configuration for chartpress, a CLI for Helm chart management.
+#
+# chartpress is used to test, package, and publish the dask-gateway Helm chart
+# to the gh-pages based Helm chart repository at https://helm.dask.org and
+# https://github.com/dask/helm-chart respectively. Note that a Helm chart
+# repository is just a website that can serve a "index.yaml" file pointing to
+# packaged Helm charts that can be downloaded.
+#
+# chartpress is used to:
+# - Build images for multiple CPU architectures
+# - Update Chart.yaml (version) and values.yaml (image tags)
+# - Package and publish Helm charts to a GitHub based Helm chart repository
+#
+# Configuration reference:
+# https://github.com/jupyterhub/chartpress#configuration
+#
+# This configuration was directly copied from the https://github.com/dask/dask-gateway repo
+
+charts:
+  - name: dask-kubernetes-operator
+    repo:
+      git: dask/helm-chart
+      published: https://helm.dask.org
+    images:
+      dask-kubernetes-operator:
+        imageName: ghcr.io/dask/dask-kubernetes-operator
+        dockerfilePath: ../Dockerfile
+        contextPath: ../../../../
+        valuesPath:
+          - image

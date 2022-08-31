@@ -1,0 +1,77 @@
+apiVersion: kubernetes.dask.org/v1
+kind: DaskJob
+metadata:
+  name: simple-job
+  namespace: default
+spec:
+  job:
+    spec:
+      containers:
+        - name: job
+          image: "dask-kubernetes:dev"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - python
+            - -c
+            - "from dask.distributed import Client; client = Client(name='job')"
+
+  cluster:
+    spec:
+      worker:
+        replicas: 2
+        spec:
+          containers:
+            - name: worker
+              image: "dask-kubernetes:dev"
+              imagePullPolicy: "IfNotPresent"
+              args:
+                - dask-worker
+                - --name
+                - $(DASK_WORKER_NAME)
+              env:
+                - name: WORKER_ENV
+                  value: hello-world # We dont test the value, just the name
+      scheduler:
+        spec:
+          containers:
+            - name: scheduler
+              image: "dask-kubernetes:dev"
+              imagePullPolicy: "IfNotPresent"
+              args:
+                - dask-scheduler
+              ports:
+                - name: tcp-comm
+                  containerPort: 8786
+                  protocol: TCP
+                - name: http-dashboard
+                  containerPort: 8787
+                  protocol: TCP
+              readinessProbe:
+                httpGet:
+                  port: http-dashboard
+                  path: /health
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              livenessProbe:
+                httpGet:
+                  port: http-dashboard
+                  path: /health
+                initialDelaySeconds: 15
+                periodSeconds: 20
+              env:
+                - name: SCHEDULER_ENV
+                  value: hello-world
+        service:
+          type: ClusterIP
+          selector:
+            dask.org/cluster-name: simple-job
+            dask.org/component: scheduler
+          ports:
+            - name: tcp-comm
+              protocol: TCP
+              port: 8786
+              targetPort: "tcp-comm"
+            - name: http-dashboard
+              protocol: TCP
+              port: 8787
+              targetPort: "http-dashboard"

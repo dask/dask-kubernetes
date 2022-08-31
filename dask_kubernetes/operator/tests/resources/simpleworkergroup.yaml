@@ -1,16 +1,19 @@
 apiVersion: kubernetes.dask.org/v1
 kind: DaskWorkerGroup
 metadata:
-  name: simple-cluster-additional-worker-group
+  name: simple-additional
+  namespace: default
 spec:
-  imagePullSecrets: null
-  image: "dask-kubernetes:dev"
-  imagePullPolicy: "IfNotPresent"
-  replicas: 2
-  resources: {}
-  env: []
-  # nodeSelector: null
-  # securityContext: null
-  # affinity: null
-  # tolerations: null
-  # serviceAccountName: null
+  cluster: simple
+  worker:
+    replicas: 2
+    spec:
+      containers:
+        - name: worker
+          image: "dask-kubernetes:dev"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - dask-worker
+          env:
+            - name: WORKER_ENV
+              value: hello-world # We dont test the value, just the name

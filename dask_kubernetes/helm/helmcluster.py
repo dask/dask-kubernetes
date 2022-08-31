@@ -7,7 +7,7 @@ import json
 
 from distributed.deploy import Cluster
 from distributed.core import rpc, Status
-from distributed.utils import Log, Logs, LoopRunner
+from distributed.utils import Log, Logs
 import kubernetes_asyncio as kubernetes
 
 from ..common.auth import ClusterAuth
@@ -85,12 +85,11 @@ class HelmCluster(Cluster):
         auth=ClusterAuth.DEFAULT,
         namespace=None,
         port_forward_cluster_ip=False,
-        loop=None,
-        asynchronous=False,
         scheduler_name="scheduler",
         worker_name="worker",
         node_host=None,
         node_port=None,
+        name=None,
         **kwargs,
     ):
         self.release_name = release_name
@@ -110,14 +109,12 @@ class HelmCluster(Cluster):
         self.scheduler_comm = None
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self._supports_scaling = True
-        self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
-        self.loop = self._loop_runner.loop
         self.scheduler_name = scheduler_name
         self.worker_name = worker_name
         self.node_host = node_host
         self.node_port = node_port
 
-        super().__init__(asynchronous=asynchronous, **kwargs)
+        super().__init__(name=name, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)

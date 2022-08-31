@@ -23,7 +23,7 @@ Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
 
     from dask_kubernetes import KubeCluster, make_pod_spec
 
-    pod_spec = make_pod_spec(image='daskdev/dask:latest')
+    pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest')
     cluster = KubeCluster(pod_spec)
     cluster.scale(10)
 
@@ -62,6 +62,10 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :caption: Operator
 
    operator
+   operator_installation
+   operator_resources
+   operator_kubecluster
+   operator_extending
 
 .. toctree::
    :maxdepth: 2

@@ -1,0 +1,49 @@
+definitions:
+
+  dask.k8s.api.v1.DaskWorker:
+    type: object
+    description: Dask Worker configuration
+    required:
+    - spec
+    properties:
+      replicas:
+        type: integer
+        default: 1
+        description: Number of workers to start
+      spec:
+        $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
+
+  dask.k8s.api.v1.DaskScheduler:
+    type: object
+    description: Dask scheduler configuration
+    required:
+    - spec
+    - service
+    properties:
+      spec:
+        $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
+      service:
+        $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.ServiceSpec'
+
+  dask.k8s.api.v1.DaskCluster:
+    type: object
+    description: Dask scheduler configuration
+    required:
+    - spec
+    properties:
+      status:
+        type: object
+        properties:
+          phase:
+            type: string
+            description: Status of the Dask cluster
+      spec:
+        type: object
+        required:
+        - scheduler
+        - worker
+        properties:
+          scheduler:
+            $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskScheduler'
+          worker:
+            $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskWorker'

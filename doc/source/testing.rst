@@ -1,6 +1,8 @@
 Testing
 =======
 
+.. warning:: Tests are not working on aarch64 (Apple M1) at the moment due to an architecture incompatibility between ``pytest-kind-control-plane`` and the docker image built from ``ci/Dockerfile``, similar to `this GitHub issue <https://github.com/kubernetes-sigs/kind/issues/2402>`_.
+
 Running the test suite for ``dask-kubernetes`` doesn't require an existing Kubernetes cluster but does require
 `Docker <https://docs.docker.com/get-docker/>`_, `kubectl <https://kubernetes.io/docs/tasks/tools/#kubectl>`_ and `helm <https://helm.sh/docs/intro/install/>`_.
 
@@ -25,6 +27,10 @@ Tests are run using `pytest <https://docs.pytest.org/en/stable/>`_::
 
     ...
     ================= 56 passed, 1 skipped, 6 xfailed, 1 xpassed, 53 warnings in 404.19s (0:06:44) ==================
+
+
+.. note::
+    Running ``pytest``, installs the `Custom Resource Definitions from the manifests <https://kubernetes.dask.org/en/latest/operator_installation.html#installing-with-manifests>`_,  tests against them and then uninstalls them. You may have to install them again manually.
 
 Kind
 ----

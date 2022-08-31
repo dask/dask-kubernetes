@@ -1,5 +1,5 @@
-dask>=2021.02.0
-distributed>=2021.02.0
+dask>=2022.08.1
+distributed>=2022.08.1
 kubernetes>=12.0.1
 kubernetes-asyncio>=12.0.1
 kopf>=1.35.3

@@ -1,22 +1,33 @@
+from __future__ import annotations
+
 import asyncio
+import atexit
+from contextlib import suppress
 from enum import Enum
+import time
+from typing import ClassVar
+import weakref
+
 import kubernetes_asyncio as kubernetes
 
-from distributed.core import rpc
+from distributed.core import Status, rpc
 from distributed.deploy import Cluster
-
-from distributed.utils import Log, Logs, LoopRunner
+from distributed.utils import (
+    Log,
+    Logs,
+    TimeoutError,
+    format_dashboard_link,
+)
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.operator import (
-    build_cluster_spec,
-    build_worker_group_spec,
     wait_for_service,
 )
 
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
     wait_for_scheduler,
+    wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
 
@@ -48,9 +59,14 @@ class KubeCluster(Cluster):
         Number of workers on initial launch.
         Use ``scale`` to change this number in the future
     resources: Dict[str, str]
-        Resources to be passed to the underlying pods.
-    env: List[dict]
-        List of environment variables to pass to worker pod
+    env: List[dict] | Dict[str, str]
+        List of environment variables to pass to worker pod.
+        Can be a list of dicts using the same structure as k8s envs
+        or a single dictionary of key/value pairs
+    worker_command: List[str] | str
+        The command to use when starting the worker.
+        If command consists of multiple words it should be passed as a list of strings.
+        Defaults to ``"dask-worker"``.
     auth: List[ClusterAuth] (optional)
         Configuration methods to attempt in order.  Defaults to
         ``[InCluster(), KubeConfig()]``.
@@ -68,6 +84,15 @@ class KubeCluster(Cluster):
     shutdown_on_close: bool (optional)
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
+    resource_timeout: int (optional)
+        Time in seconds to wait for the controller to take action before giving up.
+        If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase`` by the controller
+        then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
+        useful error.
+        Defaults to ``60`` seconds.
+    custom_cluster_spec: dict (optional)
+        A dictionary representation of a ``DaskCluster`` resource object which will be used to create
+        the cluster instead of generating one from the other keyword arguments.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -104,20 +129,23 @@ class KubeCluster(Cluster):
     KubeCluster.from_name
     """
 
+    _instances: ClassVar[weakref.WeakSet[KubeCluster]] = weakref.WeakSet()
+
     def __init__(
         self,
-        name,
+        name=None,
         namespace=None,
-        image="daskdev/dask:latest",
+        image="ghcr.io/dask/dask:latest",
         n_workers=3,
         resources={},
         env=[],
-        loop=None,
-        asynchronous=False,
+        worker_command="dask-worker",
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
         create_mode=CreateMode.CREATE_OR_CONNECT,
         shutdown_on_close=None,
+        resource_timeout=60,
+        custom_cluster_spec=None,
         **kwargs,
     ):
         self.name = name
@@ -126,21 +154,30 @@ class KubeCluster(Cluster):
         self.n_workers = n_workers
         self.resources = resources
         self.env = env
+        self.worker_command = worker_command
+        if isinstance(self.worker_command, str):
+            self.worker_command = self.worker_command.split(" ")
         self.auth = auth
         self.port_forward_cluster_ip = port_forward_cluster_ip
         self.create_mode = create_mode
         self.shutdown_on_close = shutdown_on_close
-        self._loop_runner = LoopRunner(loop=loop, asynchronous=asynchronous)
-        self.loop = self._loop_runner.loop
+        self._resource_timeout = resource_timeout
+        self._custom_cluster_spec = custom_cluster_spec
 
-        super().__init__(asynchronous=asynchronous, **kwargs)
+        if self._custom_cluster_spec:
+            name = self._custom_cluster_spec["metadata"]["name"]
+
+        self._instances.add(self)
+
+        super().__init__(name=name, **kwargs)
         if not self.asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
 
     @property
-    def cluster_name(self):
-        return f"{self.name}-cluster"
+    def dashboard_link(self):
+        host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
+        return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     async def _start(self):
         await ClusterAuth.load_first(self.auth)
@@ -148,13 +185,13 @@ class KubeCluster(Cluster):
 
         if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
             raise ValueError(
-                f"Cluster {self.cluster_name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
+                f"Cluster {self.name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
             )
         elif cluster_exists:
             await self._connect_cluster()
         elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
             raise ValueError(
-                f"Cluster {self.cluster_name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
+                f"Cluster {self.name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
             )
         else:
             await self._create_cluster()
@@ -167,9 +204,18 @@ class KubeCluster(Cluster):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             core_api = kubernetes.client.CoreV1Api(api_client)
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            data = build_cluster_spec(
-                self.name, self.image, self.n_workers, self.resources, self.env
-            )
+
+            if not self._custom_cluster_spec:
+                data = make_cluster_spec(
+                    name=self.name,
+                    env=self.env,
+                    resources=self.resources,
+                    worker_command=self.worker_command,
+                    n_workers=self.n_workers,
+                    image=self.image,
+                )
+            else:
+                data = self._custom_cluster_spec
             try:
                 await custom_objects_api.create_namespaced_custom_object(
                     group="kubernetes.dask.org",
@@ -184,9 +230,23 @@ class KubeCluster(Cluster):
                     "Are the Dask Custom Resource Definitions installed? "
                     "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
                 ) from e
-            await wait_for_scheduler(self.cluster_name, self.namespace)
-            await wait_for_service(core_api, data["metadata"]["name"], self.namespace)
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
+
+            try:
+                await self._wait_for_controller()
+            except TimeoutError as e:
+                await self._close()
+                raise e
+            await wait_for_scheduler(self.name, self.namespace)
+            await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                f"{self.name}-scheduler",
+                self.namespace,
+                port_name="http-dashboard",
+            )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
@@ -194,15 +254,29 @@ class KubeCluster(Cluster):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             core_api = kubernetes.client.CoreV1Api(api_client)
             cluster_spec = await self._get_cluster()
-            self.image = cluster_spec["spec"]["image"]
-            self.n_workers = cluster_spec["spec"]["replicas"]
-            self.resources = cluster_spec["spec"]["resources"]
-            self.env = cluster_spec["spec"]["env"]
-            await wait_for_scheduler(self.cluster_name, self.namespace)
-            await wait_for_service(
-                core_api, cluster_spec["metadata"]["name"], self.namespace
+            container_spec = cluster_spec["spec"]["worker"]["spec"]["containers"][0]
+            self.image = container_spec["image"]
+            self.n_workers = cluster_spec["spec"]["worker"]["replicas"]
+            if "resources" in container_spec:
+                self.resources = container_spec["resources"]
+            else:
+                self.resources = None
+            if "env" in container_spec:
+                self.env = container_spec["env"]
+            else:
+                self.env = {}
+            service_name = f"{cluster_spec['metadata']['name']}-scheduler"
+            await wait_for_scheduler(self.name, self.namespace)
+            await wait_for_service(core_api, service_name, self.namespace)
+            scheduler_address = await self._get_scheduler_address()
+            await wait_for_scheduler_comm(scheduler_address)
+            self.scheduler_comm = rpc(scheduler_address)
+            dashboard_address = await get_scheduler_address(
+                service_name,
+                self.namespace,
+                port_name="http-dashboard",
             )
-            self.scheduler_comm = rpc(await self._get_scheduler_address())
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -213,14 +287,36 @@ class KubeCluster(Cluster):
                     version="v1",
                     plural="daskclusters",
                     namespace=self.namespace,
-                    name=self.cluster_name,
+                    name=self.name,
                 )
-            except kubernetes.client.exceptions.ApiException:
+            except kubernetes.client.exceptions.ApiException as e:
                 return None
 
     async def _get_scheduler_address(self):
-        address = await get_scheduler_address(self.cluster_name, self.namespace)
+        address = await get_scheduler_address(f"{self.name}-scheduler", self.namespace)
         return address
+
+    async def _wait_for_controller(self):
+        """Wait for the operator to set the status.phase."""
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            watch = kubernetes.watch.Watch()
+            async for event in watch.stream(
+                func=custom_objects_api.list_namespaced_custom_object,
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskclusters",
+                namespace=self.namespace,
+                field_selector=f"metadata.name={self.name}",
+                timeout_seconds=self._resource_timeout,
+            ):
+                cluster = event["object"]
+                if "status" in cluster and "phase" in cluster["status"]:
+                    return
+                await asyncio.sleep(0.1)
+        raise TimeoutError(
+            f"Dask Cluster resource not actioned after {self._resource_timeout} seconds, is the Dask Operator running?"
+        )
 
     def get_logs(self):
         """Get logs for Dask scheduler and workers.
@@ -228,10 +324,10 @@ class KubeCluster(Cluster):
         Examples
         --------
         >>> cluster.get_logs()
-        {'foo-cluster-scheduler': ...,
-        'foo-cluster-default-worker-group-worker-0269dbfa0cfd4a22bcd9d92ae032f4d2': ...,
-        'foo-cluster-default-worker-group-worker-7c1ccb04cd0e498fb21babaedd00e5d4': ...,
-        'foo-cluster-default-worker-group-worker-d65bee23bdae423b8d40c5da7a1065b6': ...}
+        {'foo': ...,
+        'foo-default-worker-0269dbfa0cfd4a22bcd9d92ae032f4d2': ...,
+        'foo-default-worker-7c1ccb04cd0e498fb21babaedd00e5d4': ...,
+        'foo-default-worker-d65bee23bdae423b8d40c5da7a1065b6': ...}
         Each log will be a string of all logs for that container. To view
         it is recommeded that you print each log.
         >>> print(cluster.get_logs()["testdask-scheduler-5c8ffb6b7b-sjgrg"])
@@ -251,7 +347,7 @@ class KubeCluster(Cluster):
 
             pods = await core_api.list_namespaced_pod(
                 namespace=self.namespace,
-                label_selector=f"dask.org/cluster-name={self.name}-cluster",
+                label_selector=f"dask.org/cluster-name={self.name}",
             )
 
             for pod in pods.items:
@@ -272,7 +368,16 @@ class KubeCluster(Cluster):
 
         return logs
 
-    def add_worker_group(self, name, n_workers=3, image=None, resources=None, env=None):
+    def add_worker_group(
+        self,
+        name,
+        n_workers=3,
+        image=None,
+        resources=None,
+        worker_command=None,
+        env=None,
+        custom_spec=None,
+    ):
         """Create a dask worker group by name
 
         Parameters
@@ -291,6 +396,9 @@ class KubeCluster(Cluster):
         env: List[dict]
             List of environment variables to pass to worker pod.
             If ommitted will use the cluster default.
+        custom_spec: dict (optional)
+            A dictionary representation of a worker spec which will be used to create the ``DaskWorkerGroup`` instead
+            of generating one from the other keyword arguments.
 
         Examples
         --------
@@ -302,20 +410,42 @@ class KubeCluster(Cluster):
             n_workers=n_workers,
             image=image,
             resources=resources,
+            worker_command=worker_command,
             env=env,
+            custom_spec=custom_spec,
         )
 
     async def _add_worker_group(
-        self, name, n_workers=3, image=None, resources=None, env=None
+        self,
+        name,
+        n_workers=3,
+        image=None,
+        resources=None,
+        worker_command=None,
+        env=None,
+        custom_spec=None,
     ):
-        data = build_worker_group_spec(
-            f"{self.cluster_name}-{name}",
-            self.cluster_name,
-            image or self.image,
-            n_workers,
-            resources or self.resources,
-            env or self.env,
-        )
+        if custom_spec is not None:
+            spec = custom_spec
+        else:
+            spec = make_worker_spec(
+                cluster_name=self.name,
+                env=env or self.env,
+                resources=resources or self.resources,
+                worker_command=worker_command or self.worker_command,
+                n_workers=n_workers or self.n_workers,
+                image=image or self.image,
+            )
+        data = {
+            "apiVersion": "kubernetes.dask.org/v1",
+            "kind": "DaskWorkerGroup",
+            "metadata": {"name": f"{self.name}-{name}"},
+            "spec": {
+                "cluster": f"{self.name}",
+                "worker": spec,
+            },
+        }
+
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
             await custom_objects_api.create_namespaced_custom_object(
@@ -348,14 +478,14 @@ class KubeCluster(Cluster):
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.cluster_name}-{name}-worker-group",
+                name=f"{self.name}-{name}",
             )
 
-    def close(self):
+    def close(self, timeout=3600):
         """Delete the dask cluster"""
-        return self.sync(self._close)
+        return self.sync(self._close, timeout=timeout)
 
-    async def _close(self):
+    async def _close(self, timeout=None):
         await super()._close()
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -365,9 +495,14 @@ class KubeCluster(Cluster):
                     version="v1",
                     plural="daskclusters",
                     namespace=self.namespace,
-                    name=self.cluster_name,
+                    name=self.name,
                 )
+            start = time.time()
             while (await self._get_cluster()) is not None:
+                if time.time() > start + timeout:
+                    raise TimeoutError(
+                        f"Timed out deleting cluster resource {self.name}"
+                    )
                 await asyncio.sleep(1)
 
     def scale(self, n, worker_group="default"):
@@ -394,20 +529,77 @@ class KubeCluster(Cluster):
             custom_objects_api.api_client.set_default_header(
                 "content-type", "application/merge-patch+json"
             )
+            # Disable adaptivity if enabled
+            with suppress(kubernetes.client.ApiException):
+                await custom_objects_api.delete_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    name=self.name,
+                )
             await custom_objects_api.patch_namespaced_custom_object_scale(
                 group="kubernetes.dask.org",
                 version="v1",
                 plural="daskworkergroups",
                 namespace=self.namespace,
-                name=f"{self.name}-cluster-{worker_group}-worker-group",
+                name=f"{self.name}-{worker_group}",
                 body={"spec": {"replicas": n}},
             )
 
-    def adapt(self, *args, **kwargs):
-        """Turn on adaptivity"""
-        raise NotImplementedError(
-            "Adaptive mode is not supported yet for this KubeCluster."
-        )
+    def adapt(self, minimum=None, maximum=None):
+        """Turn on adaptivity
+
+        Parameters
+        ----------
+        minimum : int
+            Minimum number of workers
+        minimum : int
+            Maximum number of workers
+
+        Examples
+        --------
+        >>> cluster.adapt()  # Allow scheduler to add/remove workers within k8s cluster resource limits
+        >>> cluster.adapt(minimum=1, maximum=10) # Allow scheduler to add/remove workers within 1-10 range
+        """
+        return self.sync(self._adapt, minimum, maximum)
+
+    async def _adapt(self, minimum=None, maximum=None):
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
+            custom_objects_api.api_client.set_default_header(
+                "content-type", "application/merge-patch+json"
+            )
+            try:
+                await custom_objects_api.patch_namespaced_custom_object_scale(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    name=self.name,
+                    body={"spec": {"minimum": minimum, "maximum": maximum}},
+                )
+            except kubernetes.client.ApiException:
+                await custom_objects_api.create_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskautoscalers",
+                    namespace=self.namespace,
+                    body={
+                        "apiVersion": "kubernetes.dask.org/v1",
+                        "kind": "DaskAutoscaler",
+                        "metadata": {
+                            "name": self.name,
+                            "dask.org/cluster-name": self.name,
+                            "dask.org/component": "autoscaler",
+                        },
+                        "spec": {
+                            "cluster": self.name,
+                            "minimum": minimum,
+                            "maximum": maximum,
+                        },
+                    },
+                )
 
     def __enter__(self):
         return self
@@ -431,3 +623,177 @@ class KubeCluster(Cluster):
         >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
         return cls(name=name, create_mode=CreateMode.CONNECT_ONLY, **kwargs)
+
+
+def make_cluster_spec(
+    name,
+    image="ghcr.io/dask/dask:latest",
+    n_workers=None,
+    resources=None,
+    env=None,
+    worker_command="dask-worker",
+):
+    """Generate a ``DaskCluster`` kubernetes resource.
+
+    Populate a template with some common options to generate a ``DaskCluster`` kubernetes resource.
+
+    Parameters
+    ----------
+    name: str
+        Name of the cluster
+    image: str (optional)
+        Container image to use for the scheduler and workers
+    n_workers: int (optional)
+        Number of workers in the default worker group
+    resources: dict (optional)
+        Resource limits to set on scheduler and workers
+    env: dict (optional)
+        Environment variables to set on scheduler and workers
+    worker_command: str (optional)
+        Worker command to use when starting the workers
+    """
+    return {
+        "apiVersion": "kubernetes.dask.org/v1",
+        "kind": "DaskCluster",
+        "metadata": {"name": name},
+        "spec": {
+            "worker": make_worker_spec(
+                cluster_name=name,
+                env=env,
+                resources=resources,
+                worker_command=worker_command,
+                n_workers=n_workers,
+                image=image,
+            ),
+            "scheduler": make_scheduler_spec(
+                cluster_name=name,
+                env=env,
+                resources=resources,
+                image=image,
+            ),
+        },
+    }
+
+
+def make_worker_spec(
+    cluster_name,
+    image="ghcr.io/dask/dask:latest",
+    n_workers=3,
+    resources=None,
+    env=None,
+    worker_command="dask-worker",
+):
+    if isinstance(env, dict):
+        env = [{"name": key, "value": value} for key, value in env.items()]
+    else:
+        # If they gave us a list, assume its a list of dicts and already ready to go
+        env = env
+
+    if isinstance(worker_command, str):
+        worker_command = worker_command.split(" ")
+
+    args = worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+
+    return {
+        "cluster": cluster_name,
+        "replicas": n_workers,
+        "spec": {
+            "containers": [
+                {
+                    "name": "worker",
+                    "image": image,
+                    "args": args,
+                    "env": env,
+                    "resources": resources,
+                }
+            ]
+        },
+    }
+
+
+def make_scheduler_spec(
+    cluster_name,
+    env=None,
+    resources=None,
+    image="ghcr.io/dask/dask:latest",
+):
+    # TODO: Take the values provided in the current class constructor
+    # and build a DaskWorker compatible dict
+    if isinstance(env, dict):
+        env = [{"name": key, "value": value} for key, value in env.items()]
+    else:
+        # If they gave us a list, assume its a list of dicts and already ready to go
+        env = env
+
+    return {
+        "spec": {
+            "containers": [
+                {
+                    "name": "scheduler",
+                    "image": image,
+                    "args": ["dask-scheduler", "--host", "0.0.0.0"],
+                    "env": env,
+                    "resources": resources,
+                    "ports": [
+                        {
+                            "name": "tcp-comm",
+                            "containerPort": 8786,
+                            "protocol": "TCP",
+                        },
+                        {
+                            "name": "http-dashboard",
+                            "containerPort": 8787,
+                            "protocol": "TCP",
+                        },
+                    ],
+                    "readinessProbe": {
+                        "httpGet": {"port": "http-dashboard", "path": "/health"},
+                        "initialDelaySeconds": 5,
+                        "periodSeconds": 10,
+                    },
+                    "livenessProbe": {
+                        "httpGet": {"port": "http-dashboard", "path": "/health"},
+                        "initialDelaySeconds": 15,
+                        "periodSeconds": 20,
+                    },
+                }
+            ]
+        },
+        "service": {
+            "type": "ClusterIP",
+            "selector": {
+                "dask.org/cluster-name": cluster_name,
+                "dask.org/component": "scheduler",
+            },
+            "ports": [
+                {
+                    "name": "tcp-comm",
+                    "protocol": "TCP",
+                    "port": 8786,
+                    "targetPort": "tcp-comm",
+                },
+                {
+                    "name": "http-dashboard",
+                    "protocol": "TCP",
+                    "port": 8787,
+                    "targetPort": "http-dashboard",
+                },
+            ],
+        },
+    }
+
+
+@atexit.register
+def reap_clusters():
+    async def _reap_clusters():
+        for cluster in list(KubeCluster._instances):
+            if cluster.shutdown_on_close and cluster.status != Status.closed:
+                await ClusterAuth.load_first(cluster.auth)
+                with suppress(TimeoutError):
+                    if cluster.asynchronous:
+                        await cluster.close(timeout=10)
+                    else:
+                        cluster.close(timeout=10)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_reap_clusters())

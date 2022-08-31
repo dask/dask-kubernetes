@@ -12,11 +12,10 @@ import dask
 import dask.distributed
 import distributed.security
 from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.utils import Log, Logs
+from distributed.utils import format_dashboard_link, Log, Logs
 import kubernetes_asyncio as kubernetes
 from kubernetes_asyncio.client.rest import ApiException
 
-from ..constants import KUBECLUSTER_WORKER_CONTAINER_NAME
 from ..common.objects import (
     make_pod_from_dict,
     make_service_from_dict,
@@ -30,7 +29,10 @@ from ..common.utils import (
     get_current_namespace,
     escape,
 )
-from ..common.networking import get_external_address_for_scheduler_service
+from ..common.networking import (
+    get_external_address_for_scheduler_service,
+    get_scheduler_address,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +111,7 @@ class Pod(ProcessInterface):
             log = await self.core_api.read_namespaced_pod_log(
                 self._pod.metadata.name,
                 self.namespace,
-                container=KUBECLUSTER_WORKER_CONTAINER_NAME,
+                container=self.pod_template.spec.containers[0].name,
             )
         except ApiException as e:
             if "waiting to start" in str(e):
@@ -349,13 +351,16 @@ class KubeCluster(SpecCluster):
     deploy_mode: str (optional)
         Run the scheduler as "local" or "remote".
         Defaults to ``"remote"``.
+    apply_default_affinity: str (optional)
+        Apply a default affinity to pods: "required", "preferred" or "none"
+        Defaults to ``"preferred"``.
     **kwargs: dict
-        Additional keyword arguments to pass to LocalCluster
+        Additional keyword arguments to pass to SpecCluster
 
     Examples
     --------
     >>> from dask_kubernetes import KubeCluster, make_pod_spec
-    >>> pod_spec = make_pod_spec(image='daskdev/dask:latest',
+    >>> pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest',
     ...                          memory_limit='4G', memory_request='4G',
     ...                          cpu_limit=1, cpu_request=1,
     ...                          env={'EXTRA_PIP_PACKAGES': 'fastparquet git+https://github.com/dask/distributed'})
@@ -384,7 +389,7 @@ class KubeCluster(SpecCluster):
 
     >>> client.get_versions(check=True)
 
-    The ``daskdev/dask`` docker images support ``EXTRA_PIP_PACKAGES``,
+    The ``ghcr.io/dask/dask`` docker images support ``EXTRA_PIP_PACKAGES``,
     ``EXTRA_APT_PACKAGES`` and ``EXTRA_CONDA_PACKAGES`` environment variables
     to help with small adjustments to the worker environments.  We recommend
     the use of pip over conda in this case due to a much shorter startup time.
@@ -433,6 +438,7 @@ class KubeCluster(SpecCluster):
         scheduler_service_wait_timeout=None,
         scheduler_service_name_resolution_retries=None,
         scheduler_pod_template=None,
+        apply_default_affinity="preferred",
         **kwargs
     ):
         if isinstance(pod_template, str):
@@ -453,6 +459,7 @@ class KubeCluster(SpecCluster):
 
         self.pod_template = pod_template
         self.scheduler_pod_template = scheduler_pod_template
+        self.apply_default_affinity = apply_default_affinity
         self._generate_name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = dask.config.get(
             "kubernetes.namespace", override_with=namespace
@@ -494,6 +501,11 @@ class KubeCluster(SpecCluster):
         self.auth = auth
         self.kwargs = kwargs
         super().__init__(**self.kwargs)
+
+    @property
+    def dashboard_link(self):
+        host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
+        return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     def _get_pod_template(self, pod_template, pod_type):
         if not pod_template and dask.config.get(
@@ -551,14 +563,20 @@ class KubeCluster(SpecCluster):
             raise ValueError(msg)
 
         base_pod_template = self.pod_template
-        self.pod_template = clean_pod_template(self.pod_template, pod_type="worker")
+        self.pod_template = clean_pod_template(
+            self.pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="worker",
+        )
 
         if not self.scheduler_pod_template:
             self.scheduler_pod_template = base_pod_template
         self.scheduler_pod_template.spec.containers[0].args = ["dask-scheduler"]
 
         self.scheduler_pod_template = clean_pod_template(
-            self.scheduler_pod_template, pod_type="scheduler"
+            self.scheduler_pod_template,
+            apply_default_affinity=self.apply_default_affinity,
+            pod_type="scheduler",
         )
 
         await ClusterAuth.load_first(self.auth)
@@ -626,6 +644,16 @@ class KubeCluster(SpecCluster):
 
         await super()._start()
 
+        if self._deploy_mode == "local":
+            self.forwarded_dashboard_port = self.scheduler.services["dashboard"].port
+        else:
+            dashboard_address = await get_scheduler_address(
+                self.scheduler.service.metadata.name,
+                self.namespace,
+                port_name="http-dashboard",
+            )
+            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
+
     @classmethod
     def from_dict(cls, pod_spec, **kwargs):
         """Create cluster with worker pod spec defined by Python dictionary
@@ -642,7 +670,7 @@ class KubeCluster(SpecCluster):
         ...                      '--nthreads', '1',
         ...                      '--death-timeout', '60'],
         ...             'command': None,
-        ...             'image': 'daskdev/dask:latest',
+        ...             'image': 'ghcr.io/dask/dask:latest',
         ...             'name': 'dask-worker',
         ...         }],
         ...     'restartPolicy': 'Never',
@@ -677,7 +705,7 @@ class KubeCluster(SpecCluster):
                 baz: quux
             spec:
               containers:
-              - image: daskdev/dask:latest
+              - image: ghcr.io/dask/dask:latest
                 name: dask-worker
                 args: [dask-worker, $(DASK_SCHEDULER_ADDRESS), --nthreads, '2', --memory-limit, 8GB]
               restartPolicy: Never

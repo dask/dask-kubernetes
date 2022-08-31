@@ -1,0 +1,37 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: daskautoscalers.kubernetes.dask.org
+spec:
+  scope: Namespaced
+  group: kubernetes.dask.org
+  names:
+    kind: DaskAutoscaler
+    plural: daskautoscalers
+    singular: daskautoscaler
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+              - cluster
+              - minimum
+              - maximum
+              properties:
+                cluster:
+                  type: string
+                  description: Name of the cluster to associate this worker group with
+                minimum:
+                  type: integer
+                  description: Minimum number of workers
+                maximum:
+                  type: integer
+                  description: Maximum number of workers
+            status:
+              type: object

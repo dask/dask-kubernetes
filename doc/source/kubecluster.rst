@@ -18,7 +18,7 @@ pod specification. Then create a cluster with that spec.
 
     from dask_kubernetes import KubeCluster, make_pod_spec
 
-    pod_spec = make_pod_spec(image='daskdev/dask:latest',
+    pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest',
                              memory_limit='4G', memory_request='4G',
                              cpu_limit=1, cpu_request=1)
 
@@ -56,10 +56,10 @@ that will be used as a template.
     spec:
       restartPolicy: Never
       containers:
-      - image: daskdev/dask:latest
+      - image: ghcr.io/dask/dask:latest
         imagePullPolicy: IfNotPresent
         args: [dask-worker, --nthreads, '2', --no-dashboard, --memory-limit, 6GB, --death-timeout, '60']
-        name: dask
+        name: dask-worker
         env:
           - name: EXTRA_PIP_PACKAGES
             value: git+https://github.com/dask/distributed
@@ -224,8 +224,8 @@ following Role to that ServiceAccount via a RoleBinding:
 Docker Images
 -------------
 
-Example Dask docker images daskdev/dask and daskdev/dask-notebook
-are available on https://hub.docker.com/r/daskdev .
+Example Dask docker images ghcr.io/dask/dask and ghcr.io/dask/dask-notebook
+are available on https://github.com/orgs/dask/packages .
 More information about these images is available at the
 `Dask documentation <https://docs.dask.org/en/latest/setup/docker.html>`_.
 

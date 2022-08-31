@@ -1,9 +1,11 @@
 import pytest
+import pytest_asyncio
 
 import subprocess
 import os.path
 
 import dask.config
+from distributed import Client
 from distributed.core import Status
 from dask_ctl.discovery import (
     list_discovery_methods,
@@ -19,10 +21,10 @@ from dask_ctl.discovery import (
 @pytest.fixture(scope="session")
 def chart_repo():
     repo_name = "dask"
-    subprocess.check_output(
-        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"]
+    subprocess.run(
+        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"], check=True
     )
-    subprocess.check_output(["helm", "repo", "update"])
+    subprocess.run(["helm", "repo", "update"], check=True)
     return repo_name
 
 
@@ -49,7 +51,7 @@ def test_namespace():
 
 @pytest.fixture(scope="session")  # Creating this fixture is slow so we should reuse it.
 def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
-    subprocess.check_output(
+    subprocess.run(
         [
             "helm",
             "install",
@@ -61,10 +63,11 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
             "--wait",
             "-f",
             config_path,
-        ]
+        ],
+        check=True,
     )
     # Scale back the additional workers group for now
-    subprocess.check_output(
+    subprocess.run(
         [
             "kubectl",
             "scale",
@@ -73,13 +76,14 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
             "deployment",
             f"{release_name}-dask-worker-foo",
             "--replicas=0",
-        ]
+        ],
+        check=True,
     )
     yield release_name
-    subprocess.check_output(["helm", "delete", "-n", test_namespace, release_name])
+    subprocess.run(["helm", "delete", "-n", test_namespace, release_name], check=True)
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
@@ -120,6 +124,15 @@ def test_import():
     from distributed.deploy import Cluster
 
     assert issubclass(HelmCluster, Cluster)
+
+
+def test_loop(k8s_cluster, release, test_namespace):
+    from dask_kubernetes import HelmCluster
+
+    with Client(nthreads=[]) as client, HelmCluster(
+        release_name=release, namespace=test_namespace, loop=client.loop
+    ) as cluster:
+        assert cluster.loop is client.loop
 
 
 def test_raises_on_non_existant_release(k8s_cluster):

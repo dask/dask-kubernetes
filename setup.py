@@ -22,6 +22,8 @@ setup(
     entry_points="""
         [dask_cluster_discovery]
         helmcluster=dask_kubernetes.helm:discover
-        kubecluster_experimental=dask_kubernetes.experimental:discover
+        kubecluster=dask_kubernetes.experimental:discover
+        [dask_operator_plugin]
+        noop=dask_kubernetes.operator.plugins.noop
       """,
 )

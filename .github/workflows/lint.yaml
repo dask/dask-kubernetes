@@ -9,4 +9,6 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: "3.8"
+      - name: Install deps
+        run: ./ci/install-deps.sh
       - uses: pre-commit/action@v2.0.0
