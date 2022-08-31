@@ -21,6 +21,6 @@ async def discover() -> AsyncIterator[Tuple[str, Callable]]:
                 namespace=get_current_namespace(),
             )
         for cluster in clusters["items"]:
-            yield (cluster["metadata"]["name"].replace("-cluster", ""), KubeCluster)
+            yield (cluster["metadata"]["name"], KubeCluster)
     except Exception:
         return
