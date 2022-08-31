@@ -94,7 +94,8 @@ class HelmCluster(Cluster):
     ):
         self.release_name = release_name
         self.namespace = namespace or get_current_namespace()
-        self.name = self.release_name + "." + self.namespace
+        if name is None:
+            name = self.release_name + "." + self.namespace
         check_dependency("helm")
         check_dependency("kubectl")
         status = subprocess.run(

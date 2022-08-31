@@ -148,7 +148,6 @@ class KubeCluster(Cluster):
         custom_cluster_spec=None,
         **kwargs,
     ):
-        self.name = name
         self.namespace = namespace or get_current_namespace()
         self.image = image
         self.n_workers = n_workers
