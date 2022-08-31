@@ -1,9 +1,15 @@
+import pytest
+
 from dask.distributed import Client
-from dask_ctl import get_cluster
+from dask_kubernetes.experimental import KubeCluster
+from dask_kubernetes.experimental.discovery import discover
 
 
-def test_discovery(cluster):
-    with get_cluster(cluster.name) as cluster2:
+@pytest.mark.asyncio
+async def test_discovery(cluster):
+    clusters = [name async for name, _ in discover()]
+    assert cluster.name in clusters
+    with KubeCluster.from_name(cluster.name) as cluster2:
         assert cluster == cluster2
         assert "id" in cluster2.scheduler_info
         with Client(cluster2) as client:
