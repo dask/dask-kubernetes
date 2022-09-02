@@ -15,7 +15,7 @@ def install_deps(version):
             [
                 "pip",
                 "install",
-                f"git+http://github.com/elemental-lf/k8s-crd-resolver@{version}",
+                f"git+https://github.com/jacobtomlinson/k8s-crd-resolver.git@{version}",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
