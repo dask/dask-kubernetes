@@ -6,6 +6,7 @@ from dask_kubernetes.experimental.discovery import discover
 
 
 @pytest.mark.asyncio
+@pytest.mark.xfail(reason="Has asyncio issues on CI")
 async def test_discovery(cluster):
     clusters = [name async for name, _ in discover()]
     assert cluster.name in clusters
