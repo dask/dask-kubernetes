@@ -7,7 +7,7 @@ import tempfile
 
 from kopf.testing import KopfRunner
 
-from dask_kubernetes.common.utils import check_dependency
+from dask_kubernetes.common.utils import check_dependency, get_current_namespace
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -50,7 +50,7 @@ def install_istio(k8s_cluster):
 
 @pytest.fixture(scope="session")
 def ns(k8s_cluster):
-    return "default"
+    return get_current_namespace()
 
 
 def run_generate(crd_path, patch_path, temp_path):

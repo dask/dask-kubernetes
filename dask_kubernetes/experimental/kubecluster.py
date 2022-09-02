@@ -20,7 +20,6 @@ from distributed.utils import (
 )
 
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.common.utils import namespace_default
 from dask_kubernetes.operator import (
     wait_for_service,
 )
@@ -30,6 +29,7 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler,
     wait_for_scheduler_comm,
 )
+from dask_kubernetes.common.utils import get_current_namespace
 
 
 class CreateMode(Enum):
@@ -148,7 +148,7 @@ class KubeCluster(Cluster):
         custom_cluster_spec=None,
         **kwargs,
     ):
-        self.namespace = namespace or namespace_default()
+        self.namespace = namespace or get_current_namespace()
         self.image = image
         self.n_workers = n_workers
         self.resources = resources

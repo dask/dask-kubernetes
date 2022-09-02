@@ -12,7 +12,7 @@ import kubernetes_asyncio as kubernetes
 
 from ..common.auth import ClusterAuth
 from ..common.utils import (
-    namespace_default,
+    get_current_namespace,
     check_dependency,
 )
 from ..common.networking import get_external_address_for_scheduler_service
@@ -93,7 +93,7 @@ class HelmCluster(Cluster):
         **kwargs,
     ):
         self.release_name = release_name
-        self.namespace = namespace or namespace_default()
+        self.namespace = namespace or get_current_namespace()
         if name is None:
             name = self.release_name + "." + self.namespace
         check_dependency("helm")
@@ -313,7 +313,7 @@ async def discover(
     await ClusterAuth.load_first(auth)
     async with kubernetes.client.api_client.ApiClient() as api:
         core_api = kubernetes.client.CoreV1Api(api)
-        namespace = namespace or namespace_default()
+        namespace = namespace or get_current_namespace()
         try:
             pods = await core_api.list_pod_for_all_namespaces(
                 label_selector="app=dask,component=scheduler",
