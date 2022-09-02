@@ -176,7 +176,7 @@ class KubeCluster(Cluster):
         )
         self.env = dask.config.get("kubernetes.env", override_with=env)
         self.worker_command = dask.config.get(
-            "kubernetes.", override_with=worker_command
+            "kubernetes.worker-command", override_with=worker_command
         )
         self.auth = auth
         self.port_forward_cluster_ip = dask.config.get(
