@@ -1,18 +1,9 @@
 import pytest
 
-import dask.config
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
 from dask_kubernetes.experimental import KubeCluster, make_cluster_spec
-
-
-@pytest.fixture
-def cluster(kopf_runner, docker_image):
-    with dask.config.set({"kubernetes.name": "foo-{uuid}"}):
-        with kopf_runner:
-            with KubeCluster(image=docker_image) as cluster:
-                yield cluster
 
 
 def test_kubecluster(cluster):

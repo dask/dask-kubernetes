@@ -26,7 +26,7 @@ from ..common.objects import (
 )
 from ..common.auth import ClusterAuth
 from ..common.utils import (
-    namespace_default,
+    get_current_namespace,
     escape,
 )
 from ..common.networking import (
@@ -585,7 +585,7 @@ class KubeCluster(SpecCluster):
         self.policy_api = kubernetes.client.PolicyV1beta1Api()
 
         if self.namespace is None:
-            self.namespace = namespace_default()
+            self.namespace = get_current_namespace()
 
         environ = {k: v for k, v in os.environ.items() if k not in ["user", "uuid"]}
         self._generate_name = self._generate_name.format(

@@ -1,1 +1,1 @@
-from .helmcluster import HelmCluster
+from .helmcluster import HelmCluster, discover

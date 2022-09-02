@@ -4,3 +4,4 @@ from .kubecluster import (
     make_scheduler_spec,
     make_worker_spec,
 )
+from .discovery import discover

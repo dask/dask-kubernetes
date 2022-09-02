@@ -3,6 +3,8 @@ import os
 import shutil
 import string
 
+import kubernetes_asyncio as kubernetes
+
 
 def format_labels(labels):
     """Convert a dictionary of labels into a comma separated string"""
@@ -17,7 +19,7 @@ def escape(s):
     return "".join(c for c in s if c in valid_characters).lower()
 
 
-def namespace_default():
+def get_current_namespace():
     """
     Get current namespace if running in a k8s cluster
 
@@ -30,7 +32,11 @@ def namespace_default():
     if os.path.exists(ns_path):
         with open(ns_path) as f:
             return f.read().strip()
-    return "default"
+    try:
+        _, active_context = kubernetes.config.list_kube_config_contexts()
+        return active_context["context"]["namespace"]
+    except KeyError:
+        return "default"
 
 
 def check_dependency(dependency):
