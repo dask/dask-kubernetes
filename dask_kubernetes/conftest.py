@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 
 from kopf.testing import KopfRunner
+from pytest_kind.cluster import KindCluster
 
 from dask_kubernetes.common.utils import check_dependency, get_current_namespace
 
@@ -29,11 +30,22 @@ def docker_image():
 
 
 @pytest.fixture(scope="session")
-def k8s_cluster(kind_cluster, docker_image):
+def k8s_cluster(request, docker_image):
+    image = None
+    if version := os.environ.get("KUBERNETES_VERSION"):
+        image = f"kindest/node:{version}"
+
+    kind_cluster = KindCluster(
+        name="pytest-kind",
+        image=image,
+    )
+    kind_cluster.create()
     os.environ["KUBECONFIG"] = str(kind_cluster.kubeconfig_path)
     kind_cluster.load_docker_image(docker_image)
     yield kind_cluster
     del os.environ["KUBECONFIG"]
+    if not request.config.getoption("keep_cluster"):
+        kind_cluster.delete()
 
 
 @pytest.fixture(scope="session", autouse=True)

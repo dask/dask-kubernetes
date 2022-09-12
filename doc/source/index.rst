@@ -1,6 +1,23 @@
 Dask Kubernetes
 ===============
 
+.. image:: https://img.shields.io/pypi/v/dask-kubernetes
+   :target: https://pypi.org/project/dask-kubernetes/
+   :alt: PyPI
+
+.. image:: https://img.shields.io/conda/vn/conda-forge/dask-kubernetes
+   :target: https://anaconda.org/conda-forge/dask-kubernetes
+   :alt: Conda Forge
+
+.. image:: https://img.shields.io/badge/python%20support-3.8%7C3.9%7C3.10-blue
+   :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
+   :alt: Python Support
+
+.. image:: https://img.shields.io/badge/Kubernetes%20support-1.22%7C1.23%7C1.24-blue
+   :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
+   :alt: Kubernetes Support
+
+
 .. currentmodule:: dask_kubernetes
 
 Welcome to the documentation for ``dask-kubernetes``.
