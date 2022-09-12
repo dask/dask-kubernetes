@@ -6,6 +6,7 @@ pytest-asyncio>=0.17
 git+https://codeberg.org/hjacobs/pytest-kind.git
 pytest-timeout
 pytest-rerunfailures
+pytest-xdist
 # Workarund for https://github.com/elemental-lf/k8s-crd-resolver/issues/1
 git+https://github.com/jacobtomlinson/k8s-crd-resolver.git@pin-openapi-spec-validator
 # git+http://github.com/elemental-lf/k8s-crd-resolver@v0.10.0
