@@ -60,8 +60,7 @@ The Dask Kubernetes CI tests all PRs against all supported Python versions.
 Kubernetes
 ^^^^^^^^^^
 
-For Kubernetes we support all Kubernetes versions that are `supported by the Kubernetes maintainers <https://kubernetes.io/releases/>`_.
-Typically this means each Kubernetes version is supported for 12 months.
+For Kubernetes we follow the `yearly support KEP <https://kubernetes.io/releases/patch-releases/#support-period>`_.
 Due to the 4-6 month release cycle this also ensures that at least the current and two previous versions are supported.
 
-Due to the time it would take to test against all Kubernetes versions only the latest supported version is tested for PRs and all other versions are tested nightly.
+The Dask Kubernetes CI tests all PRs against all supported Kubernetes versions.
