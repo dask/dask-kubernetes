@@ -2,12 +2,14 @@ name: "KubeCluster"
 on:
   pull_request:
     paths:
+      - ".github/workflows/kubecluster.yaml"
       - "ci/**"
       - "dask_kubernetes/classic/**"
       - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
   push:
     paths:
+      - ".github/workflows/kubecluster.yaml"
       - "ci/**"
       - "dask_kubernetes/classic/**"
       - "dask_kubernetes/common/**"
@@ -21,6 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
+        kubernetes-version: ["1.22.13", "1.23.10", "1.24.4"]
 
     env:
       KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
@@ -33,6 +36,8 @@ jobs:
       - name: Install deps
         run: ./ci/install-deps.sh
       - name: Run tests
+        env:
+          KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
         run: pytest dask_kubernetes/common/tests dask_kubernetes/classic/tests
       - name: Debug k8s resources
         if: success() || failure()
