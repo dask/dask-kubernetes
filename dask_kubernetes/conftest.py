@@ -33,7 +33,7 @@ def docker_image():
 def k8s_cluster(request, docker_image):
     image = None
     if version := os.environ.get("KUBERNETES_VERSION"):
-        image = f"kindest/node:{version}"
+        image = f"kindest/node:v{version}"
 
     kind_cluster = KindCluster(
         name="pytest-kind",
