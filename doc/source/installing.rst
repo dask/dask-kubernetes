@@ -64,3 +64,8 @@ For Kubernetes we follow the `yearly support KEP <https://kubernetes.io/releases
 Due to the 4-6 month release cycle this also ensures that at least the current and two previous versions are supported.
 
 The Dask Kubernetes CI tests all PRs against all supported Kubernetes versions.
+
+.. note::
+
+    To keep the CI matrix smaller we test all Kubernetes versions against the latest Python, and all Python versions against the latest Kubernetes.
+    We do not test older versions of Python and Kubernetes together. See `dask/dask-kubernetes#559 <https://github.com/dask/dask-kubernetes/pull/559>`_ for more information.
