@@ -238,9 +238,7 @@ def make_service_from_dict(dict_):
 
 
 def make_pdb_from_dict(dict_):
-    return SERIALIZATION_API_CLIENT.deserialize(
-        dict_, client.V1beta1PodDisruptionBudget
-    )
+    return SERIALIZATION_API_CLIENT.deserialize(dict_, client.V1PodDisruptionBudget)
 
 
 def clean_pod_template(
