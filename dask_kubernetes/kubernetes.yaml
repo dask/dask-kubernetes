@@ -40,7 +40,7 @@ kubernetes:
           targetPort: 8787
 
   scheduler-pdb-template:
-    apiVersion: policy/v1beta1
+    apiVersion: policy/v1
     kind: PodDisruptionBudget
     spec:
       minAvailable: 1

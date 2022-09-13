@@ -582,7 +582,7 @@ class KubeCluster(SpecCluster):
         await ClusterAuth.load_first(self.auth)
 
         self.core_api = kubernetes.client.CoreV1Api()
-        self.policy_api = kubernetes.client.PolicyV1beta1Api()
+        self.policy_api = kubernetes.client.PolicyV1Api()
 
         if self.namespace is None:
             self.namespace = get_current_namespace()
