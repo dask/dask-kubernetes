@@ -47,7 +47,7 @@ The chart is published in the `Dask Helm repo <https://helm.dask.org>`_ reposito
 .. code-block:: console
 
     $ helm repo add dask https://helm.dask.org
-    $ helm reo update
+    $ helm repo update
     $ helm install myrelease dask/dask-kubernetes-operator
 
 This will install the custom resource definitions, service account, roles, and the operator deployment.
