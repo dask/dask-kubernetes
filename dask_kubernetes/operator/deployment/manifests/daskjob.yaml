@@ -77,7 +77,6 @@ spec:
                                       format: int32
                                       type: integer
                                     protocol:
-                                      default: TCP
                                       type: string
                                     targetPort:
                                       format: int-or-string
@@ -750,7 +749,6 @@ spec:
                                           name:
                                             type: string
                                           protocol:
-                                            default: TCP
                                             type: string
                                         required:
                                         - containerPort
@@ -1843,7 +1841,6 @@ spec:
                                           name:
                                             type: string
                                           protocol:
-                                            default: TCP
                                             type: string
                                         required:
                                         - containerPort
@@ -3642,7 +3639,6 @@ spec:
                                           name:
                                             type: string
                                           protocol:
-                                            default: TCP
                                             type: string
                                         required:
                                         - containerPort
@@ -4735,7 +4731,6 @@ spec:
                                           name:
                                             type: string
                                           protocol:
-                                            default: TCP
                                             type: string
                                         required:
                                         - containerPort
@@ -6542,7 +6537,6 @@ spec:
                                   name:
                                     type: string
                                   protocol:
-                                    default: TCP
                                     type: string
                                 required:
                                 - containerPort
@@ -7635,7 +7629,6 @@ spec:
                                   name:
                                     type: string
                                   protocol:
-                                    default: TCP
                                     type: string
                                 required:
                                 - containerPort
@@ -7918,7 +7911,6 @@ spec:
                           type: object
                         type: array
                       restartPolicy:
-                        default: OnFailure
                         type: string
                       runtimeClassName:
                         type: string
