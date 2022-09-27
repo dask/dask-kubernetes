@@ -6,5 +6,5 @@ pytest-asyncio>=0.17
 git+https://codeberg.org/hjacobs/pytest-kind.git
 pytest-timeout
 pytest-rerunfailures
-git+https://github.com/elemental-lf/k8s-crd-resolver@v0.12.0
+git+https://github.com/elemental-lf/k8s-crd-resolver@v0.14.0
 dask[complete]
