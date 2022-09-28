@@ -326,26 +326,16 @@ class KubeCluster(Cluster):
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            start = time.time()
-            exception = None
-            timeout = 60  # TODO make configurable
-
-            while start + timeout > time.time():
-                try:
-                    return await custom_objects_api.get_namespaced_custom_object(
-                        group="kubernetes.dask.org",
-                        version="v1",
-                        plural="daskclusters",
-                        namespace=self.namespace,
-                        name=self.name,
-                    )
-                except Exception as e:
-                    exception = e
-                    await asyncio.sleep(0.1)
-
-            raise TimeoutError(
-                f"Timed out getting cluster {self.name} after {timeout} seconds"
-            ) from exception
+            try:
+                return await custom_objects_api.get_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskclusters",
+                    namespace=self.namespace,
+                    name=self.name,
+                )
+            except kubernetes.client.exceptions.ApiException as e:
+                return None
 
     async def _get_scheduler_address(self):
         address = await get_scheduler_address(f"{self.name}-scheduler", self.namespace)
