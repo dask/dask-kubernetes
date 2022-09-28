@@ -1,19 +1,35 @@
 kubernetes:
+  ####
+  # Config options here are applied to either the classic KubeCluster, operator KubeCluster or both.
+
+  # Shared options
   name: "dask-{user}-{uuid}"
   namespace: null
+  env: {}
   count:
     start: 0
     max: null
+  scheduler-service-type: "ClusterIP"
+
+  # Operator KubeCluster options
+  image: ghcr.io/dask/dask:latest"
+  resources: {}
+  worker-command: "dask-worker"
+  port-forward-cluster-ip: null
+  create-mode: CREATE_OR_CONNECT
+  shutdown-on-close: true
+  resource-timeout: 60
+  custom-cluster-spec: null
+
+  # Classic KubeCluster options
   host: "0.0.0.0"
   port: 0
-  env: {}
   idle-timeout: null
   deploy-mode: "remote"
   interface: null
   protocol: "tcp://"
   dashboard_address: ":8787"
 
-  scheduler-service-type: "ClusterIP"
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
   scheduler-service-wait-timeout: 30

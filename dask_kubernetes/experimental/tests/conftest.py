@@ -1,10 +1,13 @@
 import pytest
 
+import dask.config
+
 from dask_kubernetes.experimental import KubeCluster
 
 
 @pytest.fixture
 def cluster(kopf_runner, docker_image):
-    with kopf_runner:
-        with KubeCluster(name="foo", image=docker_image) as cluster:
-            yield cluster
+    with dask.config.set({"kubernetes.name": "foo-{uuid}"}):
+        with kopf_runner:
+            with KubeCluster(image=docker_image, n_workers=1) as cluster:
+                yield cluster

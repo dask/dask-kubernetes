@@ -4,12 +4,18 @@ import asyncio
 import atexit
 from contextlib import suppress
 from enum import Enum
+import getpass
+import os
 import time
 from typing import ClassVar
+import warnings
 import weakref
+import uuid
 
 import kubernetes_asyncio as kubernetes
+import yaml
 
+import dask.config
 from distributed.core import Status, rpc
 from distributed.deploy import Cluster
 from distributed.utils import (
@@ -90,9 +96,11 @@ class KubeCluster(Cluster):
         then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
         useful error.
         Defaults to ``60`` seconds.
-    custom_cluster_spec: dict (optional)
-        A dictionary representation of a ``DaskCluster`` resource object which will be used to create
-        the cluster instead of generating one from the other keyword arguments.
+    scheduler_service_type: str (optional)
+        Kubernetes service type to use for the scheduler. Defaults to ``ClusterIP``.
+    custom_cluster_spec: str | dict (optional)
+        Path to a YAML manifest or a dictionary representation of a ``DaskCluster`` resource object which will be
+        used to create the cluster instead of generating one from the other keyword arguments.
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -135,36 +143,73 @@ class KubeCluster(Cluster):
         self,
         name=None,
         namespace=None,
-        image="ghcr.io/dask/dask:latest",
-        n_workers=3,
-        resources={},
-        env=[],
-        worker_command="dask-worker",
+        image=None,
+        n_workers=None,
+        resources=None,
+        env=None,
+        worker_command=None,
         auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
-        create_mode=CreateMode.CREATE_OR_CONNECT,
+        create_mode=None,
         shutdown_on_close=None,
-        resource_timeout=60,
+        resource_timeout=None,
+        scheduler_service_type=None,
         custom_cluster_spec=None,
         **kwargs,
     ):
-        self.namespace = namespace or get_current_namespace()
-        self.image = image
-        self.n_workers = n_workers
-        self.resources = resources
-        self.env = env
-        self.worker_command = worker_command
-        if isinstance(self.worker_command, str):
-            self.worker_command = self.worker_command.split(" ")
+        name = dask.config.get("kubernetes.name", override_with=name)
+        self.namespace = (
+            dask.config.get("kubernetes.namespace", override_with=namespace)
+            or get_current_namespace()
+        )
+        self.image = dask.config.get("kubernetes.image", override_with=image)
+        self.n_workers = dask.config.get(
+            "kubernetes.count.start", override_with=n_workers
+        )
+        if dask.config.get("kubernetes.count.max"):
+            warnings.warn(
+                "Setting a maximum number of workers is no longer supported. "
+                "Please use Kubernetes Resource Quotas instead."
+            )
+        self.resources = dask.config.get(
+            "kubernetes.resources", override_with=resources
+        )
+        self.env = dask.config.get("kubernetes.env", override_with=env)
+        self.worker_command = dask.config.get(
+            "kubernetes.worker-command", override_with=worker_command
+        )
         self.auth = auth
-        self.port_forward_cluster_ip = port_forward_cluster_ip
-        self.create_mode = create_mode
-        self.shutdown_on_close = shutdown_on_close
-        self._resource_timeout = resource_timeout
-        self._custom_cluster_spec = custom_cluster_spec
+        self.port_forward_cluster_ip = dask.config.get(
+            "kubernetes.port-forward-cluster-ip", override_with=port_forward_cluster_ip
+        )
+        self.create_mode = dask.config.get(
+            "kubernetes.create-mode", override_with=create_mode
+        )
+        self.shutdown_on_close = dask.config.get(
+            "kubernetes.shutdown-on-close", override_with=shutdown_on_close
+        )
+        self._resource_timeout = dask.config.get(
+            "kubernetes.resource-timeout", override_with=resource_timeout
+        )
+        self._custom_cluster_spec = dask.config.get(
+            "kubernetes.custom-cluster-spec", override_with=custom_cluster_spec
+        )
+        self.scheduler_service_type = dask.config.get(
+            "kubernetes.scheduler-service-type", override_with=scheduler_service_type
+        )
 
         if self._custom_cluster_spec:
+            if isinstance(self._custom_cluster_spec, str):
+                with open(self._custom_cluster_spec) as f:
+                    self._custom_cluster_spec = yaml.safe_load(f.read())
             name = self._custom_cluster_spec["metadata"]["name"]
+
+        if isinstance(self.worker_command, str):
+            self.worker_command = self.worker_command.split(" ")
+
+        name = name.format(
+            user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
+        )
 
         self._instances.add(self)
 
@@ -212,6 +257,7 @@ class KubeCluster(Cluster):
                     worker_command=self.worker_command,
                     n_workers=self.n_workers,
                     image=self.image,
+                    scheduler_service_type=self.scheduler_service_type,
                 )
             else:
                 data = self._custom_cluster_spec
@@ -631,6 +677,7 @@ def make_cluster_spec(
     resources=None,
     env=None,
     worker_command="dask-worker",
+    scheduler_service_type="ClusterIP",
 ):
     """Generate a ``DaskCluster`` kubernetes resource.
 
@@ -669,6 +716,7 @@ def make_cluster_spec(
                 env=env,
                 resources=resources,
                 image=image,
+                scheduler_service_type=scheduler_service_type,
             ),
         },
     }
@@ -715,6 +763,7 @@ def make_scheduler_spec(
     env=None,
     resources=None,
     image="ghcr.io/dask/dask:latest",
+    scheduler_service_type="ClusterIP",
 ):
     # TODO: Take the values provided in the current class constructor
     # and build a DaskWorker compatible dict
@@ -759,7 +808,7 @@ def make_scheduler_spec(
             ]
         },
         "service": {
-            "type": "ClusterIP",
+            "type": scheduler_service_type,
             "selector": {
                 "dask.org/cluster-name": cluster_name,
                 "dask.org/component": "scheduler",
