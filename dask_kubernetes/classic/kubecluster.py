@@ -97,7 +97,7 @@ class Pod(ProcessInterface):
             except ApiException as e:
                 if e.reason == "Not Found":
                     logger.debug(
-                        "Pod %s in namespace %s has been deleated already.",
+                        "Pod %s in namespace %s has been deleted already.",
                         name,
                         namespace,
                     )
