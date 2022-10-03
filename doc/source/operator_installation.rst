@@ -1,9 +1,6 @@
 Installing
 ==========
 
-.. warning::
-    The Dask Operator for Kubernetes is experimental. So any `bug reports <https://github.com/dask/dask-kubernetes/issues>`_ are appreciated!
-
 Installing with manifests
 -------------------------
 
@@ -95,7 +92,7 @@ running in another pod. So you need to set some extra config to tell the proxy w
 in Jupyter (and therefore interact with other services within the Kubernetes cluster) we can allow all hosts in the proxy settings with
 ``c.ServerProxy.host_allowlist = lambda app, host: True``.
 
-The :class:`dask_kubernetes.experimental.KubeCluster` and :class:`distributed.Client` objects both have a ``dashboard_link`` attribute that you can
+The :class:`dask_kubernetes.operator.kubecluster.KubeCluster` and :class:`distributed.Client` objects both have a ``dashboard_link`` attribute that you can
 view to find the URL of the dashboard, and this is also used in the widgets shown in Jupyter. The default link will not work on KubeFlow so you need
 to change this to ``"{NB_PREFIX}/proxy/{host}:{port}/status"`` to ensure it uses the Jupyter proxy.
 

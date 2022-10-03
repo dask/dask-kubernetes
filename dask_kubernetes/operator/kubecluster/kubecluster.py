@@ -25,6 +25,7 @@ from distributed.utils import (
     format_dashboard_link,
 )
 
+from dask_kubernetes.classic import KubeCluster as ClassicKubeCluster
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.operator import (
     wait_for_service,
@@ -141,6 +142,7 @@ class KubeCluster(Cluster):
 
     def __init__(
         self,
+        *args,
         name=None,
         namespace=None,
         image=None,
@@ -157,6 +159,27 @@ class KubeCluster(Cluster):
         custom_cluster_spec=None,
         **kwargs,
     ):
+
+        classic_kwargs = {}
+        if args or kwargs in classic_kwargs:
+            warnings.warn(
+                "It looks like you are using the classic implementation of KubeCluster. "
+                "Please consider migrating to the new operator based KubeCluster "
+                "https://kubernetes.dask.org/en/latest/kubecluster_migrating.html. "
+                "To suppress this warning import the classic KubeCluster directly from dask_kubernetes.classic. "
+                "But note this will be removed in the future. ",
+                DeprecationWarning,
+            )
+            return ClassicKubeCluster(
+                *args,
+                name=name,
+                namespace=namespace,
+                n_workers=n_workers,
+                env=env,
+                auth=auth,
+                **kwargs,
+            )
+
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = (
             dask.config.get("kubernetes.namespace", override_with=namespace)

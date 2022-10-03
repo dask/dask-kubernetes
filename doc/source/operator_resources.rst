@@ -1,9 +1,6 @@
 Custom Resources
 ================
-.. currentmodule:: dask_kubernetes.experimental
-
-.. warning::
-    The Dask Operator for Kubernetes is experimental. So any `bug reports <https://github.com/dask/dask-kubernetes/issues>`_ are appreciated!
+.. currentmodule:: dask_kubernetes.operator.kubecluster
 
 The Dask Operator has a few custom resources that can be used to create various Dask components.
 

@@ -1,7 +1,12 @@
 .. _kubecluster:
 
-KubeCluster
-===========
+KubeCluster (classic)
+=====================
+
+.. Warning::
+
+   This implementation of ``KubeCluster`` is being retired and we recommend :doc:`migrating to the operator based implementation <kubecluster_migrating>`.
+
 
 :class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using native
 Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
@@ -16,7 +21,7 @@ pod specification. Then create a cluster with that spec.
 
 .. code-block:: python
 
-    from dask_kubernetes import KubeCluster, make_pod_spec
+    from dask_kubernetes.classic import KubeCluster, make_pod_spec
 
     pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest',
                              memory_limit='4G', memory_request='4G',
@@ -73,7 +78,7 @@ that will be used as a template.
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster
+   from dask_kubernetes.classic import KubeCluster
 
    cluster = KubeCluster('worker-spec.yml')
    cluster.scale(10)
@@ -86,7 +91,7 @@ Best Practices
 1.  Your worker pod image should have a similar environment to your local
     environment, including versions of Python, dask, cloudpickle, and any
     libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
-    See :py:class:`dask_kubernetes.KubeCluster` docstring for guidance on how
+    See :py:class:`dask_kubernetes.operator.kubecluster` docstring for guidance on how
     to check and modify this.
 
 2.  Your Kubernetes resource limits and requests should match the
@@ -145,7 +150,7 @@ Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
-    :py:class:`dask_kubernetes.KubeCluster` is called with no arguments::
+    :py:class:`dask_kubernetes.operator.kubecluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
@@ -277,7 +282,7 @@ A ``local`` scheduler is created where the Dask client will be created.
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster
+   from dask_kubernetes.classic import KubeCluster
    from dask.distributed import Client
 
    cluster = KubeCluster.from_yaml('worker-spec.yml', deploy_mode='local')
@@ -292,7 +297,7 @@ Workers
 
 Workers are created directly as simple pods.  These worker pods are configured
 to shutdown if they are unable to connect to the scheduler for 60 seconds.
-The pods are cleaned up when :meth:`~dask_kubernetes.KubeCluster.close` is called,
+The pods are cleaned up when :meth:`~dask_kubernetes.operator.kubecluster.close` is called,
 or the scheduler process exits.
 
 The pods are created with two default `tolerations <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>`_:

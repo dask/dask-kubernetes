@@ -2,9 +2,9 @@ from typing import Callable, AsyncIterator, Tuple
 
 import kubernetes_asyncio as kubernetes
 
-from .kubecluster import KubeCluster
-from ..common.auth import ClusterAuth
-from ..common.utils import get_current_namespace
+from dask_kubernetes.operator.kubecluster import KubeCluster
+from dask_kubernetes.common.auth import ClusterAuth
+from dask_kubernetes.common.utils import get_current_namespace
 
 
 async def discover() -> AsyncIterator[Tuple[str, Callable]]:

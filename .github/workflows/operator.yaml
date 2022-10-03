@@ -5,7 +5,6 @@ on:
       - ".github/workflows/operator.yaml"
       - "ci/**"
       - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
   push:
@@ -13,7 +12,6 @@ on:
       - ".github/workflows/operator.yaml"
       - "ci/**"
       - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
 
@@ -48,7 +46,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/experimental/tests
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/operator/kubecluster/tests
       - name: Debug k8s resources
         if: success() || failure()
         run: kubectl get all -A

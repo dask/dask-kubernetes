@@ -1,3 +1,5 @@
+from warnings import warn
+
 from . import config
 from .common.auth import (
     ClusterAuth,
@@ -7,7 +9,7 @@ from .common.auth import (
     AutoRefreshKubeConfigLoader,
     AutoRefreshConfiguration,
 )
-from .classic import KubeCluster
+from .operator.kubecluster import KubeCluster
 from .helm import HelmCluster
 from .common.objects import make_pod_spec, make_pod_from_dict, clean_pod_template
 

@@ -2,7 +2,7 @@ import pytest
 
 import dask.config
 
-from dask_kubernetes.experimental import KubeCluster
+from dask_kubernetes.operator.kubecluster import KubeCluster
 
 
 @pytest.fixture

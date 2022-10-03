@@ -70,7 +70,7 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :hidden:
    :caption: Cluster Managers
 
-   kubecluster
+   operator_kubecluster
    helmcluster
 
 .. toctree::
@@ -81,8 +81,15 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    operator
    operator_installation
    operator_resources
-   operator_kubecluster
    operator_extending
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Classic
+
+   kubecluster
+   kubecluster_migrating
 
 .. toctree::
    :maxdepth: 2
