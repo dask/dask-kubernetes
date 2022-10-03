@@ -160,7 +160,26 @@ class KubeCluster(Cluster):
         **kwargs,
     ):
 
-        classic_kwargs = {}
+        classic_kwargs = {
+            "pod_template",
+            "name",
+            "namespace",
+            "n_workers",
+            "host",
+            "port",
+            "env",
+            "auth",
+            "idle_timeout",
+            "deploy_mode",
+            "interface",
+            "protocol",
+            "dashboard_address",
+            "security",
+            "scheduler_service_wait_timeout",
+            "scheduler_service_name_resolution_retries",
+            "scheduler_pod_template",
+            "apply_default_affinity",
+        }
         if args or kwargs in classic_kwargs:
             warnings.warn(
                 "It looks like you are using the classic implementation of KubeCluster. "
