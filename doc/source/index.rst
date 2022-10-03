@@ -33,15 +33,22 @@ The package ``dask-kubernetes`` provides cluster managers for Kubernetes.
 KubeCluster
 -----------
 
-:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using native
-Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
+:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using custom
+Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
+
+.. code-block:: console
+
+   $ # Install operator CRDs and controller, needs to be done once on your Kubernetes cluster
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskjob.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskautoscaler.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/operator.yaml
 
 .. code-block:: python
 
-    from dask_kubernetes import KubeCluster, make_pod_spec
-
-    pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest')
-    cluster = KubeCluster(pod_spec)
+    from dask_kubernetes import KubeCluster
+    cluster = KubeCluster(name="my_dask_cluster", image='ghcr.io/dask/dask:latest')
     cluster.scale(10)
 
 HelmCluster
