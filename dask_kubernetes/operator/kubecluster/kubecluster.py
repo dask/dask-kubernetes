@@ -140,26 +140,7 @@ class KubeCluster(Cluster):
 
     _instances: ClassVar[weakref.WeakSet[KubeCluster]] = weakref.WeakSet()
 
-    def __init__(
-        self,
-        *args,
-        name=None,
-        namespace=None,
-        image=None,
-        n_workers=None,
-        resources=None,
-        env=None,
-        worker_command=None,
-        auth=ClusterAuth.DEFAULT,
-        port_forward_cluster_ip=None,
-        create_mode=None,
-        shutdown_on_close=None,
-        resource_timeout=None,
-        scheduler_service_type=None,
-        custom_cluster_spec=None,
-        **kwargs,
-    ):
-
+    def __new__(cls, *args, **kwargs):
         classic_kwargs = {
             "pod_template",
             "name",
@@ -191,13 +172,29 @@ class KubeCluster(Cluster):
             )
             return ClassicKubeCluster(
                 *args,
-                name=name,
-                namespace=namespace,
-                n_workers=n_workers,
-                env=env,
-                auth=auth,
                 **kwargs,
             )
+        return super().__new__(cls, *args, **kwargs)
+
+    def __init__(
+        self,
+        *,
+        name=None,
+        namespace=None,
+        image=None,
+        n_workers=None,
+        resources=None,
+        env=None,
+        worker_command=None,
+        auth=ClusterAuth.DEFAULT,
+        port_forward_cluster_ip=None,
+        create_mode=None,
+        shutdown_on_close=None,
+        resource_timeout=None,
+        scheduler_service_type=None,
+        custom_cluster_spec=None,
+        **kwargs,
+    ):
 
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = (
