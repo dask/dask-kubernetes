@@ -46,7 +46,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/operator/kubecluster/tests
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator
       - name: Debug k8s resources
         if: success() || failure()
         run: kubectl get all -A
