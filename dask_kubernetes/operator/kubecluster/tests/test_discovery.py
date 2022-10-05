@@ -1,8 +1,8 @@
 import pytest
 
 from dask.distributed import Client
-from dask_kubernetes.operator.kubecluster import KubeCluster
-from dask_kubernetes.operator.kubecluster.discovery import discover
+from dask_kubernetes.operator import KubeCluster
+from dask_kubernetes.operator import discover
 
 
 @pytest.mark.asyncio

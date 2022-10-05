@@ -47,7 +47,7 @@ Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
 
 .. code-block:: python
 
-    from dask_kubernetes import KubeCluster
+    from dask_kubernetes.operator import KubeCluster
     cluster = KubeCluster(name="my_dask_cluster", image='ghcr.io/dask/dask:latest')
     cluster.scale(10)
 

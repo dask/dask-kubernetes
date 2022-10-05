@@ -2,7 +2,7 @@ from typing import Callable, AsyncIterator, Tuple
 
 import kubernetes_asyncio as kubernetes
 
-from dask_kubernetes.operator.kubecluster import KubeCluster
+from dask_kubernetes.operator import KubeCluster
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.utils import get_current_namespace
 

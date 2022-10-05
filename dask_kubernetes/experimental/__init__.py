@@ -13,10 +13,10 @@ def __getattr__(name):
     if name in no_longer_experimental:
         warn(
             f"Yay {name} is no longer experimental 🎉. "
-            "You can import it directly from dask_kubernetes or explicitly from dask_kubernetes.operator.kubecluster",
+            "You can import it directly from dask_kubernetes or explicitly from dask_kubernetes.operator",
             DeprecationWarning,
         )
-        new_module = import_module("dask_kubernetes.operator.kubecluster")
+        new_module = import_module("dask_kubernetes.operator")
         return getattr(new_module, name)
 
     raise AttributeError(f"module {__name__} has no attribute {name}")

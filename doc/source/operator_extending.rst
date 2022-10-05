@@ -1,6 +1,6 @@
 Extending (advanced)
 ====================
-.. currentmodule:: dask_kubernetes.operator.kubecluster
+.. currentmodule:: dask_kubernetes.operator
 
 You can extend the functionality of the Dask Operator controller by writing plugins.
 You may wish to do this if you want the operator to create other resources like Istio ``VirtualSerivce``, ``Gateway`` and ``Certificate`` resources.

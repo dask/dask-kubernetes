@@ -3,7 +3,7 @@ import pytest
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
-from dask_kubernetes.operator.kubecluster import KubeCluster, make_cluster_spec
+from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
 
 def test_experimental_shim():

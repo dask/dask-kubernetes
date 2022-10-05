@@ -91,7 +91,7 @@ Best Practices
 1.  Your worker pod image should have a similar environment to your local
     environment, including versions of Python, dask, cloudpickle, and any
     libraries that you may wish to use (like NumPy, Pandas, or Scikit-Learn).
-    See :py:class:`dask_kubernetes.operator.kubecluster` docstring for guidance on how
+    See :py:class:`dask_kubernetes.classic.KubeCluster` docstring for guidance on how
     to check and modify this.
 
 2.  Your Kubernetes resource limits and requests should match the
@@ -150,7 +150,7 @@ Some notable ones are described below:
 
 1.  ``kubernetes.worker-template-path``: a path to a YAML file that holds a
     Pod spec for the worker.  If provided then this will be used when
-    :py:class:`dask_kubernetes.operator.kubecluster` is called with no arguments::
+    :py:class:`dask_kubernetes.classic.KubeCluster` is called with no arguments::
 
        cluster = KubeCluster()  # reads provided yaml file
 
@@ -297,7 +297,7 @@ Workers
 
 Workers are created directly as simple pods.  These worker pods are configured
 to shutdown if they are unable to connect to the scheduler for 60 seconds.
-The pods are cleaned up when :meth:`~dask_kubernetes.operator.kubecluster.close` is called,
+The pods are cleaned up when :meth:`~dask_kubernetes.classic.KubeCluster.close` is called,
 or the scheduler process exits.
 
 The pods are created with two default `tolerations <https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/>`_:

@@ -34,6 +34,11 @@ FAKE_KEY = os.path.join(TEST_DIR, "fake-key-file")
 FAKE_CA = os.path.join(TEST_DIR, "fake-ca-file")
 
 
+def test_deprecation_warning():
+    with pytest.deprecated_call():
+        from dask_kubernetes import KubeCluster  # noqa
+
+
 @pytest.fixture
 def pod_spec(docker_image):
     yield clean_pod_template(

@@ -25,9 +25,8 @@ from distributed.utils import (
     format_dashboard_link,
 )
 
-from dask_kubernetes.classic import KubeCluster as ClassicKubeCluster
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.operator import (
+from dask_kubernetes.operator.controller import (
     wait_for_service,
 )
 
@@ -107,7 +106,7 @@ class KubeCluster(Cluster):
 
     Examples
     --------
-    >>> from dask_kubernetes import KubeCluster
+    >>> from dask_kubernetes.operator import KubeCluster
     >>> cluster = KubeCluster(name="foo")
 
     You can add another group of workers (default is 3 workers)
@@ -139,42 +138,6 @@ class KubeCluster(Cluster):
     """
 
     _instances: ClassVar[weakref.WeakSet[KubeCluster]] = weakref.WeakSet()
-
-    def __new__(cls, *args, **kwargs):
-        classic_kwargs = {
-            "pod_template",
-            "name",
-            "namespace",
-            "n_workers",
-            "host",
-            "port",
-            "env",
-            "auth",
-            "idle_timeout",
-            "deploy_mode",
-            "interface",
-            "protocol",
-            "dashboard_address",
-            "security",
-            "scheduler_service_wait_timeout",
-            "scheduler_service_name_resolution_retries",
-            "scheduler_pod_template",
-            "apply_default_affinity",
-        }
-        if args or kwargs in classic_kwargs:
-            warnings.warn(
-                "It looks like you are using the classic implementation of KubeCluster. "
-                "Please consider migrating to the new operator based KubeCluster "
-                "https://kubernetes.dask.org/en/latest/kubecluster_migrating.html. "
-                "To suppress this warning import the classic KubeCluster directly from dask_kubernetes.classic. "
-                "But note this will be removed in the future. ",
-                DeprecationWarning,
-            )
-            return ClassicKubeCluster(
-                *args,
-                **kwargs,
-            )
-        return super().__new__(cls, *args, **kwargs)
 
     def __init__(
         self,

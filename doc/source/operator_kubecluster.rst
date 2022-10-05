@@ -1,7 +1,7 @@
 KubeCluster
 ===========
 
-.. currentmodule:: dask_kubernetes.operator.kubecluster
+.. currentmodule:: dask_kubernetes.operator
 
 .. note::
 
@@ -10,7 +10,7 @@ KubeCluster
 Cluster manager
 ---------------
 
-The operator has a new cluster manager called :class:`dask_kubernetes.operator.kubecluster.KubeCluster` that you can use to conveniently create and manage a Dask cluster in Python. Then connect a Dask :class:`distributed.Client` object to it directly and perform your work.
+The operator has a new cluster manager called :class:`dask_kubernetes.operator.KubeCluster` that you can use to conveniently create and manage a Dask cluster in Python. Then connect a Dask :class:`distributed.Client` object to it directly and perform your work.
 
 The goal of the cluster manager is to abstract away the complexity of the Kubernetes resources and provide a clean and simple Python API to manager clusters while still getting all the benefits of the operator.
 
@@ -20,7 +20,7 @@ To create a cluster in the default namespace, run the following
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster
+   from dask_kubernetes.operator import KubeCluster
 
    cluster = KubeCluster(name='foo')
 
@@ -70,7 +70,7 @@ Additional worker groups can also be created via the cluster manager in Python.
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster
+   from dask_kubernetes.operator import KubeCluster
 
    cluster = KubeCluster(name='foo')
 
@@ -100,7 +100,7 @@ You can also generate a spec with :func:`make_cluster_spec` which ``KubeCluster`
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster, make_cluster_spec
+   from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
    config = {
       "name": "foo",
@@ -116,7 +116,7 @@ You can also modify the spec before passing it to ``KubeCluster``, for example i
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster, make_cluster_spec
+   from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
    spec = make_cluster_spec(name="selector-example", n_workers=2)
    spec["spec"]["worker"]["spec"]["nodeSelector"] = {"disktype": "ssd"}
@@ -127,7 +127,7 @@ The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`
 
 .. code-block:: python
 
-   from dask_kubernetes import KubeCluster, make_worker_spec
+   from dask_kubernetes.operator import KubeCluster, make_worker_spec
 
    cluster = KubeCluster(name="example")
 
@@ -142,7 +142,7 @@ The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`
 API
 ---
 
-.. currentmodule:: dask_kubernetes.operator.kubecluster
+.. currentmodule:: dask_kubernetes.operator
 
 .. autosummary::
    KubeCluster

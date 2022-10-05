@@ -1,6 +1,6 @@
 Custom Resources
 ================
-.. currentmodule:: dask_kubernetes.operator.kubecluster
+.. currentmodule:: dask_kubernetes.operator
 
 The Dask Operator has a few custom resources that can be used to create various Dask components.
 

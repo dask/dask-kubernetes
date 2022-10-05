@@ -1,6 +1,6 @@
 Overview
 ========
-.. currentmodule:: dask_kubernetes.operator.kubecluster
+.. currentmodule:: dask_kubernetes.operator
 
 What is the operator?
 ---------------------
