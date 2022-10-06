@@ -38,12 +38,10 @@ Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
 
 .. code-block:: console
 
-   $ # Install operator CRDs and controller, needs to be done once on your Kubernetes cluster
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskjob.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskautoscaler.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/operator.yaml
+    $ # Install operator CRDs and controller, needs to be done once on your Kubernetes cluster
+    $ helm repo add dask https://helm.dask.org && helm repo update
+    $ kubectl create ns dask-operator
+    $ helm install --namespace dask-operator dask-operator dask/dask-kubernetes-operator
 
 .. code-block:: python
 

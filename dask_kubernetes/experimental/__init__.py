@@ -15,6 +15,7 @@ def __getattr__(name):
             f"Yay {name} is no longer experimental 🎉. "
             "You can import it directly from dask_kubernetes or explicitly from dask_kubernetes.operator",
             DeprecationWarning,
+            stacklevel=2,
         )
         new_module = import_module("dask_kubernetes.operator")
         return getattr(new_module, name)

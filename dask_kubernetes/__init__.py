@@ -30,6 +30,7 @@ def __getattr__(name):
             "To suppress this warning import KubeCluster directly from dask_kubernetes.classic. "
             "But note this will be removed in the future. ",
             DeprecationWarning,
+            stacklevel=2,
         )
         new_module = import_module("dask_kubernetes.classic")
         return getattr(new_module, name)
