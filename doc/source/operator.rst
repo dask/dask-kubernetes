@@ -1,15 +1,12 @@
 Overview
 ========
-.. currentmodule:: dask_kubernetes.experimental
-
-.. warning::
-    The Dask Operator for Kubernetes is experimental. So any `bug reports <https://github.com/dask/dask-kubernetes/issues>`_ are appreciated!
+.. currentmodule:: dask_kubernetes.operator
 
 What is the operator?
 ---------------------
 
 The Dask Operator is a small service that runs on your Kubernetes cluster and allows you to create and manage your Dask clusters as Kubernetes resources.
-Creating clusters can either be done via the :doc:`Kubernetes API with kubectl <operator_resources>` or the :doc:`Python API with the experimental KubeCluster <operator_kubecluster>`.
+Creating clusters can either be done via the :doc:`Kubernetes API with kubectl <operator_resources>` or the :doc:`Python API with KubeCluster <operator_kubecluster>`.
 
 To :doc:`install the operator <operator_installation>` you need to apply some custom resource definitions that allow us to describe Dask resources and the operator itself which is a small Python application that
 watches the Kubernetes API for events related to our custom resources and creates other resources such as ``Pods`` and ``Services`` accordingly.

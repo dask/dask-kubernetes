@@ -26,7 +26,7 @@ from distributed.utils import (
 )
 
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.operator import (
+from dask_kubernetes.operator.controller import (
     wait_for_service,
 )
 
@@ -106,7 +106,7 @@ class KubeCluster(Cluster):
 
     Examples
     --------
-    >>> from dask_kubernetes import KubeCluster
+    >>> from dask_kubernetes.operator import KubeCluster
     >>> cluster = KubeCluster(name="foo")
 
     You can add another group of workers (default is 3 workers)
@@ -141,6 +141,7 @@ class KubeCluster(Cluster):
 
     def __init__(
         self,
+        *,
         name=None,
         namespace=None,
         image=None,
@@ -157,6 +158,7 @@ class KubeCluster(Cluster):
         custom_cluster_spec=None,
         **kwargs,
     ):
+
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = (
             dask.config.get("kubernetes.namespace", override_with=namespace)

@@ -3,5 +3,5 @@ from .kubecluster import (
     make_cluster_spec,
     make_scheduler_spec,
     make_worker_spec,
-    discover,
 )
+from .discovery import discover

@@ -8,7 +8,7 @@ from dask.distributed import Client, wait
 from distributed.utils_test import captured_logger
 from dask.utils import tmpfile
 
-from dask_kubernetes import KubeCluster, make_pod_spec
+from dask_kubernetes.classic import KubeCluster, make_pod_spec
 from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))

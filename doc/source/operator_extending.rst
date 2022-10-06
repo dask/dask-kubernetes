@@ -1,9 +1,6 @@
 Extending (advanced)
 ====================
-.. currentmodule:: dask_kubernetes.experimental
-
-.. warning::
-    The Dask Operator for Kubernetes is experimental. So any `bug reports <https://github.com/dask/dask-kubernetes/issues>`_ are appreciated!
+.. currentmodule:: dask_kubernetes.operator
 
 You can extend the functionality of the Dask Operator controller by writing plugins.
 You may wish to do this if you want the operator to create other resources like Istio ``VirtualSerivce``, ``Gateway`` and ``Certificate`` resources.
