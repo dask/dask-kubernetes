@@ -12,7 +12,7 @@ kubernetes:
   scheduler-service-type: "ClusterIP"
 
   # Operator KubeCluster options
-  image: ghcr.io/dask/dask:latest"
+  image: "ghcr.io/dask/dask:latest"
   resources: {}
   worker-command: "dask-worker"
   port-forward-cluster-ip: null
