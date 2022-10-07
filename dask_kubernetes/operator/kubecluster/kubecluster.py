@@ -483,6 +483,7 @@ class KubeCluster(Cluster):
                 n_workers=n_workers or self.n_workers,
                 image=image or self.image,
             )
+            spec["cluster"] = self.name
         data = {
             "apiVersion": "kubernetes.dask.org/v1",
             "kind": "DaskWorkerGroup",
@@ -706,7 +707,6 @@ def make_cluster_spec(
         "metadata": {"name": name},
         "spec": {
             "worker": make_worker_spec(
-                cluster_name=name,
                 env=env,
                 resources=resources,
                 worker_command=worker_command,
@@ -725,7 +725,6 @@ def make_cluster_spec(
 
 
 def make_worker_spec(
-    cluster_name,
     image="ghcr.io/dask/dask:latest",
     n_workers=3,
     resources=None,
@@ -744,7 +743,6 @@ def make_worker_spec(
     args = worker_command + ["--name", "$(DASK_WORKER_NAME)"]
 
     return {
-        "cluster": cluster_name,
         "replicas": n_workers,
         "spec": {
             "containers": [
