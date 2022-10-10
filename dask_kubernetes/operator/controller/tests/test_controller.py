@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 import asyncio
@@ -9,6 +11,9 @@ import os.path
 from dask.distributed import Client
 
 DIR = pathlib.Path(__file__).parent.absolute()
+
+
+_EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
 
 
 @pytest.fixture()
@@ -147,7 +152,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     total = client.submit(sum, futures)
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
 
-            # Get the the first env value (the only one) of the scheduler
+            # Get the first env value (the only one) of the scheduler
             scheduler_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
@@ -158,7 +163,19 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             # Just check if its in the string, no need to parse the json
             assert "SCHEDULER_ENV" in scheduler_env
 
-            # Get the the first env value (the only one) of the first worker
+            # Get the first annotation (the only one) of the scheduler
+            scheduler_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=scheduler",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )  # First and last char is a quote
+            assert scheduler_annotations == _EXPECTED_ANNOTATIONS
+
+            # Get the first env value (the only one) of the first worker
             worker_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
@@ -166,9 +183,21 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 "-o",
                 "jsonpath='{.items[0].spec.containers[0].env[0]}'",
             )
-            # Just check if its in the string, no need to parse the json
+            # Just check if it's in the string, no need to parse the json
             assert "WORKER_ENV" in worker_env
             assert cluster_name
+
+            # Get the first annotation (the only one) of a worker
+            worker_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=worker",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )
+            assert worker_annotations == _EXPECTED_ANNOTATIONS
 
 
 @pytest.mark.asyncio
