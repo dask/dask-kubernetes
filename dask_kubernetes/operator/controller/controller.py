@@ -109,7 +109,7 @@ def build_worker_pod_spec(
     return pod_spec
 
 
-def build_job_pod_spec(job_name, cluster_name, namespace, spec):
+def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations):
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
@@ -120,6 +120,7 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec):
                 "dask.org/component": "job-runner",
                 "sidecar.istio.io/inject": "false",
             },
+            "annotations": annotations,
         },
         "spec": spec,
     }
@@ -422,11 +423,13 @@ async def daskjob_create(spec, name, namespace, logger, **kwargs):
             f"Cluster {cluster_spec['metadata']['name']} for job {name} created in {namespace}."
         )
 
+        annotations = _get_dask_cluster_annotations(kwargs["meta"])
         job_pod_spec = build_job_pod_spec(
             job_name=name,
             cluster_name=cluster_name,
             namespace=namespace,
             spec=spec["job"]["spec"],
+            annotations=annotations,
         )
         kopf.adopt(job_pod_spec)
         await corev1api.create_namespaced_pod(
