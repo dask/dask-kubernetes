@@ -3,6 +3,8 @@ kind: DaskJob
 metadata:
   name: simple-job
   namespace: default
+  annotations:
+    test-annotation: "annotation-value"
 spec:
   job:
     spec:

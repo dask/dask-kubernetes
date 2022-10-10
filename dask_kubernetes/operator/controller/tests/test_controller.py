@@ -216,6 +216,19 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             while job not in k8s_cluster.kubectl("get", "po"):
                 await asyncio.sleep(0.1)
 
+            job_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=job-runner",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )
+            # There might be more annotations on the job runner than expected
+            for key, value in _EXPECTED_ANNOTATIONS.items():
+                assert job_annotations[key] == value
+
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
             while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):
                 await asyncio.sleep(0.1)
