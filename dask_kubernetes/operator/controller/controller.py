@@ -61,7 +61,7 @@ def build_scheduler_pod_spec(cluster_name, spec, annotations):
     }
 
 
-def build_scheduler_service_spec(cluster_name, spec):
+def build_scheduler_service_spec(cluster_name, spec, annotations):
     return {
         "apiVersion": "v1",
         "kind": "Service",
@@ -70,6 +70,7 @@ def build_scheduler_service_spec(cluster_name, spec):
             "labels": {
                 "dask.org/cluster-name": cluster_name,
             },
+            "annotations": annotations,
         },
         "spec": spec,
     }
@@ -220,7 +221,9 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
         logger.info(f"Scheduler pod {data['metadata']['name']} created in {namespace}.")
 
         # TODO Check for existing scheduler service
-        data = build_scheduler_service_spec(name, scheduler_spec.get("service"))
+        data = build_scheduler_service_spec(
+            name, scheduler_spec.get("service"), annotations
+        )
         kopf.adopt(data)
         await api.create_namespaced_service(
             namespace=namespace,

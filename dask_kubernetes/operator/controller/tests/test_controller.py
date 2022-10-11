@@ -175,6 +175,18 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             )  # First and last char is a quote
             assert scheduler_annotations == _EXPECTED_ANNOTATIONS
 
+            # Get the first annotation (the only one) of the scheduler
+            service_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "svc",
+                    "--selector=dask.org/cluster-name=simple",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )  # First and last char is a quote
+            assert service_annotations == _EXPECTED_ANNOTATIONS
+
             # Get the first env value (the only one) of the first worker
             worker_env = k8s_cluster.kubectl(
                 "get",

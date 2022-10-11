@@ -78,9 +78,9 @@ configuration settings and can be scaled separately. You can then use `resource 
 to schedule different tasks to different groups.
 
 All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>` on the
-``DaskCluster`` resource will be passed onto the scheduler ``Pod`` as well the ``DaskWorkerGroup`` resources.
-Annotations created by `kopf` or `kubectl` (i.e. starting with "kopf.zalando.org" or "kubectl.kubernetes.io") will not
-be passed on.
+``DaskCluster`` resource will be passed onto the scheduler ``Pod`` and ``Service`` as well the ``DaskWorkerGroup``
+resources. Annotations created by `kopf` or `kubectl` (i.e. starting with "kopf.zalando.org" or "kubectl.kubernetes.io")
+will not be passed on.
 
 For example you may wish to have a smaller pool of workers that have more memory for memory intensive tasks, or GPUs for compute intensive tasks.
 
