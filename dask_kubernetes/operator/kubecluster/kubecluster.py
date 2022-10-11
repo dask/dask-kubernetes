@@ -476,7 +476,6 @@ class KubeCluster(Cluster):
             spec = custom_spec
         else:
             spec = make_worker_spec(
-                cluster_name=self.name,
                 env=env or self.env,
                 resources=resources or self.resources,
                 worker_command=worker_command or self.worker_command,
