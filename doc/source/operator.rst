@@ -62,7 +62,8 @@ A ``DaskWorkerGroup`` represents a homogenous group of workers that can be scale
 with some intelligence around the ``Pod`` lifecycle. A worker group must be attached to a Dask Cluster resource in order to function.
 
 All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>` on the
-``DaskWorkerGroup`` resource will be passed onto worker ``Pod`` resources.
+``DaskWorkerGroup`` resource will be passed onto worker ``Pod`` resources. Annotations created by `kopf` or
+`kubectl` (i.e. starting with "kopf.zalando.org" or "kubectl.kubernetes.io") will not be passed on.
 
 
 Clusters
@@ -78,6 +79,8 @@ to schedule different tasks to different groups.
 
 All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>` on the
 ``DaskCluster`` resource will be passed onto the scheduler ``Pod`` as well the ``DaskWorkerGroup`` resources.
+Annotations created by `kopf` or `kubectl` (i.e. starting with "kopf.zalando.org" or "kubectl.kubernetes.io") will not
+be passed on.
 
 For example you may wish to have a smaller pool of workers that have more memory for memory intensive tasks, or GPUs for compute intensive tasks.
 
@@ -89,7 +92,8 @@ A ``DaskJob`` is a batch style resource that creates a ``Pod`` to perform some s
 All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>` on the
 ``DaskJob`` resource will be passed on to the job-runner ``Pod`` resource. If one also wants to set Kubernetes
 annotations on the cluster-related resources (scheduler and worker ``Pods``), these can be set as
-``spec.cluster.metadata`` in the ``DaskJob`` resource.
+``spec.cluster.metadata`` in the ``DaskJob`` resource. Annotations created by `kopf` or `kubectl` (i.e. starting with
+"kopf.zalando.org" or "kubectl.kubernetes.io") will not be passed on.
 
 Once the job ``Pod`` runs to completion the cluster is removed automatically to save resources. This is great for workflows like training a distributed machine learning model with Dask.
 

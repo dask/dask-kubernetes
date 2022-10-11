@@ -5,6 +5,8 @@ metadata:
   namespace: default
   annotations:
     test-annotation: "annotation-value"
+    "kopf.zalando.org/foobar": "should-not-be-propagated"
+    "kubectl.kubernetes.io": "should-not-be-propagated"
 spec:
   job:
     spec:

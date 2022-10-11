@@ -15,10 +15,10 @@ from dask_kubernetes.common.networking import (
     get_scheduler_address,
 )
 
-_DEFAULT_ANNOTATIONS = [
-    "kopf.zalando.org/last-handled-configuration",
-    "kubectl.kubernetes.io/last-applied-configuration",
-]
+_ANNOTATION_NAMESPACES_TO_IGNORE = (
+    "kopf.zalando.org",
+    "kubectl.kubernetes.io",
+)
 
 # Load operator plugins from other packages
 PLUGINS = []
@@ -37,7 +37,10 @@ def _get_dask_cluster_annotations(meta):
     return {
         annotation_key: annotation_value
         for annotation_key, annotation_value in meta.annotations.items()
-        if annotation_key not in _DEFAULT_ANNOTATIONS
+        if not any(
+            annotation_key.startswith(namespace)
+            for namespace in _ANNOTATION_NAMESPACES_TO_IGNORE
+        )
     }
 
 
