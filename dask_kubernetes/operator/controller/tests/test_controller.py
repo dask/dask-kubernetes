@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 import asyncio
@@ -9,6 +11,9 @@ import os.path
 from dask.distributed import Client
 
 DIR = pathlib.Path(__file__).parent.absolute()
+
+
+_EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
 
 
 @pytest.fixture()
@@ -147,7 +152,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     total = client.submit(sum, futures)
                     assert (await total) == sum(map(lambda x: x + 1, range(10)))
 
-            # Get the the first env value (the only one) of the scheduler
+            # Get the first env value (the only one) of the scheduler
             scheduler_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
@@ -158,7 +163,31 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             # Just check if its in the string, no need to parse the json
             assert "SCHEDULER_ENV" in scheduler_env
 
-            # Get the the first env value (the only one) of the first worker
+            # Get the first annotation (the only one) of the scheduler
+            scheduler_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=scheduler",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )  # First and last char is a quote
+            assert scheduler_annotations == _EXPECTED_ANNOTATIONS
+
+            # Get the first annotation (the only one) of the scheduler
+            service_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "svc",
+                    "--selector=dask.org/cluster-name=simple",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )  # First and last char is a quote
+            assert service_annotations == _EXPECTED_ANNOTATIONS
+
+            # Get the first env value (the only one) of the first worker
             worker_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
@@ -166,9 +195,21 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 "-o",
                 "jsonpath='{.items[0].spec.containers[0].env[0]}'",
             )
-            # Just check if its in the string, no need to parse the json
+            # Just check if it's in the string, no need to parse the json
             assert "WORKER_ENV" in worker_env
             assert cluster_name
+
+            # Get the first annotation (the only one) of a worker
+            worker_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=worker",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )
+            assert worker_annotations == _EXPECTED_ANNOTATIONS
 
 
 @pytest.mark.asyncio
@@ -186,6 +227,19 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             # Assert job pod is created
             while job not in k8s_cluster.kubectl("get", "po"):
                 await asyncio.sleep(0.1)
+
+            job_annotations = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=job-runner",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.annotations}'",
+                )[1:-1]
+            )
+            # There might be more annotations on the job runner than expected
+            for key, value in _EXPECTED_ANNOTATIONS.items():
+                assert job_annotations[key] == value
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
             while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):

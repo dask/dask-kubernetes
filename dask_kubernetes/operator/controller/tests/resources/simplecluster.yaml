@@ -3,6 +3,10 @@ kind: DaskCluster
 metadata:
   name: simple
   namespace: default
+  annotations:
+    test-annotation: "annotation-value"
+    "kopf.zalando.org/foobar": "should-not-be-propagated"
+    "kubectl.kubernetes.io": "should-not-be-propagated"
 spec:
   worker:
     replicas: 2
@@ -17,7 +21,7 @@ spec:
             - $(DASK_WORKER_NAME)
           env:
             - name: WORKER_ENV
-              value: hello-world # We dont test the value, just the name
+              value: hello-world # We don't test the value, just the name
   scheduler:
     spec:
       containers:
