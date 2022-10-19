@@ -61,7 +61,7 @@ rules:
 
   # Application: watching & handling for the custom resource we declare.
   - apiGroups: [kubernetes.dask.org]
-    resources: [daskclusters, daskworkergroups, daskworkergroups/scale, daskjobs]
+    resources: [daskclusters, daskworkergroups, daskworkergroups/scale, daskjobs, daskautoscalers]
     verbs: [get, list, watch, patch, create, delete]
 
   # Application: other resources it produces and manipulates.
