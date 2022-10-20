@@ -1,4 +1,6 @@
 import asyncio
+import enum
+
 import aiohttp
 from contextlib import suppress
 
@@ -20,6 +22,10 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kubectl.kubernetes.io",
 )
 
+class DaskClusterPhase(enum.Enum):
+    CREATED = "Created"
+    RUNNING = "Running"
+
 # Load operator plugins from other packages
 PLUGINS = []
 for ep in entry_points(group="dask_operator_plugin"):
@@ -30,6 +36,8 @@ for ep in entry_points(group="dask_operator_plugin"):
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
 
+
+def build_scheduler_pod_spec(name, spec):
     pass
 
 
@@ -197,10 +205,10 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     This allows us to track that the operator is running.
     """
     logger.info(f"DaskCluster {name} created in {namespace}.")
-    patch.status["phase"] = "Created"
+    patch.status["phase"] = DaskClusterPhase.CREATED.value
 
 
-@kopf.on.field("daskcluster", field="status.phase", new="Created")
+@kopf.on.field("daskcluster", field="status.phase", new=DaskClusterPhase.CREATED.value)
 async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
     """When the DaskCluster status.phase goes into Pending create the cluster components."""
     logger.info("Creating Dask cluster components.")
@@ -245,7 +253,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
         )
         logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
     # TODO Set to "Pending" here and track scheduler readiness before finally setting to "Running"
-    patch.status["phase"] = "Running"
+    patch.status["phase"] = DaskClusterPhase.RUNNING.value
 
 
 @kopf.on.create("daskworkergroup")
