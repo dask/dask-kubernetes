@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import json
 
 import pytest
@@ -10,7 +11,7 @@ import os.path
 
 from dask.distributed import Client
 
-from dask_kubernetes.operator import DaskJobStatus
+from dask_kubernetes.operator import DaskJobStatus, KUBERNETES_DATETIME_FORMAT
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -240,6 +241,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             while job not in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
+            await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
             job_status = json.loads(
                 k8s_cluster.kubectl(
                     "get",
@@ -256,6 +258,32 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             # Assert job pod is created
             while job not in k8s_cluster.kubectl("get", "po"):
                 await asyncio.sleep(0.1)
+
+            # Assert that pod started Running
+            while "Running" not in k8s_cluster.kubectl("get", "po"):
+                await asyncio.sleep(0.1)
+
+            await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
+            job_status = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskjobs",
+                    "-o",
+                    "jsonpath='{.items[0].status}'",
+                )[1:-1]
+            )
+            assert job_status["clusterName"] == cluster_name
+            assert job_status["jobStatus"] == DaskJobStatus.RUNNING.value
+            start_time = datetime.strptime(
+                job_status["startTime"], KUBERNETES_DATETIME_FORMAT
+            )
+            assert (
+                datetime.utcnow()
+                > start_time
+                > (datetime.utcnow() - timedelta(seconds=10))
+            )
+            assert set(job_status.keys()) == {"clusterName", "jobStatus", "startTime"}
+
 
             job_annotations = json.loads(
                 k8s_cluster.kubectl(
