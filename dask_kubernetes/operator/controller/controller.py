@@ -37,6 +37,12 @@ class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
 
 
+class DaskJobStatus(enum.Enum):
+    JOB_CREATED = "JobCreated"
+    CLUSTER_CREATED = "ClusterCreated"
+    RUNNING = "Running"
+
+
 def build_scheduler_pod_spec(name, spec):
     pass
 
@@ -413,8 +419,14 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 
 
 @kopf.on.create("daskjob")
-async def daskjob_create(spec, name, namespace, logger, **kwargs):
+async def daskjob_create(name, namespace, logger, patch, **kwargs):
     logger.info(f"A DaskJob has been created called {name} in {namespace}.")
+    patch.status["jobStatus"] = DaskJobStatus.JOB_CREATED.value
+
+
+@kopf.on.field("daskjob", field="status.jobStatus", new=DaskJobStatus.JOB_CREATED.value)
+async def daskjob_create_components(spec, name, namespace, logger, patch, **kwargs):
+    logger.info("Creating Dask job components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         corev1api = kubernetes.client.CoreV1Api(api_client)
@@ -450,6 +462,8 @@ async def daskjob_create(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             body=job_pod_spec,
         )
+        patch.status["clusterName"] = cluster_name
+        patch.status["jobStatus"] = DaskJobStatus.CLUSTER_CREATED.value
 
 
 @kopf.on.field(

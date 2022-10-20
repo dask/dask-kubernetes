@@ -10,6 +10,8 @@ import os.path
 
 from dask.distributed import Client
 
+from dask_kubernetes.operator import DaskJobStatus
+
 DIR = pathlib.Path(__file__).parent.absolute()
 
 
@@ -220,9 +222,36 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
 
             runner_name = f"{job}-runner"
 
+            # Assert that job was created
+            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+                await asyncio.sleep(0.1)
+
+            job_status = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskjobs",
+                    "-o",
+                    "jsonpath='{.items[0].status}'",
+                )[1:-1]
+            )
+            assert job_status == {"jobStatus": DaskJobStatus.JOB_CREATED.value}
+
             # Assert that cluster is created
             while job not in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
+
+            job_status = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskjobs",
+                    "-o",
+                    "jsonpath='{.items[0].status}'",
+                )[1:-1]
+            )
+            assert job_status == {
+                "clusterName": cluster_name,
+                "jobStatus": DaskJobStatus.CLUSTER_CREATED.value,
+            }
 
             # Assert job pod is created
             while job not in k8s_cluster.kubectl("get", "po"):
