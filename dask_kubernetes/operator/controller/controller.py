@@ -23,9 +23,11 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kubectl.kubernetes.io",
 )
 
+
 class DaskClusterPhase(enum.Enum):
     CREATED = "Created"
     RUNNING = "Running"
+
 
 # Load operator plugins from other packages
 PLUGINS = []
@@ -471,64 +473,63 @@ async def daskjob_create_components(spec, name, namespace, logger, patch, **kwar
         patch.status["jobStatus"] = DaskJobStatus.CLUSTER_CREATED.value
 
 
-@kopf.on.field("pod", field="status.phase", labels={"dask.org/component": "job-runner"})
-async def handle_runner_status_change(meta, new, namespace, logger, **kwargs):
-    logger.info(f"Job now in phase {new}.")
-    if new == "Running":
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
-            api_client.set_default_header(
-                "content-type", "application/merge-patch+json"
-            )
-            await customobjectsapi.patch_namespaced_custom_object_status(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskjobs",
-                namespace=namespace,
-                name=meta["labels"]["dask.org/cluster-name"].rstrip(
-                    _JOB_CLUSTER_POSTFIX
-                ),
-                body={
-                    "status": {
-                        "jobStatus": DaskJobStatus.RUNNING.value,
-                        "startTime": datetime.utcnow().strftime(
-                            KUBERNETES_DATETIME_FORMAT
-                        ),
-                    }
-                },
-            )
+@kopf.on.field(
+    "pod",
+    field="status.phase",
+    labels={"dask.org/component": "job-runner"},
+    new="Running",
+)
+async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
+    logger.info("Job now in running")
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        api_client.set_default_header("content-type", "application/merge-patch+json")
+        await customobjectsapi.patch_namespaced_custom_object_status(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskjobs",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+            body={
+                "status": {
+                    "jobStatus": DaskJobStatus.RUNNING.value,
+                    "startTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+                }
+            },
+        )
 
-    if new == "Succeeded":
-        logger.info("Job succeeded, deleting Dask cluster.")
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
-            await customobjectsapi.delete_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace=namespace,
-                name=meta["labels"]["dask.org/cluster-name"],
-            )
-            api_client.set_default_header(
-                "content-type", "application/merge-patch+json"
-            )
-            await customobjectsapi.patch_namespaced_custom_object_status(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskjobs",
-                namespace=namespace,
-                name=meta["labels"]["dask.org/cluster-name"].rstrip(
-                    _JOB_CLUSTER_POSTFIX
-                ),
-                body={
-                    "status": {
-                        "jobStatus": DaskJobStatus.COMPLETED.value,
-                        "endTime": datetime.utcnow().strftime(
-                            KUBERNETES_DATETIME_FORMAT
-                        ),
-                    }
-                },
-            )
+
+@kopf.on.field(
+    "pod",
+    field="status.phase",
+    labels={"dask.org/component": "job-runner"},
+    new="Succeeded",
+)
+async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
+    logger.info("Job succeeded, deleting Dask cluster.")
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        await customobjectsapi.delete_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+        )
+        api_client.set_default_header("content-type", "application/merge-patch+json")
+        await customobjectsapi.patch_namespaced_custom_object_status(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskjobs",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+            body={
+                "status": {
+                    "jobStatus": DaskJobStatus.COMPLETED.value,
+                    "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+                }
+            },
+        )
 
 
 @kopf.on.create("daskautoscaler")

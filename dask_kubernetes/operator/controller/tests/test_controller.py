@@ -11,7 +11,10 @@ import os.path
 
 from dask.distributed import Client
 
-from dask_kubernetes.operator import DaskJobStatus, KUBERNETES_DATETIME_FORMAT
+from dask_kubernetes.operator.controller import (
+    DaskJobStatus,
+    KUBERNETES_DATETIME_FORMAT,
+)
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -251,7 +254,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 )[1:-1]
             )
             assert job_status == {
-                "clusterName": cluster_name,
+                "clusterName": job,
                 "jobStatus": DaskJobStatus.CLUSTER_CREATED.value,
             }
 
@@ -272,7 +275,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                     "jsonpath='{.items[0].status}'",
                 )[1:-1]
             )
-            assert job_status["clusterName"] == cluster_name
+            assert job_status["clusterName"] == job
             assert job_status["jobStatus"] == DaskJobStatus.RUNNING.value
             start_time = datetime.strptime(
                 job_status["startTime"], KUBERNETES_DATETIME_FORMAT
@@ -283,7 +286,6 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 > (datetime.utcnow() - timedelta(seconds=10))
             )
             assert set(job_status.keys()) == {"clusterName", "jobStatus", "startTime"}
-
 
             job_annotations = json.loads(
                 k8s_cluster.kubectl(
@@ -314,7 +316,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                     "jsonpath='{.items[0].status}'",
                 )[1:-1]
             )
-            assert job_status["clusterName"] == cluster_name
+            assert job_status["clusterName"] == job
             assert job_status["jobStatus"] == DaskJobStatus.COMPLETED.value
             start_time = datetime.strptime(
                 job_status["startTime"], KUBERNETES_DATETIME_FORMAT
@@ -322,7 +324,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             assert (
                 datetime.utcnow()
                 > start_time
-                > (datetime.utcnow() - timedelta(seconds=20))
+                > (datetime.utcnow() - timedelta(minutes=1))
             )
             end_time = datetime.strptime(
                 job_status["endTime"], KUBERNETES_DATETIME_FORMAT
@@ -330,7 +332,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             assert (
                 datetime.utcnow()
                 > end_time
-                > (datetime.utcnow() - timedelta(seconds=10))
+                > (datetime.utcnow() - timedelta(minutes=1))
             )
             assert set(job_status.keys()) == {
                 "clusterName",
