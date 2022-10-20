@@ -306,5 +306,38 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             while job in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
+            job_status = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskjobs",
+                    "-o",
+                    "jsonpath='{.items[0].status}'",
+                )[1:-1]
+            )
+            assert job_status["clusterName"] == cluster_name
+            assert job_status["jobStatus"] == DaskJobStatus.COMPLETED.value
+            start_time = datetime.strptime(
+                job_status["startTime"], KUBERNETES_DATETIME_FORMAT
+            )
+            assert (
+                datetime.utcnow()
+                > start_time
+                > (datetime.utcnow() - timedelta(seconds=20))
+            )
+            end_time = datetime.strptime(
+                job_status["endTime"], KUBERNETES_DATETIME_FORMAT
+            )
+            assert (
+                datetime.utcnow()
+                > end_time
+                > (datetime.utcnow() - timedelta(seconds=10))
+            )
+            assert set(job_status.keys()) == {
+                "clusterName",
+                "jobStatus",
+                "startTime",
+                "endTime",
+            }
+
     assert "A DaskJob has been created" in runner.stdout
     assert "Job succeeded, deleting Dask cluster." in runner.stdout

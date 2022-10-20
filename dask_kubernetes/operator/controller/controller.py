@@ -42,6 +42,7 @@ class DaskJobStatus(enum.Enum):
     JOB_CREATED = "JobCreated"
     CLUSTER_CREATED = "ClusterCreated"
     RUNNING = "Running"
+    COMPLETED = "Completed"
 
 
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -507,6 +508,26 @@ async def handle_runner_status_change(meta, new, namespace, logger, **kwargs):
                 plural="daskclusters",
                 namespace=namespace,
                 name=meta["labels"]["dask.org/cluster-name"],
+            )
+            api_client.set_default_header(
+                "content-type", "application/merge-patch+json"
+            )
+            await customobjectsapi.patch_namespaced_custom_object_status(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskjobs",
+                namespace=namespace,
+                name=meta["labels"]["dask.org/cluster-name"].rstrip(
+                    _JOB_CLUSTER_POSTFIX
+                ),
+                body={
+                    "status": {
+                        "jobStatus": DaskJobStatus.COMPLETED.value,
+                        "endTime": datetime.utcnow().strftime(
+                            KUBERNETES_DATETIME_FORMAT
+                        ),
+                    }
+                },
             )
 
 
