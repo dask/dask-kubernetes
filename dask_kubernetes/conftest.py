@@ -2,6 +2,7 @@ import pytest
 
 import pathlib
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -85,6 +86,11 @@ def customresources(k8s_cluster):
             os.path.join(crd_path, f"{crd}.patch.yaml"),
             os.path.join(temp_dir.name, f"{crd}.yaml"),
         )
+
+    shutil.copyfile(
+        os.path.join(DIR, "operator", "deployment", "manifests", "kopfpeering.yaml"),
+        os.path.join(temp_dir.name, "kopfpeering.yaml"),
+    )
 
     k8s_cluster.kubectl("apply", "-f", temp_dir.name)
     yield
