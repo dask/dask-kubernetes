@@ -20,6 +20,25 @@ spec:
           type: object
           properties:
             status:
+              properties:
+                clusterName:
+                  type: string
+                endTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                jobRunnerPodName:
+                  type: string
+                  nullable: true
+                jobStatus:
+                  type: string
+                  nullable: true
+                startTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+              required:
+                - jobStatus
               type: object
             spec:
               type: object
@@ -34,3 +53,12 @@ spec:
                       $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
                 cluster:
                   $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskCluster'
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - jsonPath: .status.jobStatus
+          name: Status
+          type: string
+        - jsonPath: .spec.cluster.spec.worker.replicas
+          name: Number Of Workers
+          type: integer

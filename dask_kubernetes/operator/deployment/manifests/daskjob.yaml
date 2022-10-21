@@ -12,7 +12,14 @@ spec:
     singular: daskjob
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - jsonPath: .status.jobStatus
+      name: Status
+      type: string
+    - jsonPath: .spec.cluster.spec.worker.replicas
+      name: Number Of Workers
+      type: integer
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
@@ -8796,7 +8803,28 @@ spec:
             - job
             type: object
           status:
+            properties:
+              clusterName:
+                type: string
+              endTime:
+                format: date-time
+                nullable: true
+                type: string
+              jobRunnerPodName:
+                nullable: true
+                type: string
+              jobStatus:
+                nullable: true
+                type: string
+              startTime:
+                format: date-time
+                nullable: true
+                type: string
+            required:
+            - jobStatus
             type: object
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
