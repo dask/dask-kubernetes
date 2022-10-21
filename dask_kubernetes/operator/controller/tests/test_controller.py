@@ -9,6 +9,7 @@ import pathlib
 
 import os.path
 
+import yaml
 from dask.distributed import Client
 
 from dask_kubernetes.operator.controller import (
@@ -52,9 +53,10 @@ def gen_job(k8s_cluster):
     """Yields an instantiated context manager for creating/deleting a simple job."""
 
     @asynccontextmanager
-    async def cm():
-        job_path = os.path.join(DIR, "resources", "simplejob.yaml")
-        job_name = "simple-job"
+    async def cm(job_file):
+        job_path = os.path.join(DIR, "resources", job_file)
+        with open(job_path) as f:
+            job_name = yaml.load(f, yaml.Loader)["metadata"]["name"]
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", job_path)
@@ -218,10 +220,55 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert worker_annotations == _EXPECTED_ANNOTATIONS
 
 
+def _get_job_status(k8s_cluster):
+    return json.loads(
+        k8s_cluster.kubectl(
+            "get",
+            "daskjobs",
+            "-o",
+            "jsonpath='{.items[0].status}'",
+        )[1:-1]
+    )
+
+
+def _assert_job_status_created(job_status):
+    assert job_status == {"jobStatus": DaskJobStatus.JOB_CREATED.value}
+
+
+def _assert_job_status_cluster_created(job, job_status):
+    assert job_status == {
+        "clusterName": job,
+        "jobStatus": DaskJobStatus.CLUSTER_CREATED.value,
+    }
+
+
+def _assert_job_status_running(job, job_status):
+    assert job_status["clusterName"] == job
+    assert job_status["jobStatus"] == DaskJobStatus.RUNNING.value
+    start_time = datetime.strptime(job_status["startTime"], KUBERNETES_DATETIME_FORMAT)
+    assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(seconds=10))
+    assert set(job_status.keys()) == {"clusterName", "jobStatus", "startTime"}
+
+
+def _assert_final_job_status(job, job_status, expected_status):
+    assert job_status["clusterName"] == job
+    assert job_status["jobStatus"] == expected_status
+    start_time = datetime.strptime(job_status["startTime"], KUBERNETES_DATETIME_FORMAT)
+    assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(minutes=1))
+    end_time = datetime.strptime(job_status["endTime"], KUBERNETES_DATETIME_FORMAT)
+    assert datetime.utcnow() > end_time > (datetime.utcnow() - timedelta(minutes=1))
+    assert set(job_status.keys()) == {
+        "clusterName",
+        "jobStatus",
+        "startTime",
+        "endTime",
+    }
+
+
 @pytest.mark.asyncio
 async def test_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
-        async with gen_job() as job:
+        async with gen_job("simplejob.yaml") as job:
             assert job
 
             runner_name = f"{job}-runner"
@@ -230,33 +277,16 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             while job not in k8s_cluster.kubectl("get", "daskjobs"):
                 await asyncio.sleep(0.1)
 
-            job_status = json.loads(
-                k8s_cluster.kubectl(
-                    "get",
-                    "daskjobs",
-                    "-o",
-                    "jsonpath='{.items[0].status}'",
-                )[1:-1]
-            )
-            assert job_status == {"jobStatus": DaskJobStatus.JOB_CREATED.value}
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_created(job_status)
 
             # Assert that cluster is created
             while job not in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
-            job_status = json.loads(
-                k8s_cluster.kubectl(
-                    "get",
-                    "daskjobs",
-                    "-o",
-                    "jsonpath='{.items[0].status}'",
-                )[1:-1]
-            )
-            assert job_status == {
-                "clusterName": job,
-                "jobStatus": DaskJobStatus.CLUSTER_CREATED.value,
-            }
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_cluster_created(job, job_status)
 
             # Assert job pod is created
             while job not in k8s_cluster.kubectl("get", "po"):
@@ -267,25 +297,8 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
-            job_status = json.loads(
-                k8s_cluster.kubectl(
-                    "get",
-                    "daskjobs",
-                    "-o",
-                    "jsonpath='{.items[0].status}'",
-                )[1:-1]
-            )
-            assert job_status["clusterName"] == job
-            assert job_status["jobStatus"] == DaskJobStatus.RUNNING.value
-            start_time = datetime.strptime(
-                job_status["startTime"], KUBERNETES_DATETIME_FORMAT
-            )
-            assert (
-                datetime.utcnow()
-                > start_time
-                > (datetime.utcnow() - timedelta(seconds=10))
-            )
-            assert set(job_status.keys()) == {"clusterName", "jobStatus", "startTime"}
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_running(job, job_status)
 
             job_annotations = json.loads(
                 k8s_cluster.kubectl(
@@ -308,38 +321,58 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             while job in k8s_cluster.kubectl("get", "daskclusters"):
                 await asyncio.sleep(0.1)
 
-            job_status = json.loads(
-                k8s_cluster.kubectl(
-                    "get",
-                    "daskjobs",
-                    "-o",
-                    "jsonpath='{.items[0].status}'",
-                )[1:-1]
-            )
-            assert job_status["clusterName"] == job
-            assert job_status["jobStatus"] == DaskJobStatus.COMPLETED.value
-            start_time = datetime.strptime(
-                job_status["startTime"], KUBERNETES_DATETIME_FORMAT
-            )
-            assert (
-                datetime.utcnow()
-                > start_time
-                > (datetime.utcnow() - timedelta(minutes=1))
-            )
-            end_time = datetime.strptime(
-                job_status["endTime"], KUBERNETES_DATETIME_FORMAT
-            )
-            assert (
-                datetime.utcnow()
-                > end_time
-                > (datetime.utcnow() - timedelta(minutes=1))
-            )
-            assert set(job_status.keys()) == {
-                "clusterName",
-                "jobStatus",
-                "startTime",
-                "endTime",
-            }
+            job_status = _get_job_status(k8s_cluster)
+            _assert_final_job_status(job, job_status, DaskJobStatus.SUCCESSFUL.value)
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job succeeded, deleting Dask cluster." in runner.stdout
+
+
+@pytest.mark.asyncio
+async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
+    with kopf_runner as runner:
+        async with gen_job("failedjob.yaml") as job:
+            assert job
+
+            runner_name = f"{job}-runner"
+
+            # Assert that job was created
+            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+                await asyncio.sleep(0.1)
+
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_created(job_status)
+
+            # Assert that cluster is created
+            while job not in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+            await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_cluster_created(job, job_status)
+
+            # Assert job pod is created
+            while job not in k8s_cluster.kubectl("get", "po"):
+                await asyncio.sleep(0.1)
+
+            # Assert that pod started Running
+            while "Running" not in k8s_cluster.kubectl("get", "po"):
+                await asyncio.sleep(0.1)
+
+            await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
+            job_status = _get_job_status(k8s_cluster)
+            _assert_job_status_running(job, job_status)
+
+            # Assert job pod runs to failure
+            while "Error" not in k8s_cluster.kubectl("get", "po", runner_name):
+                await asyncio.sleep(0.1)
+
+            # Assert cluster is removed on completion
+            while job in k8s_cluster.kubectl("get", "daskclusters"):
+                await asyncio.sleep(0.1)
+
+            job_status = _get_job_status(k8s_cluster)
+            _assert_final_job_status(job, job_status, DaskJobStatus.FAILED.value)
+
+    assert "A DaskJob has been created" in runner.stdout
+    assert "Job failed, deleting Dask cluster." in runner.stdout

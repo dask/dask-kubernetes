@@ -23,10 +23,20 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kubectl.kubernetes.io",
 )
 
+KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
 
 class DaskClusterPhase(enum.Enum):
     CREATED = "Created"
     RUNNING = "Running"
+
+
+class DaskJobStatus(enum.Enum):
+    JOB_CREATED = "JobCreated"
+    CLUSTER_CREATED = "ClusterCreated"
+    RUNNING = "Running"
+    SUCCESSFUL = "Successful"
+    FAILED = "Failed"
 
 
 # Load operator plugins from other packages
@@ -38,16 +48,6 @@ for ep in entry_points(group="dask_operator_plugin"):
 
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
-
-
-class DaskJobStatus(enum.Enum):
-    JOB_CREATED = "JobCreated"
-    CLUSTER_CREATED = "ClusterCreated"
-    RUNNING = "Running"
-    COMPLETED = "Completed"
-
-
-KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
 def build_scheduler_pod_spec(name, spec):
@@ -525,7 +525,40 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
             name=meta["labels"]["dask.org/cluster-name"],
             body={
                 "status": {
-                    "jobStatus": DaskJobStatus.COMPLETED.value,
+                    "jobStatus": DaskJobStatus.SUCCESSFUL.value,
+                    "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+                }
+            },
+        )
+
+
+@kopf.on.field(
+    "pod",
+    field="status.phase",
+    labels={"dask.org/component": "job-runner"},
+    new="Failed",
+)
+async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
+    logger.info("Job failed, deleting Dask cluster.")
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        await customobjectsapi.delete_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+        )
+        api_client.set_default_header("content-type", "application/merge-patch+json")
+        await customobjectsapi.patch_namespaced_custom_object_status(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskjobs",
+            namespace=namespace,
+            name=meta["labels"]["dask.org/cluster-name"],
+            body={
+                "status": {
+                    "jobStatus": DaskJobStatus.FAILED.value,
                     "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
                 }
             },
