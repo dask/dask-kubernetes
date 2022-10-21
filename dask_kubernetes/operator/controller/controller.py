@@ -50,10 +50,6 @@ class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
 
 
-def build_scheduler_pod_spec(name, spec):
-    pass
-
-
 def _get_dask_cluster_annotations(meta):
     return {
         annotation_key: annotation_value
@@ -134,12 +130,16 @@ def build_worker_pod_spec(
     return pod_spec
 
 
+def get_job_runner_pod_name(job_name):
+    return f"{job_name}-runner"
+
+
 def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations):
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
-            "name": f"{job_name}-runner",
+            "name": get_job_runner_pod_name(job_name),
             "labels": {
                 "dask.org/cluster-name": cluster_name,
                 "dask.org/component": "job-runner",
@@ -471,6 +471,7 @@ async def daskjob_create_components(spec, name, namespace, logger, patch, **kwar
         )
         patch.status["clusterName"] = cluster_name
         patch.status["jobStatus"] = DaskJobStatus.CLUSTER_CREATED.value
+        patch.status["jobRunnerPodName"] = get_job_runner_pod_name(name)
 
 
 @kopf.on.field(
