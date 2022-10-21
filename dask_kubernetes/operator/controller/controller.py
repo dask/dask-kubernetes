@@ -1,5 +1,4 @@
 import asyncio
-import enum
 from datetime import datetime
 
 import aiohttp
@@ -24,19 +23,6 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
 )
 
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-
-class DaskClusterPhase(enum.Enum):
-    CREATED = "Created"
-    RUNNING = "Running"
-
-
-class DaskJobStatus(enum.Enum):
-    JOB_CREATED = "JobCreated"
-    CLUSTER_CREATED = "ClusterCreated"
-    RUNNING = "Running"
-    SUCCESSFUL = "Successful"
-    FAILED = "Failed"
 
 
 # Load operator plugins from other packages
@@ -218,10 +204,10 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     This allows us to track that the operator is running.
     """
     logger.info(f"DaskCluster {name} created in {namespace}.")
-    patch.status["phase"] = DaskClusterPhase.CREATED.value
+    patch.status["phase"] = "Created"
 
 
-@kopf.on.field("daskcluster", field="status.phase", new=DaskClusterPhase.CREATED.value)
+@kopf.on.field("daskcluster", field="status.phase", new="Created")
 async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
     """When the DaskCluster status.phase goes into Pending create the cluster components."""
     logger.info("Creating Dask cluster components.")
@@ -266,7 +252,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
         )
         logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
     # TODO Set to "Pending" here and track scheduler readiness before finally setting to "Running"
-    patch.status["phase"] = DaskClusterPhase.RUNNING.value
+    patch.status["phase"] = "Running"
 
 
 @kopf.on.create("daskworkergroup")
@@ -428,10 +414,10 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
 @kopf.on.create("daskjob")
 async def daskjob_create(name, namespace, logger, patch, **kwargs):
     logger.info(f"A DaskJob has been created called {name} in {namespace}.")
-    patch.status["jobStatus"] = DaskJobStatus.JOB_CREATED.value
+    patch.status["jobStatus"] = "JobCreated"
 
 
-@kopf.on.field("daskjob", field="status.jobStatus", new=DaskJobStatus.JOB_CREATED.value)
+@kopf.on.field("daskjob", field="status.jobStatus", new="JobCreated")
 async def daskjob_create_components(spec, name, namespace, logger, patch, **kwargs):
     logger.info("Creating Dask job components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -470,7 +456,7 @@ async def daskjob_create_components(spec, name, namespace, logger, patch, **kwar
             body=job_pod_spec,
         )
         patch.status["clusterName"] = cluster_name
-        patch.status["jobStatus"] = DaskJobStatus.CLUSTER_CREATED.value
+        patch.status["jobStatus"] = "ClusterCreated"
         patch.status["jobRunnerPodName"] = get_job_runner_pod_name(name)
 
 
@@ -493,7 +479,7 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
             name=meta["labels"]["dask.org/cluster-name"],
             body={
                 "status": {
-                    "jobStatus": DaskJobStatus.RUNNING.value,
+                    "jobStatus": "Running",
                     "startTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
                 }
             },
@@ -526,7 +512,7 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
             name=meta["labels"]["dask.org/cluster-name"],
             body={
                 "status": {
-                    "jobStatus": DaskJobStatus.SUCCESSFUL.value,
+                    "jobStatus": "Successful",
                     "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
                 }
             },
@@ -559,7 +545,7 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
             name=meta["labels"]["dask.org/cluster-name"],
             body={
                 "status": {
-                    "jobStatus": DaskJobStatus.FAILED.value,
+                    "jobStatus": "Failed",
                     "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
                 }
             },

@@ -13,7 +13,6 @@ import yaml
 from dask.distributed import Client
 
 from dask_kubernetes.operator.controller import (
-    DaskJobStatus,
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
 )
@@ -233,20 +232,20 @@ def _get_job_status(k8s_cluster):
 
 
 def _assert_job_status_created(job_status):
-    assert job_status == {"jobStatus": DaskJobStatus.JOB_CREATED.value}
+    assert job_status == {"jobStatus": "JobCreated"}
 
 
 def _assert_job_status_cluster_created(job, job_status):
     assert job_status == {
         "clusterName": job,
         "jobRunnerPodName": get_job_runner_pod_name(job),
-        "jobStatus": DaskJobStatus.CLUSTER_CREATED.value,
+        "jobStatus": "ClusterCreated",
     }
 
 
 def _assert_job_status_running(job, job_status):
     assert job_status["clusterName"] == job
-    assert job_status["jobStatus"] == DaskJobStatus.RUNNING.value
+    assert job_status["jobStatus"] == "Running"
     assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
     start_time = datetime.strptime(job_status["startTime"], KUBERNETES_DATETIME_FORMAT)
     assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(seconds=10))
@@ -332,7 +331,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
-            _assert_final_job_status(job, job_status, DaskJobStatus.SUCCESSFUL.value)
+            _assert_final_job_status(job, job_status, "Successful")
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job succeeded, deleting Dask cluster." in runner.stdout
@@ -382,7 +381,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
-            _assert_final_job_status(job, job_status, DaskJobStatus.FAILED.value)
+            _assert_final_job_status(job, job_status, "Failed")
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job failed, deleting Dask cluster." in runner.stdout
