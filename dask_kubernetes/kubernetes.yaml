@@ -1,19 +1,35 @@
 kubernetes:
+  ####
+  # Config options here are applied to either the classic KubeCluster, operator KubeCluster or both.
+
+  # Shared options
   name: "dask-{user}-{uuid}"
   namespace: null
+  env: {}
   count:
     start: 0
     max: null
+  scheduler-service-type: "ClusterIP"
+
+  # Operator KubeCluster options
+  image: "ghcr.io/dask/dask:latest"
+  resources: {}
+  worker-command: "dask-worker"
+  port-forward-cluster-ip: null
+  create-mode: CREATE_OR_CONNECT
+  shutdown-on-close: true
+  resource-timeout: 60
+  custom-cluster-spec: null
+
+  # Classic KubeCluster options
   host: "0.0.0.0"
   port: 0
-  env: {}
   idle-timeout: null
   deploy-mode: "remote"
   interface: null
   protocol: "tcp://"
   dashboard_address: ":8787"
 
-  scheduler-service-type: "ClusterIP"
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
   scheduler-service-wait-timeout: 30
@@ -30,17 +46,17 @@ kubernetes:
         dask.org/cluster-name: "" # Cluster name will be added automatically
         dask.org/component: scheduler
       ports:
-        - name: comm
+        - name: tcp-comm
           protocol: TCP
           port: 8786
           targetPort: 8786
-        - name: dashboard
+        - name: http-dashboard
           protocol: TCP
           port: 8787
           targetPort: 8787
 
   scheduler-pdb-template:
-    apiVersion: policy/v1beta1
+    apiVersion: policy/v1
     kind: PodDisruptionBudget
     spec:
       minAvailable: 1
@@ -61,7 +77,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - -scheduler
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-scheduler
@@ -83,7 +99,7 @@ kubernetes:
     # spec:
     #   restartPolicy: Never
     #   containers:
-    #   - name: dask
+    #   - name: dask-worker
     #     image: ghcr.io/dask/dask:latest
     #     args:
     #       - dask-worker

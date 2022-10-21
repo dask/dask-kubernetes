@@ -1,4 +1,4 @@
-from dask_kubernetes.constants import KUBECLUSTER_WORKER_CONTAINER_NAME
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 from dask_kubernetes.common.objects import make_pod_from_dict
 
 
@@ -16,7 +16,7 @@ def test_make_pod_from_dict():
                         "1",
                     ],
                     "image": "image-name",
-                    "name": KUBECLUSTER_WORKER_CONTAINER_NAME,
+                    "name": KUBECLUSTER_CONTAINER_NAME,
                     "securityContext": {
                         "capabilities": {"add": ["SYS_ADMIN"]},
                         "privileged": True,

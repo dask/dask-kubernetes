@@ -7,4 +7,4 @@ appVersion: "2022.4.1"
 home: https://kubernetes.dask.org/
 sources:
   - https://github.com/dask/dask-kubernetes/
-icon: https://docs.dask.org/en/latest/_images/dask_icon_no_pad.svg
+icon: https://avatars3.githubusercontent.com/u/17131925?v=3&s=200

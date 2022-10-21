@@ -45,3 +45,27 @@ or use ``pip`` locally if you want to install all dependencies as well::
 You can also install directly from git main branch::
 
     pip install git+https://github.com/dask/dask-kubernetes
+
+Supported Versions
+------------------
+
+Python
+^^^^^^
+
+All Dask projects generally follow the `NEP 29 <https://numpy.org/neps/nep-0029-deprecation_policy.html>`_ deprecation policy for Python where each Python minor version is support ed for 42 months.
+Due to Python's 12 month release cycle this ensures at least the current version and two previous versions are supported.
+
+The Dask Kubernetes CI tests all PRs against all supported Python versions.
+
+Kubernetes
+^^^^^^^^^^
+
+For Kubernetes we follow the `yearly support KEP <https://kubernetes.io/releases/patch-releases/#support-period>`_.
+Due to the 4-6 month release cycle this also ensures that at least the current and two previous versions are supported.
+
+The Dask Kubernetes CI tests all PRs against all supported Kubernetes versions.
+
+.. note::
+
+    To keep the CI matrix smaller we test all Kubernetes versions against the latest Python, and all Python versions against the latest Kubernetes.
+    We do not test older versions of Python and Kubernetes together. See `dask/dask-kubernetes#559 <https://github.com/dask/dask-kubernetes/pull/559>`_ for more information.

@@ -2,26 +2,38 @@ name: "Operator"
 on:
   pull_request:
     paths:
+      - ".github/workflows/operator.yaml"
       - "ci/**"
       - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
   push:
     paths:
+      - ".github/workflows/operator.yaml"
       - "ci/**"
       - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/experimental/**"
       - "dask_kubernetes/common/**"
       - "dask_kubernetes/*"
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
+        kubernetes-version: ["1.25.0"]
+        include:
+        - python-version: "3.10"
+          kubernetes-version: "1.22.13"
+        - python-version: "3.10"
+          kubernetes-version: "1.23.10"
+        - python-version: "3.10"
+          kubernetes-version: "1.24.4"
+
+    env:
+      KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
 
     steps:
       - uses: actions/checkout@v2
@@ -32,5 +44,9 @@ jobs:
         run: ./ci/install-deps.sh
       - name: Run tests
         env:
-          KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator/tests dask_kubernetes/experimental/tests
+          KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
+          TEST_ISTIO: "true"
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator
+      - name: Debug k8s resources
+        if: success() || failure()
+        run: kubectl get all -A

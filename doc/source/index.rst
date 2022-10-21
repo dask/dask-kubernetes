@@ -1,6 +1,23 @@
 Dask Kubernetes
 ===============
 
+.. image:: https://img.shields.io/pypi/v/dask-kubernetes
+   :target: https://pypi.org/project/dask-kubernetes/
+   :alt: PyPI
+
+.. image:: https://img.shields.io/conda/vn/conda-forge/dask-kubernetes
+   :target: https://anaconda.org/conda-forge/dask-kubernetes
+   :alt: Conda Forge
+
+.. image:: https://img.shields.io/badge/python%20support-3.8%7C3.9%7C3.10-blue
+   :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
+   :alt: Python Support
+
+.. image:: https://img.shields.io/badge/Kubernetes%20support-1.22%7C1.23%7C1.24%7C1.25-blue
+   :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
+   :alt: Kubernetes Support
+
+
 .. currentmodule:: dask_kubernetes
 
 Welcome to the documentation for ``dask-kubernetes``.
@@ -16,15 +33,20 @@ The package ``dask-kubernetes`` provides cluster managers for Kubernetes.
 KubeCluster
 -----------
 
-:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using native
-Kubernetes APIs.  It is designed to dynamically launch ad-hoc deployments.
+:class:`KubeCluster` deploys Dask clusters on Kubernetes clusters using custom
+Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
+
+.. code-block:: console
+
+    $ # Install operator CRDs and controller, needs to be done once on your Kubernetes cluster
+    $ helm repo add dask https://helm.dask.org && helm repo update
+    $ kubectl create ns dask-operator
+    $ helm install --namespace dask-operator dask-operator dask/dask-kubernetes-operator
 
 .. code-block:: python
 
-    from dask_kubernetes import KubeCluster, make_pod_spec
-
-    pod_spec = make_pod_spec(image='ghcr.io/dask/dask:latest')
-    cluster = KubeCluster(pod_spec)
+    from dask_kubernetes.operator import KubeCluster
+    cluster = KubeCluster(name="my_dask_cluster", image='ghcr.io/dask/dask:latest')
     cluster.scale(10)
 
 HelmCluster
@@ -53,7 +75,7 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :hidden:
    :caption: Cluster Managers
 
-   kubecluster
+   operator_kubecluster
    helmcluster
 
 .. toctree::
@@ -62,6 +84,17 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :caption: Operator
 
    operator
+   operator_installation
+   operator_resources
+   operator_extending
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Classic
+
+   kubecluster
+   kubecluster_migrating
 
 .. toctree::
    :maxdepth: 2

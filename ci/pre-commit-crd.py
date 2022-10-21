@@ -15,7 +15,7 @@ def install_deps(version):
             [
                 "pip",
                 "install",
-                f"git+http://github.com/elemental-lf/k8s-crd-resolver@{version}",
+                f"git+https://github.com/elemental-lf/k8s-crd-resolver@{version}",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -82,6 +82,8 @@ def main(version, *args):
             # TODO: Not sure how to do this other than hard-code the template names
             run_action("daskcluster.yaml", temp_dir, crd_path, output_paths)
             run_action("daskworkergroup.yaml", temp_dir, crd_path, output_paths)
+            run_action("daskjob.yaml", temp_dir, crd_path, output_paths)
+            run_action("daskautoscaler.yaml", temp_dir, crd_path, output_paths)
 
         else:
             run_action(changed_file, temp_dir, crd_path, output_paths)
