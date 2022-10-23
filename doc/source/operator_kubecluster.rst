@@ -136,6 +136,72 @@ The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`
 
    cluster.add_worker_group(custom_spec=worker_spec)
 
+Role-Based Access Control (RBAC)
+--------------------------------
+
+In order to spawn a Dask cluster from a pod that runs on the cluster, the service account creating that pod will require
+a set of RBAC permissions. Create a service account you will use for Dask, and then attach the
+following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
+
+.. code-block:: yaml
+
+   kind: ClusterRole
+   apiVersion: rbac.authorization.k8s.io/v1
+   metadata:
+     name: dask-cluster-role
+   rules:
+     # Application: watching & handling for the custom resource we declare.
+     - apiGroups: [kubernetes.dask.org]
+       resources: [daskclusters, daskworkergroups, daskworkergroups/scale, daskjobs, daskautoscalers]
+       verbs: [get, list, watch, patch, create, delete]
+
+     # Application: other resources it produces and manipulates.
+     # Here, we create/delete Pods.
+     - apiGroups:
+       - ""  # indicates the core API group
+       resources: [pods, pods/status]
+       verbs: ["*"]
+
+     - apiGroups: 
+       - ""  # indicates the core API group
+       resources: [services]
+       verbs: ["*"]
+
+     - apiGroups: ["", events.k8s.io]
+       resources: [events]
+       verbs: ["*"]
+
+     - apiGroups:
+       - ""  # indicates the core API group
+       resources:
+       - "pods/log"
+       verbs:
+       - "get"
+       - "list"
+
+     - apiGroups:
+       - "policy"  # indicates the policy API group
+       resources:
+       - "poddisruptionbudgets"
+       verbs:
+       - "get"
+       - "list"
+       - "watch"
+       - "create"
+       - "delete"
+   ---
+   apiVersion: rbac.authorization.k8s.io/v1
+   kind: ClusterRoleBinding
+   metadata:
+     name: dask-cluster-role-binding
+   roleRef:
+     apiGroup: rbac.authorization.k8s.io
+     kind: ClusterRole
+     name: dask-cluster-role
+   subjects:
+     - kind: ServiceAccount
+       name: dask-sa # adjust name based on the service account you created
+  
 
 .. _api:
 
