@@ -179,16 +179,6 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
        - "get"
        - "list"
 
-     - apiGroups:
-       - "policy"  # indicates the policy API group
-       resources:
-       - "poddisruptionbudgets"
-       verbs:
-       - "get"
-       - "list"
-       - "watch"
-       - "create"
-       - "delete"
    ---
    apiVersion: rbac.authorization.k8s.io/v1
    kind: ClusterRoleBinding
