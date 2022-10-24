@@ -160,25 +160,18 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
      - apiGroups:
        - ""  # indicates the core API group
        resources: [pods, pods/status]
-       verbs: ["*"]
+       verbs:
+       - "get"
+       - "list"
+       - "watch"
 
      - apiGroups: 
        - ""  # indicates the core API group
        resources: [services]
-       verbs: ["*"]
-
-     - apiGroups: ["", events.k8s.io]
-       resources: [events]
-       verbs: ["*"]
-
-     - apiGroups:
-       - ""  # indicates the core API group
-       resources:
-       - "pods/log"
        verbs:
        - "get"
        - "list"
-
+       - "watch"
    ---
    apiVersion: rbac.authorization.k8s.io/v1
    kind: ClusterRoleBinding
