@@ -155,8 +155,7 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
        resources: [daskclusters, daskworkergroups, daskworkergroups/scale, daskjobs, daskautoscalers]
        verbs: [get, list, watch, patch, create, delete]
 
-     # Application: other resources it produces and manipulates.
-     # Here, we create/delete Pods.
+     # Application: other resources it needs to watch and get information from.
      - apiGroups:
        - ""  # indicates the core API group
        resources: [pods, pods/status]
@@ -183,7 +182,7 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
      name: dask-cluster-role
    subjects:
      - kind: ServiceAccount
-       name: dask-sa # adjust name based on the service account you created
+       name: dask-sa  # adjust name based on the service account you created
   
 
 .. _api:
