@@ -42,7 +42,9 @@ async def get_external_address_for_scheduler_service(
             with suppress(socket.gaierror):
                 # Try to resolve the service name. If we are inside the cluster this should succeed.
                 host = f"{service.metadata.name}.{service.metadata.namespace}"
-                if _is_service_available(host=host, port=port, retries=service_name_resolution_retries):
+                if _is_service_available(
+                    host=host, port=port, retries=service_name_resolution_retries
+                ):
                     return _tcp_address(host, port)
 
         # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
