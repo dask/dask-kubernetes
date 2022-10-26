@@ -63,7 +63,7 @@ User permissions
 
 Kubeflow doesn't know anything about our Dask custom resource definitions so we need to update the ``kubeflow-kubernetes-edit`` cluster role. This role
 allows users with cluster edit permissions to create pods, jobs and other resources and we need to add the Dask custom resources to that list. Edit the
-existing ``clusterrole`` and add a new rule to the ``rules`` section for ``kubernetes.dask.org`` what allows all operations on all custom resources.
+existing ``clusterrole`` and add a new rule to the ``rules`` section for ``kubernetes.dask.org`` that allows all operations on all custom resources in our API namespace.
 
 .. code-block:: console
 
