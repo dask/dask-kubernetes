@@ -4,14 +4,12 @@ Installing
 Installing with manifests
 -------------------------
 
-To install the the operator first we need to create the Dask custom resources:
+To install the the operator first we need to create the Dask custom resources along with the controller.
+The controller is a small Python application that will watch the Kubernetes API for new Dask custom resources being created and add/remove pods/services/etc to create them.
 
 .. code-block:: console
 
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskjob.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskautoscaler.yaml
+   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/full.yaml
 
 Then you should be able to list your Dask clusters via ``kubectl``.
 
@@ -20,13 +18,7 @@ Then you should be able to list your Dask clusters via ``kubectl``.
    $ kubectl get daskclusters
    No resources found in default namespace.
 
-Next we need to install the operator itself. The operator is a small Python application that will watch the Kubernetes API for new Dask custom resources being created and add/remove pods/services/etc to create them.
-
-.. code-block:: console
-
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/operator.yaml
-
-This will create the appropriate roles, service accounts and a deployment for the operator. We can check the operator pod is running:
+We can check the controller pod is running:
 
 .. code-block:: console
 

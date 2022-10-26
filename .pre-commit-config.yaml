@@ -22,3 +22,9 @@ repos:
         language: script
         types: [yaml]
         pass_filenames: true
+      - id: consolidate-manifests
+        name: consolidate-manifests
+        entry: ci/consolidate-manifests.sh
+        language: script
+        types: [yaml]
+        pass_filenames: false
