@@ -116,7 +116,9 @@ async def port_forward_dashboard(service_name, namespace):
     return port
 
 
-async def get_scheduler_address(service_name, namespace, port_name="tcp-comm", port_forward_cluster_ip=None):
+async def get_scheduler_address(
+    service_name, namespace, port_name="tcp-comm", port_forward_cluster_ip=None
+):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)
