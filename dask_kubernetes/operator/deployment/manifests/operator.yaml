@@ -26,7 +26,7 @@ spec:
       serviceAccountName: dask-kubernetes-operator
       containers:
         - name: operator
-          image: ghcr.io/dask/dask-kubernetes-operator:latest
+          image: ghcr.io/dask/dask-kubernetes-operator:2022.10.1
           imagePullPolicy: IfNotPresent
 ---
 apiVersion: v1
