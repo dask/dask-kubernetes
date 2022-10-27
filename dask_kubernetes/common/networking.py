@@ -14,10 +14,6 @@ from distributed.core import rpc
 from .utils import check_dependency
 
 
-def _tcp_address(host, port):
-    return f"tcp://{host}:{port}"
-
-
 async def get_external_address_for_scheduler_service(
     core_api,
     service,
@@ -45,14 +41,14 @@ async def get_external_address_for_scheduler_service(
                 if _is_service_available(
                     host=host, port=port, retries=service_name_resolution_retries
                 ):
-                    return _tcp_address(host, port)
+                    return f"tcp://{host}:{port}"
 
         # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
         host = "localhost"
         port = await port_forward_service(
             service.metadata.name, service.metadata.namespace, port
         )
-    return _tcp_address(host, port)
+    return f"tcp://{host}:{port}"
 
 
 def _is_service_available(host, port, retries=20):

@@ -848,4 +848,5 @@ def reap_clusters():
                     else:
                         cluster.close(timeout=10)
 
-    asyncio.run(_reap_clusters())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_reap_clusters())
