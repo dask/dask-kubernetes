@@ -43,9 +43,22 @@ The chart is published in the `Dask Helm repo <https://helm.dask.org>`_ reposito
 
 .. code-block:: console
 
-    $ helm repo add dask https://helm.dask.org && helm repo update
-    $ kubectl create ns dask-operator
-    $ helm install --namespace dask-operator dask-operator dask/dask-kubernetes-operator
+    $ helm repo add dask https://helm.dask.org
+    "dask" has been added to your repositories
+
+    $ helm repo update
+    Hang tight while we grab the latest from your chart repositories...
+    ...Successfully got an update from the "dask" chart repository
+    Update Complete. ⎈Happy Helming!⎈
+
+    $ helm install --create-namespace -n dask-operator --generate-name dask/dask-kubernetes-operator
+    NAME: dask-kubernetes-operator-1666875935
+    NAMESPACE: dask-operator
+    STATUS: deployed
+    REVISION: 1
+    TEST SUITE: None
+    NOTES:
+    Operator has been installed successfully.
 
 This will install the custom resource definitions, service account, roles, and the operator deployment.
 
