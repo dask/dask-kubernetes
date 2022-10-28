@@ -30,7 +30,7 @@ Tests are run using `pytest <https://docs.pytest.org/en/stable/>`_::
 
 
 .. note::
-    Running ``pytest``, installs the `Custom Resource Definitions from the manifests <https://kubernetes.dask.org/en/latest/operator_installation.html#installing-with-manifests>`_,  tests against them and then uninstalls them. You may have to install them again manually.
+    Running ``pytest`` `compiles the Custom Resource Definitions from source <https://github.com/dask/dask-kubernetes/blob/7c845e9679b614b7b554f10127876d5eb7cb318b/dask_kubernetes/conftest.py#L77>`_ using ``k8s-crd-resolver``, tests against them and then uninstalls them. You may have to install them again manually.
 
 Kind
 ----

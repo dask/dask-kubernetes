@@ -1,44 +1,19 @@
 Installing
 ==========
 
-Installing with manifests
--------------------------
+To use the Dask Operator you must install the custom resource definitions, service account, roles, and the operator controller deployment.
 
-To install the the operator first we need to create the Dask custom resources:
-
-.. code-block:: console
-
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskcluster.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskworkergroup.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskjob.yaml
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/daskautoscaler.yaml
-
-Then you should be able to list your Dask clusters via ``kubectl``.
+Quickstart
+----------
 
 .. code-block:: console
 
-   $ kubectl get daskclusters
-   No resources found in default namespace.
-
-Next we need to install the operator itself. The operator is a small Python application that will watch the Kubernetes API for new Dask custom resources being created and add/remove pods/services/etc to create them.
-
-.. code-block:: console
-
-   $ kubectl apply -f https://raw.githubusercontent.com/dask/dask-kubernetes/main/dask_kubernetes/operator/deployment/manifests/operator.yaml
-
-This will create the appropriate roles, service accounts and a deployment for the operator. We can check the operator pod is running:
-
-.. code-block:: console
-
-   $ kubectl get pods -A -l application=dask-kubernetes-operator
-   NAMESPACE       NAME                                        READY   STATUS    RESTARTS   AGE
-   dask-operator   dask-kubernetes-operator-775b8bbbd5-zdrf7   1/1     Running   0          74s
-
+    $ helm install --repo https://helm.dask.org --create-namespace -n dask-operator --generate-name dask-kubernetes-operator
 
 Installing with Helm
 --------------------
 
-Alternatively, the operator has a basic Helm chart which can be used to manage the installation of the operator.
+The operator has a Helm chart which can be used to manage the installation of the operator.
 The chart is published in the `Dask Helm repo <https://helm.dask.org>`_ repository, and can be installed via:
 
 .. code-block:: console
@@ -60,11 +35,32 @@ The chart is published in the `Dask Helm repo <https://helm.dask.org>`_ reposito
     NOTES:
     Operator has been installed successfully.
 
-This will install the custom resource definitions, service account, roles, and the operator deployment.
+Then you should be able to list your Dask clusters via ``kubectl``.
+
+.. code-block:: console
+
+   $ kubectl get daskclusters
+   No resources found in default namespace.
+
+We can also check the operator pod is running:
+
+.. code-block:: console
+
+   $ kubectl get pods -A -l app.kubernetes.io/name=dask-kubernetes-operator
+   NAMESPACE       NAME                                        READY   STATUS    RESTARTS   AGE
+   dask-operator   dask-kubernetes-operator-775b8bbbd5-zdrf7   1/1     Running   0          74s
 
 .. warning::
     Please note that `Helm does not support updating or deleting CRDs. <https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations>`_ If updates
-    are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs.
+    are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs or delete/reinstall the Dask Operator.
+
+Installing with Manifests
+-------------------------
+
+If you prefer to install the operator from static manifests with ``kubectl`` and set configuration options with tools like ``kustomize`` you can generate the default manifests with::
+
+      $ helm template --include-crds --repo https://helm.dask.org release dask-kubernetes-operator | kubectl apply -f -
+
 
 Kubeflow
 --------
