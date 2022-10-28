@@ -54,9 +54,6 @@ def main(version, *args):
 
     output_paths = [
         os.path.join(
-            ROOT_DIR, "dask_kubernetes", "operator", "deployment", "manifests"
-        ),
-        os.path.join(
             ROOT_DIR,
             "dask_kubernetes",
             "operator",
