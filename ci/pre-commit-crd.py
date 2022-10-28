@@ -42,8 +42,8 @@ def run_action(changed_file, temp_dir, crd_path, output_paths):
         output_file,
     )
 
-    shutil.copyfile(output_file, f"{output_paths[0]}/{file_name}.yaml")
-    shutil.copyfile(output_file, f"{output_paths[1]}/{file_name}.yaml")
+    for output_path in output_paths:
+        shutil.copyfile(output_file, f"{output_path}/{file_name}.yaml")
 
 
 def main(version, *args):
