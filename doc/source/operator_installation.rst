@@ -10,6 +10,9 @@ Quickstart
 
     $ helm install --repo https://helm.dask.org --create-namespace -n dask-operator --generate-name dask-kubernetes-operator
 
+.. figure:: images/operator-install.gif
+   :align: left
+
 Installing with Helm
 --------------------
 
