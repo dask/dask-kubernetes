@@ -325,4 +325,4 @@ async def discover(
                         HelmCluster,
                     )
         except aiohttp.client_exceptions.ClientConnectorError:
-            warnings.warn("Unable to connect to Kubernetes cluster")
+            warnings.warn("Unable to connect to Kubernetes cluster.")
