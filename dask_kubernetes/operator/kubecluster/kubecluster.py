@@ -292,6 +292,7 @@ class KubeCluster(Cluster):
                 f"{self.name}-scheduler",
                 self.namespace,
                 port_name="http-dashboard",
+                port_forward_cluster_ip=self.port_forward_cluster_ip,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -322,6 +323,7 @@ class KubeCluster(Cluster):
                 service_name,
                 self.namespace,
                 port_name="http-dashboard",
+                port_forward_cluster_ip=self.port_forward_cluster_ip,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -340,7 +342,11 @@ class KubeCluster(Cluster):
                 return None
 
     async def _get_scheduler_address(self):
-        address = await get_scheduler_address(f"{self.name}-scheduler", self.namespace)
+        address = await get_scheduler_address(
+            f"{self.name}-scheduler",
+            self.namespace,
+            port_forward_cluster_ip=self.port_forward_cluster_ip,
+        )
         return address
 
     async def _wait_for_controller(self):

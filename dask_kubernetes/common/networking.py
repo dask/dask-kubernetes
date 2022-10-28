@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import suppress
 import random
 import socket
 import subprocess
@@ -33,18 +34,20 @@ async def get_external_address_for_scheduler_service(
         nodes = await core_api.list_node()
         host = nodes.items[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
-        try:
-            # Try to resolve the service name. If we are inside the cluster this should succeed.
-            host = f"{service.metadata.name}.{service.metadata.namespace}"
-            _is_service_available(
-                host=host, port=port, retries=service_name_resolution_retries
-            )
-        except socket.gaierror:
-            # If we are outside it will fail and we need to port forward the service.
-            host = "localhost"
-            port = await port_forward_service(
-                service.metadata.name, service.metadata.namespace, port
-            )
+        if not port_forward_cluster_ip:
+            with suppress(socket.gaierror):
+                # Try to resolve the service name. If we are inside the cluster this should succeed.
+                host = f"{service.metadata.name}.{service.metadata.namespace}"
+                if _is_service_available(
+                    host=host, port=port, retries=service_name_resolution_retries
+                ):
+                    return f"tcp://{host}:{port}"
+
+        # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
+        host = "localhost"
+        port = await port_forward_service(
+            service.metadata.name, service.metadata.namespace, port
+        )
     return f"tcp://{host}:{port}"
 
 
@@ -89,19 +92,19 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
     )
     finalize(kproc, kproc.kill)
 
-    if await is_comm_open("localhost", local_port, retries=100):
+    if await is_comm_open("localhost", local_port, retries=2000):
         return local_port
     raise ConnectionError("kubectl port forward failed")
 
 
-async def is_comm_open(ip, port, retries=10):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+async def is_comm_open(ip, port, retries=200):
     while retries > 0:
-        result = sock.connect_ex((ip, port))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            result = sock.connect_ex((ip, port))
         if result == 0:
             return True
         else:
-            time.sleep(2)
+            time.sleep(0.1)
             retries -= 1
     return False
 
@@ -111,11 +114,12 @@ async def port_forward_dashboard(service_name, namespace):
     return port
 
 
-async def get_scheduler_address(service_name, namespace, port_name="tcp-comm"):
+async def get_scheduler_address(
+    service_name, namespace, port_name="tcp-comm", port_forward_cluster_ip=None
+):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)
-        port_forward_cluster_ip = None
         address = await get_external_address_for_scheduler_service(
             api,
             service,
