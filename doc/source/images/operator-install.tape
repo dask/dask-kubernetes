@@ -42,10 +42,10 @@
 
 Output doc/source/images/operator-install.gif
 
-Set FontSize 18
-Set Width 1200
-Set Height 200
-Set Padding 20
+Set FontSize 36
+Set Width 2400
+Set Height 400
+Set Padding 40
 Set TypingSpeed 25ms
 
 Type "helm install --wait --repo https://helm.dask.org --create-namespace -n dask-operator --generate-name dask-kubernetes-operator"
