@@ -22,6 +22,19 @@ def test_kubecluster(cluster):
         assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
+@pytest.mark.asyncio
+async def test_kubecluster_async(kopf_runner, docker_image):
+    with kopf_runner:
+        async with KubeCluster(
+            name="async",
+            image=docker_image,
+            n_workers=1,
+            asynchronous=True,
+        ) as cluster:
+            async with Client(cluster, asynchronous=True) as client:
+                assert await client.submit(lambda x: x + 1, 10).result() == 11
+
+
 def test_custom_worker_command(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
