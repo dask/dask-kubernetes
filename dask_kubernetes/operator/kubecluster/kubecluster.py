@@ -244,6 +244,14 @@ class KubeCluster(Cluster):
 
         await super()._start()
 
+    def __await__(self):
+        async def _():
+            if self.status == Status.created:
+                await self._start()
+            return self
+
+        return _().__await__()
+
     async def _create_cluster(self):
         if self.shutdown_on_close is None:
             self.shutdown_on_close = True
