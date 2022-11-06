@@ -24,6 +24,7 @@ from distributed.utils import (
     TimeoutError,
     format_dashboard_link,
 )
+from kubernetes_asyncio.client.exceptions import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.operator.controller import (
@@ -558,13 +559,20 @@ class KubeCluster(Cluster):
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
                 custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-                await custom_objects_api.delete_namespaced_custom_object(
-                    group="kubernetes.dask.org",
-                    version="v1",
-                    plural="daskclusters",
-                    namespace=self.namespace,
-                    name=self.name,
-                )
+                try:
+                    await custom_objects_api.delete_namespaced_custom_object(
+                        group="kubernetes.dask.org",
+                        version="v1",
+                        plural="daskclusters",
+                        namespace=self.namespace,
+                        name=self.name,
+                    )
+                except ApiException as e:
+                    if e.reason == "Not Found":
+                        # TODO: maybe add a warning or do nothing?
+                        pass
+                    else:
+                        raise
             start = time.time()
             while (await self._get_cluster()) is not None:
                 if time.time() > start + timeout:
