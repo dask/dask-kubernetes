@@ -132,13 +132,6 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "simple-default",
                     )
                     await client.wait_for_workers(3)
-                    k8s_cluster.kubectl(
-                        "delete",
-                        "pods",
-                        "-l",
-                        "dask.org/cluster-name=simple,dask.org/component=worker",
-                    )
-                    await client.wait_for_workers(2)
 
 
 @pytest.mark.timeout(180)
