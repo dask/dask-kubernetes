@@ -362,6 +362,7 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
 
 
 @kopf.on.update("daskworkergroup")
+@kopf.timer("daskworkergroup", interval=5.0)
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)

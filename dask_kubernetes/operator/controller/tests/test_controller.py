@@ -134,6 +134,29 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     await client.wait_for_workers(3)
 
 
+@pytest.mark.asyncio
+async def test_group_recovers_from_pod_deletion(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as cluster_name:
+            scheduler_pod_name = "simple-scheduler"
+            service_name = "simple-scheduler"
+            while "Running" not in k8s_cluster.kubectl(
+                "get", "pods", scheduler_pod_name
+            ):
+                await asyncio.sleep(0.1)
+            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
+                async with Client(
+                    f"tcp://localhost:{port}", asynchronous=True
+                ) as client:
+                    k8s_cluster.kubectl(
+                        "delete",
+                        "pods",
+                        "-l",
+                        "dask.org/cluster-name=simple,dask.org/component=worker",
+                    )
+                    await client.wait_for_workers(2)
+
+
 @pytest.mark.timeout(180)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
