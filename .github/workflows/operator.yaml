@@ -23,13 +23,9 @@ jobs:
       - name: Lint Helm Chart
         run: helm lint dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
       - name: Download Pluto
-        uses: FairwindsOps/pluto/github-action@master
-      - name: Generate templates
-        run: |
-          mkdir manifests
-          helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator > manifests/generated.yaml
+        uses: FairwindsOps/pluto/github-action@v5.11.1
       - name: Check for deprecated APIs
-        run: pluto detect-files -d manifests
+        run: helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator | pluto detect -
 
   test:
     runs-on: ubuntu-latest
