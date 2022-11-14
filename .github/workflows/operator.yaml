@@ -16,19 +16,20 @@ on:
       - "dask_kubernetes/*"
 
 jobs:
-  lint-manifests:
+  lint-chart:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Lint Helm Chart
+        run: helm lint dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
       - name: Download Pluto
         uses: FairwindsOps/pluto/github-action@master
       - name: Generate templates
         run: |
           mkdir manifests
           helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator > manifests/generated.yaml
-      - name: Use pluto
-        run: |
-          pluto detect-files -d manifests
+      - name: Check for deprecated APIs
+        run: pluto detect-files -d manifests
 
   test:
     runs-on: ubuntu-latest
