@@ -24,8 +24,8 @@ jobs:
         uses: FairwindsOps/pluto/github-action@master
       - name: Generate templates
         run: |
-        mkdir manifests
-        helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator > manifests/generated.yaml
+          mkdir manifests
+          helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator > manifests/generated.yaml
       - name: Use pluto
         run: |
           pluto detect-files -d manifests
