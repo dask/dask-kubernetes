@@ -56,6 +56,7 @@ def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
+@pytest.mark.skip(reason="Flaky and fails ~10% of the time.")
 def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
