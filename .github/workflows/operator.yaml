@@ -16,7 +16,7 @@ on:
       - "dask_kubernetes/*"
 
 jobs:
-  k8sAPI:
+  lint-manifests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
