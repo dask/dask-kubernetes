@@ -364,7 +364,14 @@ class KubeCluster(Cluster):
                 timeout_seconds=self._resource_timeout,
             ):
                 cluster = event["object"]
-                if "status" in cluster and "phase" in cluster["status"]:
+
+                # Wait until the phase is actually Running, ignoring
+                # other non-ready phases such as Created.
+                if (
+                    "status" in cluster
+                    and "phase" in cluster["status"]
+                    and cluster["status"]["phase"] == "Running"
+                ):
                     return
                 await asyncio.sleep(0.1)
         raise TimeoutError(

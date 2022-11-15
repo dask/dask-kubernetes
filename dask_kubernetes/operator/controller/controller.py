@@ -186,9 +186,19 @@ async def wait_for_service(api, service_name, namespace):
     """Block until service is available."""
     while True:
         try:
-            await api.read_namespaced_service(service_name, namespace)
-            break
+            service = await api.read_namespaced_service(service_name, namespace)
+
+            # If the service is of type LoadBalancer, also wait until it's ready.
+            if (
+                service.spec.type == "LoadBalancer"
+                and len(service.status.load_balancer.ingress or []) == 0
+            ):
+                pass
+            else:
+                break
         except Exception:
+            pass
+        finally:
             await asyncio.sleep(0.1)
 
 
