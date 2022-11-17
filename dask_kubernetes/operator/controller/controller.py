@@ -246,7 +246,6 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
             namespace=namespace,
             body=data,
         )
-        await wait_for_service(api, data["metadata"]["name"], namespace)
         logger.info(
             f"Scheduler service {data['metadata']['name']} created in {namespace}."
         )
