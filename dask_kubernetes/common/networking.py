@@ -5,7 +5,7 @@ import socket
 import subprocess
 import time
 from weakref import finalize
-
+import os
 import kubernetes_asyncio as kubernetes
 from tornado.iostream import StreamClosedError
 
@@ -45,8 +45,10 @@ async def get_external_address_for_scheduler_service(
 
         # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
         host = "localhost"
+        local_port = os.getenv('DASK_SCHEDULER_FORWARD_PORT')
+        
         port = await port_forward_service(
-            service.metadata.name, service.metadata.namespace, port
+            service.metadata.name, service.metadata.namespace, port, local_port
         )
     return f"tcp://{host}:{port}"
 
