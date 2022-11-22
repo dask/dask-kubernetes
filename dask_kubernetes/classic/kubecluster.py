@@ -7,6 +7,7 @@ import time
 import uuid
 import warnings
 
+import aiohttp
 import yaml
 import dask
 import dask.distributed
@@ -91,20 +92,29 @@ class Pod(ProcessInterface):
 
     async def close(self, **kwargs):
         if self._pod:
-            name, namespace = self._pod.metadata.name, self.namespace
-            try:
-                await self.core_api.delete_namespaced_pod(name, namespace)
-            except ApiException as e:
-                if e.reason == "Not Found":
-                    logger.debug(
-                        "Pod %s in namespace %s has been deleted already.",
-                        name,
-                        namespace,
-                    )
-                else:
-                    raise
-
-        await super().close(**kwargs)
+            retry_count = 0  # Retry 10 times
+            while True:
+                name, namespace = self._pod.metadata.name, self.namespace
+                try:
+                    await self.core_api.delete_namespaced_pod(name, namespace)
+                    return await super().close(**kwargs)
+                except ApiException as e:
+                    if e.reason == "Not Found":
+                        logger.debug(
+                            "Pod %s in namespace %s has been deleted already.",
+                            name,
+                            namespace,
+                        )
+                        return await super().close(**kwargs)
+                    else:
+                        raise
+                except aiohttp.client_exceptions.ClientConnectorError as e:
+                    if retry_count < 10:
+                        logger.debug("Connection error, retrying... - %s", str(e))
+                        await asyncio.sleep(0.1)
+                        retry_count += 1
+                    else:
+                        raise e
 
     async def logs(self):
         try:
