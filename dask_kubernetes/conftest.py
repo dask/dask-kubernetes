@@ -74,6 +74,38 @@ def run_generate(crd_path, patch_path, temp_path):
 
 
 @pytest.fixture(scope="session", autouse=True)
+def install_gateway(k8s_cluster):
+    # To ensure the operator can coexist with Gateway
+    subprocess.run(
+        [
+            "helm",
+            "upgrade",
+            "dask-gateway",
+            "dask-gateway",
+            "--install",
+            "--repo=https://helm.dask.org",
+            "--create-namespace",
+            "--namespace",
+            "dask-gateway",
+        ],
+        check=True,
+        env={**os.environ},
+    )
+    yield
+    subprocess.run(
+        [
+            "helm",
+            "delete",
+            "--namespace",
+            "dask-gateway",
+            "dask-gateway",
+        ],
+        check=True,
+        env={**os.environ},
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
 def customresources(k8s_cluster):
 
     temp_dir = tempfile.TemporaryDirectory()
