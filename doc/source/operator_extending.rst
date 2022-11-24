@@ -17,7 +17,7 @@ For example whenever a ``DaskCluster`` resource is created the controller sets t
 
 .. code-block:: python
 
-   @kopf.on.create("daskcluster")
+   @kopf.on.create("daskcluster.kubernetes.dask.org")
    async def daskcluster_create(name, namespace, logger, patch, **kwargs):
       """When DaskCluster resource is created set the status.phase.
 
@@ -31,7 +31,7 @@ This handler creates the ``Pod``, ``Service`` and ``DaskWorkerGroup`` subresourc
 
 .. code-block:: python
 
-   @kopf.on.field("daskcluster", field="status.phase", new="Created")
+   @kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Created")
    async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
       """When the DaskCluster status.phase goes into Pending create the cluster components."""
       async with kubernetes.client.api_client.ApiClient() as api_client:
