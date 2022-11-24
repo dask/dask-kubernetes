@@ -207,7 +207,7 @@ async def startup(**kwargs):
     await ClusterAuth.load_first()
 
 
-@kopf.on.create("daskcluster")
+@kopf.on.create("daskcluster.kubernetes.dask.org")
 async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     """When DaskCluster resource is created set the status.phase.
 
@@ -217,7 +217,7 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     patch.status["phase"] = "Created"
 
 
-@kopf.on.field("daskcluster", field="status.phase", new="Created")
+@kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Created")
 async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
     """When the DaskCluster status.phase goes into Pending create the cluster components."""
     logger.info("Creating Dask cluster components.")
@@ -265,7 +265,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
     patch.status["phase"] = "Running"
 
 
-@kopf.on.create("daskworkergroup")
+@kopf.on.create("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CustomObjectsApi(api_client)
@@ -371,7 +371,7 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
         ) from e
 
 
-@kopf.on.update("daskworkergroup")
+@kopf.on.update("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
@@ -421,13 +421,15 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
 
 
-@kopf.on.create("daskjob")
+@kopf.on.create("daskjob.kubernetes.dask.org")
 async def daskjob_create(name, namespace, logger, patch, **kwargs):
     logger.info(f"A DaskJob has been created called {name} in {namespace}.")
     patch.status["jobStatus"] = "JobCreated"
 
 
-@kopf.on.field("daskjob", field="status.jobStatus", new="JobCreated")
+@kopf.on.field(
+    "daskjob.kubernetes.dask.org", field="status.jobStatus", new="JobCreated"
+)
 async def daskjob_create_components(spec, name, namespace, logger, patch, **kwargs):
     logger.info("Creating Dask job components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -562,7 +564,7 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
         )
 
 
-@kopf.on.create("daskautoscaler")
+@kopf.on.create("daskautoscaler.kubernetes.dask.org")
 async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
     async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -590,7 +592,7 @@ async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
         logger.info(f"Successfully adopted by {spec['cluster']}")
 
 
-@kopf.timer("daskautoscaler", interval=5.0)
+@kopf.timer("daskautoscaler.kubernetes.dask.org", interval=5.0)
 async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     # Ask the scheduler for the desired number of worker
     try:
