@@ -75,6 +75,7 @@ def run_generate(crd_path, patch_path, temp_path):
 
 @pytest.fixture(scope="session", autouse=True)
 def install_gateway(k8s_cluster):
+    check_dependency("helm")
     # To ensure the operator can coexist with Gateway
     subprocess.run(
         [
