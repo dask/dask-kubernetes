@@ -57,6 +57,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install deps
         run: ./ci/install-deps.sh
+      - name: Install Dask Gateway  # To ensure the operator can coexist with Gateway
+        run: helm install --generate-name dask-gateway --repo=https://helm.dask.org --create-namespace --namespace dask-gateway
       - name: Run tests
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
