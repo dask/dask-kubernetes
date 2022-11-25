@@ -5,6 +5,7 @@ import atexit
 from contextlib import suppress
 from enum import Enum
 import getpass
+import logging
 import os
 import time
 from typing import ClassVar
@@ -37,6 +38,8 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
+
+logger = logging.getLogger(__name__)
 
 
 class CreateMode(Enum):
@@ -569,8 +572,9 @@ class KubeCluster(Cluster):
                     )
                 except ApiException as e:
                     if e.reason == "Not Found":
-                        # TODO: maybe add a warning or do nothing?
-                        pass
+                        logger.warning(
+                            "Failed to delete DaskCluster, looks like it has already been deleted."
+                        )
                     else:
                         raise
             start = time.time()
