@@ -207,6 +207,13 @@ async def startup(**kwargs):
     await ClusterAuth.load_first()
 
 
+# There may be useful things for us to expose via the liveness probe
+# https://kopf.readthedocs.io/en/stable/probing/#probe-handlers
+@kopf.on.probe(id="now")
+def get_current_timestamp(**kwargs):
+    return datetime.utcnow().isoformat()
+
+
 @kopf.on.create("daskcluster.kubernetes.dask.org")
 async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     """When DaskCluster resource is created set the status.phase.
