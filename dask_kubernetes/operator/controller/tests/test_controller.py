@@ -189,7 +189,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )  # First and last char is a quote
-            assert _EXPECTED_ANNOTATIONS <= scheduler_annotations
+            assert _EXPECTED_ANNOTATIONS.items() <= scheduler_annotations.items()
 
             # Get the first annotation (the only one) of the scheduler
             service_annotations = json.loads(
@@ -201,7 +201,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )  # First and last char is a quote
-            assert _EXPECTED_ANNOTATIONS <= service_annotations
+            assert _EXPECTED_ANNOTATIONS.items() <= service_annotations.items()
 
             # Get the first env value (the only one) of the first worker
             worker_env = k8s_cluster.kubectl(
@@ -225,7 +225,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )
-            assert _EXPECTED_ANNOTATIONS <= worker_annotations
+            assert _EXPECTED_ANNOTATIONS.items() <= worker_annotations.items()
 
 
 def _get_job_status(k8s_cluster):
@@ -320,7 +320,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )
-            _EXPECTED_ANNOTATIONS <= job_annotations
+            _EXPECTED_ANNOTATIONS.items() <= job_annotations.items()
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
             while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):
