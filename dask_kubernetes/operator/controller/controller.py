@@ -1,21 +1,15 @@
+from contextlib import suppress
 from datetime import datetime
+from uuid import uuid4
 
 import aiohttp
-from contextlib import suppress
-
 import kopf
 import kubernetes_asyncio as kubernetes
 import pykube
-
-from uuid import uuid4
-
 from dask.compatibility import entry_points
-from distributed.core import rpc
-
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.common.networking import (
-    get_scheduler_address,
-)
+from dask_kubernetes.common.networking import get_scheduler_address
+from distributed.core import rpc
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -397,9 +391,19 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
 @kopf.on.update("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
     async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
+        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+        corev1api = kubernetes.client.CoreV1Api(api_client)
 
-        workers = await api.list_namespaced_pod(
+        cluster = await customobjectsapi.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskclusters",
+            namespace=namespace,
+            name=spec["cluster"],
+        )
+        cluster_labels = cluster.get("metadata", {}).get("labels", {})
+
+        workers = await corev1api.list_namespaced_pod(
             namespace=namespace,
             label_selector=f"dask.org/workergroup-name={name}",
         )
@@ -418,7 +422,8 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
                     annotations=annotations,
                 )
                 kopf.adopt(data)
-                await api.create_namespaced_pod(
+                kopf.label(data, labels=cluster_labels)
+                await corev1api.create_namespaced_pod(
                     namespace=namespace,
                     body=data,
                 )
@@ -435,7 +440,7 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             )
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
-                await api.delete_namespaced_pod(
+                await corev1api.delete_namespaced_pod(
                     name=wid,
                     namespace=namespace,
                 )
