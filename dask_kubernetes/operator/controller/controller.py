@@ -1,21 +1,15 @@
 import asyncio
-from datetime import datetime
-
-import aiohttp
 from contextlib import suppress
-
-import kopf
-import kubernetes_asyncio as kubernetes
-
+from datetime import datetime
 from uuid import uuid4
 
+import aiohttp
+import kopf
+import kubernetes_asyncio as kubernetes
 from dask.compatibility import entry_points
-from distributed.core import rpc
-
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.common.networking import (
-    get_scheduler_address,
-)
+from dask_kubernetes.common.networking import get_scheduler_address
+from distributed.core import rpc
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
