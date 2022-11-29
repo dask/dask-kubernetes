@@ -220,19 +220,6 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
     settings.networking.request_timeout = 10
 
-    # You will probably want to configure your own identifiers/prefixes
-    # so that you don't run into any conflicts with other kopf based
-    # operators in the cluster. I recommend changing the following settings:
-    group = "kubernetes.dask.org"
-    settings.peering.name = "dask-kubernetes-operator"
-    settings.persistence.finalizer = group
-    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
-        prefix=group
-    )
-    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
-        prefix=group
-    )
-
 
 # There may be useful things for us to expose via the liveness probe
 # https://kopf.readthedocs.io/en/stable/probing/#probe-handlers
