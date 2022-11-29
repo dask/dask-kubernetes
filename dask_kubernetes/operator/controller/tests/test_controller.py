@@ -34,7 +34,9 @@ def gen_cluster(k8s_cluster):
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", cluster_path)
-        while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+        while cluster_name not in k8s_cluster.kubectl(
+            "get", "daskclusters.kubernetes.dask.org"
+        ):
             await asyncio.sleep(0.1)
 
         try:
@@ -42,7 +44,9 @@ def gen_cluster(k8s_cluster):
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
             k8s_cluster.kubectl("delete", "-f", cluster_path)
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+            while cluster_name in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -60,7 +64,9 @@ def gen_job(k8s_cluster):
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", job_path)
-        while job_name not in k8s_cluster.kubectl("get", "daskjobs"):
+        while job_name not in k8s_cluster.kubectl(
+            "get", "daskjobs.kubernetes.dask.org"
+        ):
             await asyncio.sleep(0.1)
 
         try:
@@ -68,7 +74,9 @@ def gen_job(k8s_cluster):
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
             k8s_cluster.kubectl("delete", "-f", job_path)
-            while job_name in k8s_cluster.kubectl("get", "daskjobs"):
+            while job_name in k8s_cluster.kubectl(
+                "get", "daskjobs.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -121,14 +129,14 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=5",
-                        "daskworkergroup",
+                        "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
                     await client.wait_for_workers(5)
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=3",
-                        "daskworkergroup",
+                        "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
                     await client.wait_for_workers(3)
@@ -224,7 +232,7 @@ def _get_job_status(k8s_cluster):
     return json.loads(
         k8s_cluster.kubectl(
             "get",
-            "daskjobs",
+            "daskjobs.kubernetes.dask.org",
             "-o",
             "jsonpath='{.items[0].status}'",
         )[1:-1]
@@ -275,14 +283,16 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
-            while job not in k8s_cluster.kubectl("get", "daskclusters"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
@@ -317,7 +327,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters"):
+            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
@@ -336,14 +346,16 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
-            while job not in k8s_cluster.kubectl("get", "daskclusters"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
@@ -367,7 +379,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters"):
+            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
