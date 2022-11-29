@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 
 import aiohttp
@@ -6,6 +5,7 @@ from contextlib import suppress
 
 import kopf
 import kubernetes_asyncio as kubernetes
+import pykube
 
 from uuid import uuid4
 
@@ -34,6 +34,12 @@ for ep in entry_points(group="dask_operator_plugin"):
 
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
+
+
+class DaskClusters(pykube.objects.NamespacedAPIObject):
+    version = "kubernetes.dask.org/v1"
+    endpoint = "daskclusters"
+    kind = "DaskCluster"
 
 
 def _get_dask_cluster_annotations(meta):
@@ -72,6 +78,7 @@ def build_scheduler_service_spec(cluster_name, spec, annotations):
             "name": f"{cluster_name}-scheduler",
             "labels": {
                 "dask.org/cluster-name": cluster_name,
+                "dask.org/component": "scheduler",
             },
             "annotations": annotations,
         },
@@ -182,26 +189,6 @@ def build_cluster_spec(name, worker_spec, scheduler_spec):
     }
 
 
-async def wait_for_service(api, service_name, namespace):
-    """Block until service is available."""
-    while True:
-        try:
-            service = await api.read_namespaced_service(service_name, namespace)
-
-            # If the service is of type LoadBalancer, also wait until it's ready.
-            if (
-                service.spec.type == "LoadBalancer"
-                and len(service.status.load_balancer.ingress or []) == 0
-            ):
-                pass
-            else:
-                break
-        except Exception:
-            pass
-        finally:
-            await asyncio.sleep(0.1)
-
-
 @kopf.on.startup()
 async def startup(**kwargs):
     await ClusterAuth.load_first()
@@ -226,7 +213,7 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
 
 @kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Created")
 async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
-    """When the DaskCluster status.phase goes into Pending create the cluster components."""
+    """When the DaskCluster status.phase goes into Created create the cluster components."""
     logger.info("Creating Dask cluster components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
@@ -241,7 +228,6 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
             namespace=namespace,
             body=data,
         )
-        # await wait_for_scheduler(name, namespace)
         logger.info(f"Scheduler pod {data['metadata']['name']} created in {namespace}.")
 
         # TODO Check for existing scheduler service
@@ -253,7 +239,6 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
             namespace=namespace,
             body=data,
         )
-        await wait_for_service(api, data["metadata"]["name"], namespace)
         logger.info(
             f"Scheduler service {data['metadata']['name']} created in {namespace}."
         )
@@ -268,8 +253,25 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
             body=data,
         )
         logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
-    # TODO Set to "Pending" here and track scheduler readiness before finally setting to "Running"
-    patch.status["phase"] = "Running"
+    patch.status["phase"] = "Pending"
+
+
+@kopf.on.field("service", field="status", labels={"dask.org/component": "scheduler"})
+def handle_scheduler_service_status(spec, labels, status, namespace, logger, **kwargs):
+    # If the Service is a LoadBalancer with no ingress endpoints mark the cluster as Pending
+    if spec["type"] == "LoadBalancer" and not len(
+        status.get("load_balancer", {}).get("ingress", [])
+    ):
+        phase = "Pending"
+    # Otherwise mark it as Running
+    else:
+        phase = "Running"
+
+    api = pykube.HTTPClient(pykube.KubeConfig.from_env())
+    cluster = DaskClusters.objects(api, namespace=namespace).get_by_name(
+        labels["dask.org/cluster-name"]
+    )
+    cluster.patch({"status": {"phase": phase}})
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
