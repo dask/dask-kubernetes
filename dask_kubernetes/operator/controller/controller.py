@@ -203,8 +203,35 @@ async def wait_for_service(api, service_name, namespace):
 
 
 @kopf.on.startup()
-async def startup(**kwargs):
+async def startup(settings: kopf.OperatorSettings, **kwargs):
+    # Authenticate with k8s
     await ClusterAuth.load_first()
+
+    # Set server and client timeouts to reconnect from time to time.
+    # In rare occasions the connection might go idle we will no longer receive any events.
+    # These timeouts should help in those cases.
+    # https://github.com/nolar/kopf/issues/698
+    # https://github.com/nolar/kopf/issues/204
+    settings.watching.server_timeout = 120
+    settings.watching.client_timeout = 150
+    settings.watching.connect_timeout = 5
+
+    # The default timeout is 300s which is usually to long
+    # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
+    settings.networking.request_timeout = 10
+
+    # You will probably want to configure your own identifiers/prefixes
+    # so that you don't run into any conflicts with other kopf based
+    # operators in the cluster. I recommend changing the following settings:
+    group = "kubernetes.dask.org"
+    settings.peering.name = "dask-kubernetes-operator"
+    settings.persistence.finalizer = group
+    settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
+        prefix=group
+    )
+    settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
+        prefix=group
+    )
 
 
 # There may be useful things for us to expose via the liveness probe
