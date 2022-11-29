@@ -190,8 +190,22 @@ def build_cluster_spec(name, worker_spec, scheduler_spec):
 
 
 @kopf.on.startup()
-async def startup(**kwargs):
+async def startup(settings: kopf.OperatorSettings, **kwargs):
+    # Authenticate with k8s
     await ClusterAuth.load_first()
+
+    # Set server and client timeouts to reconnect from time to time.
+    # In rare occasions the connection might go idle we will no longer receive any events.
+    # These timeouts should help in those cases.
+    # https://github.com/nolar/kopf/issues/698
+    # https://github.com/nolar/kopf/issues/204
+    settings.watching.server_timeout = 120
+    settings.watching.client_timeout = 150
+    settings.watching.connect_timeout = 5
+
+    # The default timeout is 300s which is usually to long
+    # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
+    settings.networking.request_timeout = 10
 
 
 # There may be useful things for us to expose via the liveness probe
