@@ -1,14 +1,11 @@
-from datetime import datetime, timedelta
+import asyncio
 import json
+import os.path
+import pathlib
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 import pytest
-
-import asyncio
-from contextlib import asynccontextmanager
-import pathlib
-
-import os.path
-
 import yaml
 from dask.distributed import Client
 
@@ -21,6 +18,7 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 
 _EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
+_EXPECTED_LABELS = {"test-label": "label-value"}
 
 
 @pytest.fixture()
@@ -226,6 +224,42 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 )[1:-1]
             )
             assert _EXPECTED_ANNOTATIONS.items() <= worker_annotations.items()
+
+            # Assert labels from the dask cluster are propagated into the dask worker group
+            workergroup_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskworkergroups",
+                    "--selector=dask.org/component=workergroup",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+
+            # Assert labels from the dask cluster are propagated into the dask scheduler
+            scheduler_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=scheduler",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+
+            # Assert labels from the dask cluster are propagated into the dask worker pod
+            worker_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=worker",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
 
 
 def _get_job_status(k8s_cluster):
