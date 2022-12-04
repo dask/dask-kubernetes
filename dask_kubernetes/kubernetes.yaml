@@ -20,6 +20,7 @@ kubernetes:
   shutdown-on-close: true
   resource-timeout: 60
   custom-cluster-spec: null
+  scheduler-forward-port: null
 
   # Classic KubeCluster options
   host: "0.0.0.0"
