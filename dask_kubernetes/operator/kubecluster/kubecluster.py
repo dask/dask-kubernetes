@@ -303,8 +303,7 @@ class KubeCluster(Cluster):
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
-                local_port = local_port
-
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -339,7 +338,7 @@ class KubeCluster(Cluster):
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
-                                local_port = local_port
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 

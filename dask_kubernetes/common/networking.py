@@ -5,7 +5,6 @@ import socket
 import subprocess
 import time
 from weakref import finalize
-import os
 import kubernetes_asyncio as kubernetes
 from tornado.iostream import StreamClosedError
 
@@ -20,7 +19,7 @@ async def get_external_address_for_scheduler_service(
     port_forward_cluster_ip=None,
     service_name_resolution_retries=20,
     port_name="tcp-comm",
-    local_port=None
+    local_port=None,
 ):
     """Take a service object and return the scheduler address."""
     [port] = [
@@ -46,7 +45,7 @@ async def get_external_address_for_scheduler_service(
 
         # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
         host = "localhost"
-       
+
         port = await port_forward_service(
             service.metadata.name, service.metadata.namespace, port, local_port
         )
@@ -62,6 +61,7 @@ def _is_service_available(host, port, retries=20):
                 raise e
             time.sleep(0.5)
 
+
 def _port_in_use(port):
     if port is None:
         return True
@@ -72,6 +72,7 @@ def _port_in_use(port):
         return False
     except OSError:
         return True
+
 
 def _random_free_port(low, high, retries=20):
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -94,7 +95,8 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
         [
             "kubectl",
             "port-forward",
-            "--address","0.0.0.0",
+            "--address",
+            "0.0.0.0",
             "--namespace",
             f"{namespace}",
             f"service/{service_name}",
@@ -128,7 +130,11 @@ async def port_forward_dashboard(service_name, namespace):
 
 
 async def get_scheduler_address(
-    service_name, namespace, port_name="tcp-comm", port_forward_cluster_ip=None, local_port=None
+    service_name,
+    namespace,
+    port_name="tcp-comm",
+    port_forward_cluster_ip=None,
+    local_port=None,
 ):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
@@ -137,7 +143,8 @@ async def get_scheduler_address(
             api,
             service,
             port_forward_cluster_ip=port_forward_cluster_ip,
-            port_name=port_name, local_port=local_port
+            port_name=port_name,
+            local_port=local_port,
         )
         return address
 
