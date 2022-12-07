@@ -1,14 +1,11 @@
-from datetime import datetime, timedelta
+import asyncio
 import json
+import os.path
+import pathlib
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 import pytest
-
-import asyncio
-from contextlib import asynccontextmanager
-import pathlib
-
-import os.path
-
 import yaml
 from dask.distributed import Client
 
@@ -21,6 +18,7 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 
 _EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
+_EXPECTED_LABELS = {"test-label": "label-value"}
 
 
 @pytest.fixture()
@@ -34,7 +32,9 @@ def gen_cluster(k8s_cluster):
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", cluster_path)
-        while cluster_name not in k8s_cluster.kubectl("get", "daskclusters"):
+        while cluster_name not in k8s_cluster.kubectl(
+            "get", "daskclusters.kubernetes.dask.org"
+        ):
             await asyncio.sleep(0.1)
 
         try:
@@ -42,7 +42,9 @@ def gen_cluster(k8s_cluster):
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
             k8s_cluster.kubectl("delete", "-f", cluster_path)
-            while cluster_name in k8s_cluster.kubectl("get", "daskclusters"):
+            while cluster_name in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -60,7 +62,9 @@ def gen_job(k8s_cluster):
 
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-f", job_path)
-        while job_name not in k8s_cluster.kubectl("get", "daskjobs"):
+        while job_name not in k8s_cluster.kubectl(
+            "get", "daskjobs.kubernetes.dask.org"
+        ):
             await asyncio.sleep(0.1)
 
         try:
@@ -68,7 +72,9 @@ def gen_job(k8s_cluster):
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
             k8s_cluster.kubectl("delete", "-f", job_path)
-            while job_name in k8s_cluster.kubectl("get", "daskjobs"):
+            while job_name in k8s_cluster.kubectl(
+                "get", "daskjobs.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
     yield cm
@@ -121,14 +127,14 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=5",
-                        "daskworkergroup",
+                        "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
                     await client.wait_for_workers(5)
                     k8s_cluster.kubectl(
                         "scale",
                         "--replicas=3",
-                        "daskworkergroup",
+                        "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
                     await client.wait_for_workers(3)
@@ -181,7 +187,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )  # First and last char is a quote
-            assert scheduler_annotations == _EXPECTED_ANNOTATIONS
+            assert _EXPECTED_ANNOTATIONS.items() <= scheduler_annotations.items()
 
             # Get the first annotation (the only one) of the scheduler
             service_annotations = json.loads(
@@ -193,7 +199,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )  # First and last char is a quote
-            assert service_annotations == _EXPECTED_ANNOTATIONS
+            assert _EXPECTED_ANNOTATIONS.items() <= service_annotations.items()
 
             # Get the first env value (the only one) of the first worker
             worker_env = k8s_cluster.kubectl(
@@ -217,14 +223,50 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )
-            assert worker_annotations == _EXPECTED_ANNOTATIONS
+            assert _EXPECTED_ANNOTATIONS.items() <= worker_annotations.items()
+
+            # Assert labels from the dask cluster are propagated into the dask worker group
+            workergroup_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "daskworkergroups",
+                    "--selector=dask.org/component=workergroup",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+
+            # Assert labels from the dask cluster are propagated into the dask scheduler
+            scheduler_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=scheduler",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+
+            # Assert labels from the dask cluster are propagated into the dask worker pod
+            worker_labels = json.loads(
+                k8s_cluster.kubectl(
+                    "get",
+                    "pods",
+                    "--selector=dask.org/component=worker",
+                    "-o",
+                    "jsonpath='{.items[0].metadata.labels}'",
+                )[1:-1]
+            )
+            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
 
 
 def _get_job_status(k8s_cluster):
     return json.loads(
         k8s_cluster.kubectl(
             "get",
-            "daskjobs",
+            "daskjobs.kubernetes.dask.org",
             "-o",
             "jsonpath='{.items[0].status}'",
         )[1:-1]
@@ -275,14 +317,16 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
-            while job not in k8s_cluster.kubectl("get", "daskclusters"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
@@ -310,16 +354,14 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )
-            # There might be more annotations on the job runner than expected
-            for key, value in _EXPECTED_ANNOTATIONS.items():
-                assert job_annotations[key] == value
+            _EXPECTED_ANNOTATIONS.items() <= job_annotations.items()
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
             while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters"):
+            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
@@ -338,14 +380,16 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs"):
+            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
-            while job not in k8s_cluster.kubectl("get", "daskclusters"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
@@ -369,7 +413,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters"):
+            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
                 await asyncio.sleep(0.1)
 
             job_status = _get_job_status(k8s_cluster)
