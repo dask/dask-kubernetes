@@ -234,7 +234,8 @@ class KubeCluster(Cluster):
             await self._connect_cluster()
         elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
             raise ValueError(
-                f"Cluster {self.name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
+                f"Cluster {self.name} doesn't already exist and create "
+                f"mode is '{CreateMode.CONNECT_ONLY}'"
             )
         else:
             await self._create_cluster()
