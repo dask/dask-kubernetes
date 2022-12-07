@@ -44,6 +44,16 @@ def test_multiple_clusters(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
+def test_clusters_with_custom_port_forward(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="bar", image=docker_image, n_workers=1, scheduler_forward_port=8888
+        ) as cluster1:
+            assert cluster1.forwarded_dashboard_port == "8888"
+            with Client(cluster1) as client1:
+                assert client1.submit(lambda x: x + 1, 10).result() == 11
+
+
 def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(

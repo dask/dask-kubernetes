@@ -89,8 +89,10 @@ def _random_free_port(low, high, retries=20):
 
 async def port_forward_service(service_name, namespace, remote_port, local_port=None):
     check_dependency("kubectl")
-    if not local_port or _port_in_use(local_port):
+    if not local_port:
         local_port = _random_free_port(49152, 65535)  # IANA suggested range
+    elif _port_in_use(local_port):
+        raise ConnectionError("Specified Port already in use.")
     kproc = subprocess.Popen(
         [
             "kubectl",
