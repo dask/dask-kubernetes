@@ -98,6 +98,9 @@ class KubeCluster(Cluster):
     custom_cluster_spec: str | dict (optional)
         Path to a YAML manifest or a dictionary representation of a ``DaskCluster`` resource object which will be
         used to create the cluster instead of generating one from the other keyword arguments.
+    scheduler_forward_port: int (optional)
+        The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
+
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -153,6 +156,7 @@ class KubeCluster(Cluster):
         resource_timeout=None,
         scheduler_service_type=None,
         custom_cluster_spec=None,
+        scheduler_forward_port=None,
         **kwargs,
     ):
 
@@ -195,6 +199,9 @@ class KubeCluster(Cluster):
         )
         self.scheduler_service_type = dask.config.get(
             "kubernetes.scheduler-service-type", override_with=scheduler_service_type
+        )
+        self.scheduler_forward_port = dask.config.get(
+            "kubernetes.scheduler-forward-port", override_with=scheduler_forward_port
         )
 
         if self._custom_cluster_spec:
@@ -286,11 +293,15 @@ class KubeCluster(Cluster):
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
+            local_port = self.scheduler_forward_port
+            if local_port:
+                local_port = int(local_port)
             dashboard_address = await get_scheduler_address(
                 f"{self.name}-scheduler",
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -317,11 +328,15 @@ class KubeCluster(Cluster):
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
+            local_port = self.scheduler_forward_port
+            if local_port:
+                local_port = int(local_port)
             dashboard_address = await get_scheduler_address(
                 service_name,
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
