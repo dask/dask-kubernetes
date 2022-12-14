@@ -407,7 +407,9 @@ async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
             label_selector=f"dask.org/workergroup-name={name}",
         )
-        current_workers = len(workers.items)
+        current_workers = len(
+            [w for w in workers.items if w.status.phase != "Terminating"]
+        )
         desired_workers = spec["worker"]["replicas"]
         workers_needed = desired_workers - current_workers
         annotations = _get_dask_cluster_annotations(kwargs["meta"])
