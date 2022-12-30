@@ -13,6 +13,37 @@ from distributed.core import rpc
 from .utils import check_dependency
 
 
+async def get_internal_address_for_scheduler_service(
+    service,
+    port_forward_cluster_ip=None,
+    service_name_resolution_retries=20,
+    port_name="tcp-comm",
+    local_port=None,
+):
+    """Take a service object and return the scheduler address."""
+    [port] = [
+        port.port
+        for port in service.spec.ports
+        if port.name == service.metadata.name or port.name == port_name
+    ]
+    if not port_forward_cluster_ip:
+        with suppress(socket.gaierror):
+            # Try to resolve the service name. If we are inside the cluster this should succeed.
+            host = f"{service.metadata.name}.{service.metadata.namespace}"
+            if _is_service_available(
+                host=host, port=port, retries=service_name_resolution_retries
+            ):
+                return f"tcp://{host}:{port}"
+
+    # If the service name is unresolvable, we are outside the cluster and we need to port forward the service.
+    host = "localhost"
+
+    port = await port_forward_service(
+        service.metadata.name, service.metadata.namespace, port, local_port
+    )
+    return f"tcp://{host}:{port}"
+
+
 async def get_external_address_for_scheduler_service(
     core_api,
     service,
@@ -137,17 +168,26 @@ async def get_scheduler_address(
     port_name="tcp-comm",
     port_forward_cluster_ip=None,
     local_port=None,
+    allow_external=True,
 ):
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         service = await api.read_namespaced_service(service_name, namespace)
-        address = await get_external_address_for_scheduler_service(
-            api,
-            service,
-            port_forward_cluster_ip=port_forward_cluster_ip,
-            port_name=port_name,
-            local_port=local_port,
-        )
+        if allow_external:
+            address = await get_external_address_for_scheduler_service(
+                api,
+                service,
+                port_forward_cluster_ip=port_forward_cluster_ip,
+                port_name=port_name,
+                local_port=local_port,
+            )
+        else:
+            address = await get_internal_address_for_scheduler_service(
+                service,
+                port_forward_cluster_ip=port_forward_cluster_ip,
+                port_name=port_name,
+                local_port=local_port,
+            )
         return address
 
 
