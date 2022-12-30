@@ -80,3 +80,36 @@ you attempt to locally commit code::
 
    $ pip install pre-commit
    $ pre-commit install
+
+Testing Operator Controller PRs
+--------------------------------
+
+Sometimes you may want to try out a PR of changes made to the operator controller before it has been merged.
+
+To do this you'll need to build a custom Docker image and push it to a registry that your k8s cluster can pull from.
+
+The custom image needs to take the latest stable release of the controller and install the development branch into it.
+You can do this directly from GitHub repos with `pip` or you can copy your local files in and install that.
+
+.. code-block:: dockerfile
+
+    FROM ghcr.io/dask/dask-kubernetes-operator:<latest stable release>
+
+    RUN pip install git+https://github.com/dask/dask-kubernetes.git@refs/pull/<PR>/head
+
+.. code-block:: console
+
+    $ docker build -t <image>:<tag> .
+    $ docker push -t <image>:<tag> .
+
+Then you can use ``helm`` to install the controller with your custom image.
+
+.. code-block:: console
+
+    $ helm install --repo https://helm.dask.org \
+        --create-namespace \
+        -n dask-operator \
+        --generate-name \
+        dask-kubernetes-operator \
+        --set image.name=<image> \
+        --set image.tag=<tag>
