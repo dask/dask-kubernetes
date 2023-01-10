@@ -5,6 +5,7 @@ import atexit
 from contextlib import suppress
 from enum import Enum
 import getpass
+import logging
 import os
 import time
 from typing import ClassVar
@@ -24,6 +25,7 @@ from distributed.utils import (
     TimeoutError,
     format_dashboard_link,
 )
+from kubernetes_asyncio.client.exceptions import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
 
@@ -33,6 +35,8 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
+
+logger = logging.getLogger(__name__)
 
 
 class CreateMode(Enum):
@@ -248,6 +252,14 @@ class KubeCluster(Cluster):
             await self._create_cluster()
 
         await super()._start()
+
+    def __await__(self):
+        async def _():
+            if self.status == Status.created:
+                await self._start()
+            return self
+
+        return _().__await__()
 
     async def _create_cluster(self):
         if self.shutdown_on_close is None:
@@ -563,13 +575,21 @@ class KubeCluster(Cluster):
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
                 custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-                await custom_objects_api.delete_namespaced_custom_object(
-                    group="kubernetes.dask.org",
-                    version="v1",
-                    plural="daskclusters",
-                    namespace=self.namespace,
-                    name=self.name,
-                )
+                try:
+                    await custom_objects_api.delete_namespaced_custom_object(
+                        group="kubernetes.dask.org",
+                        version="v1",
+                        plural="daskclusters",
+                        namespace=self.namespace,
+                        name=self.name,
+                    )
+                except ApiException as e:
+                    if e.reason == "Not Found":
+                        logger.warning(
+                            "Failed to delete DaskCluster, looks like it has already been deleted."
+                        )
+                    else:
+                        raise
             start = time.time()
             while (await self._get_cluster()) is not None:
                 if time.time() > start + timeout:
