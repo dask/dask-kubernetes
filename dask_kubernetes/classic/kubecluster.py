@@ -467,8 +467,8 @@ class KubeCluster(SpecCluster):
         if isinstance(scheduler_pod_template, dict):
             scheduler_pod_template = make_pod_from_dict(scheduler_pod_template)
 
-        self.pod_template = pod_template
-        self.scheduler_pod_template = scheduler_pod_template
+        self.pod_template = copy.deepcopy(pod_template)
+        self.scheduler_pod_template = copy.deepcopy(scheduler_pod_template)
         self.apply_default_affinity = apply_default_affinity
         self._generate_name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = dask.config.get(
