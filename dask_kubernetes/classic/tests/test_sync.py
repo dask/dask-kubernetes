@@ -232,6 +232,22 @@ def test_pod_template_minimal_dict(docker_image):
             assert result == 11
 
 
+def test_worker_pod_template_spec_are_copied(docker_image):
+    worker_spec = make_pod_spec(docker_image)
+    worker_spec.spec.containers[0].args[0] = "fake-worker-cmd"
+
+    with KubeCluster(pod_template=worker_spec):
+        assert worker_spec.spec.containers[0].args[0] == "fake-worker-cmd"
+
+
+def test_scheduler_pod_template_spec_are_copied(docker_image):
+    scheduler_spec = make_pod_spec(docker_image)
+    scheduler_spec.spec.containers[0].args[0] = "fake-scheduler-cmd"
+
+    with KubeCluster(pod_template=make_pod_spec(docker_image), scheduler_pod_template=scheduler_spec):
+        assert scheduler_spec.spec.containers[0].args[0] == "fake-scheduler-cmd"
+
+
 def test_pod_template_from_conf(docker_image):
     spec = {
         "spec": {
