@@ -244,7 +244,9 @@ def test_scheduler_pod_template_spec_are_copied(docker_image):
     scheduler_spec = make_pod_spec(docker_image)
     scheduler_spec.spec.containers[0].args[0] = "fake-scheduler-cmd"
 
-    with KubeCluster(pod_template=make_pod_spec(docker_image), scheduler_pod_template=scheduler_spec):
+    with KubeCluster(
+        pod_template=make_pod_spec(docker_image), scheduler_pod_template=scheduler_spec
+    ):
         assert scheduler_spec.spec.containers[0].args[0] == "fake-scheduler-cmd"
 
 
