@@ -321,6 +321,7 @@ async def retire_workers(
         scheduler_service_name,
         namespace,
         port_name="http-dashboard",
+        allow_external=False,
     )
     async with aiohttp.ClientSession() as session:
         url = f"{dashboard_address}/api/v1/retire_workers"
@@ -339,6 +340,7 @@ async def retire_workers(
         comm_address = await get_scheduler_address(
             scheduler_service_name,
             namespace,
+            allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
             return await scheduler_comm.workers_to_close(
@@ -365,6 +367,7 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
         scheduler_service_name,
         namespace,
         port_name="http-dashboard",
+        allow_external=False,
     )
     async with aiohttp.ClientSession() as session:
         url = f"{dashboard_address}/api/v1/adaptive_target"
@@ -379,6 +382,7 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
         comm_address = await get_scheduler_address(
             scheduler_service_name,
             namespace,
+            allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
             return await scheduler_comm.adaptive_target()
