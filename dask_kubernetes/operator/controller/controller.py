@@ -1,3 +1,6 @@
+import asyncio
+import copy
+from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
 from uuid import uuid4
@@ -7,6 +10,8 @@ import kopf
 import kubernetes_asyncio as kubernetes
 import pykube
 from dask.compatibility import entry_points
+from kubernetes_asyncio.client import ApiException
+
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc
@@ -83,6 +88,8 @@ def build_scheduler_service_spec(cluster_name, spec, annotations):
 def build_worker_pod_spec(
     worker_group_name, namespace, cluster_name, uuid, spec, annotations
 ):
+    spec = copy.deepcopy(spec)
+
     worker_name = f"{worker_group_name}-worker-{uuid}"
     pod_spec = {
         "apiVersion": "v1",
@@ -308,8 +315,14 @@ async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
         )
         logger.info(f"Successfully adopted by {spec['cluster']}")
 
-    await daskworkergroup_update(
-        spec=spec, name=name, namespace=namespace, logger=logger, **kwargs
+    del kwargs["new"]
+    await daskworkergroup_replica_update(
+        spec=spec,
+        name=name,
+        namespace=namespace,
+        logger=logger,
+        new=spec["worker"]["replicas"],
+        **kwargs,
     )
 
 
@@ -329,7 +342,13 @@ async def retire_workers(
         async with session.post(url, json=params) as resp:
             if resp.status <= 300:
                 retired_workers = await resp.json()
+                logger.info("Retired workers %s", retired_workers)
                 return [retired_workers[w]["name"] for w in retired_workers.keys()]
+            logger.debug(
+                "Received %d response from scheduler API with body %s",
+                resp.status,
+                await resp.text(),
+            )
 
     # Otherwise try gracefully retiring via the RPC
     logger.info(
@@ -343,10 +362,12 @@ async def retire_workers(
             allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
-            return await scheduler_comm.workers_to_close(
+            workers_to_close = await scheduler_comm.workers_to_close(
                 n=n_workers,
                 attribute="name",
             )
+            await scheduler_comm.retire_workers(names=workers_to_close)
+            return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
     logger.info(
@@ -392,67 +413,92 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
         ) from e
 
 
-@kopf.on.update("daskworkergroup.kubernetes.dask.org")
-async def daskworkergroup_update(spec, name, namespace, logger, **kwargs):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
-        corev1api = kubernetes.client.CoreV1Api(api_client)
+worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 
-        cluster = await customobjectsapi.get_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskclusters",
-            namespace=namespace,
-            name=spec["cluster"],
-        )
-        cluster_labels = cluster.get("metadata", {}).get("labels", {})
 
-        workers = await corev1api.list_namespaced_pod(
-            namespace=namespace,
-            label_selector=f"dask.org/workergroup-name={name}",
-        )
-        current_workers = len(
-            [w for w in workers.items if w.status.phase != "Terminating"]
-        )
-        desired_workers = spec["worker"]["replicas"]
-        workers_needed = desired_workers - current_workers
-        annotations = _get_dask_cluster_annotations(kwargs["meta"])
-        if workers_needed > 0:
-            for _ in range(workers_needed):
-                data = build_worker_pod_spec(
+@kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
+async def daskworkergroup_replica_update(
+    name, namespace, meta, spec, new, body, logger, **kwargs
+):
+    cluster_name = spec["cluster"]
+
+    # Replica updates can come in quick succession and the changes must be applied atomically to ensure
+    # the number of workers ends in the correct state
+    async with worker_group_scale_locks[f"{namespace}/{name}"]:
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
+            corev1api = kubernetes.client.CoreV1Api(api_client)
+
+            try:
+                cluster = await customobjectsapi.get_namespaced_custom_object(
+                    group="kubernetes.dask.org",
+                    version="v1",
+                    plural="daskclusters",
+                    namespace=namespace,
+                    name=cluster_name,
+                )
+            except ApiException as e:
+                if e.status == 404:
+                    # No need to scale if worker group is deleted, pods will be cleaned up
+                    return
+                else:
+                    raise e
+
+            cluster_labels = cluster.get("metadata", {}).get("labels", {})
+
+            workers = await corev1api.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"dask.org/workergroup-name={name}",
+            )
+            current_workers = len(
+                [w for w in workers.items if w.status.phase != "Terminating"]
+            )
+            desired_workers = new
+            workers_needed = desired_workers - current_workers
+            annotations = _get_dask_cluster_annotations(meta)
+            if workers_needed > 0:
+                for _ in range(workers_needed):
+                    data = build_worker_pod_spec(
+                        worker_group_name=name,
+                        namespace=namespace,
+                        cluster_name=cluster_name,
+                        uuid=uuid4().hex[:10],
+                        spec=spec["worker"]["spec"],
+                        annotations=annotations,
+                    )
+                    kopf.adopt(data, owner=body)
+                    kopf.label(data, labels=cluster_labels)
+                    await corev1api.create_namespaced_pod(
+                        namespace=namespace,
+                        body=data,
+                    )
+                logger.info(
+                    f"Scaled worker group {name} up to {desired_workers} workers."
+                )
+            if workers_needed < 0:
+                worker_ids = await retire_workers(
+                    n_workers=-workers_needed,
+                    scheduler_service_name=f"{cluster_name}-scheduler",
                     worker_group_name=name,
                     namespace=namespace,
-                    cluster_name=spec["cluster"],
-                    uuid=uuid4().hex[:10],
-                    spec=spec["worker"]["spec"],
-                    annotations=annotations,
+                    logger=logger,
                 )
-                kopf.adopt(data)
-                kopf.label(data, labels=cluster_labels)
-                await corev1api.create_namespaced_pod(
-                    namespace=namespace,
-                    body=data,
+                logger.info(f"Workers to close: {worker_ids}")
+                for wid in worker_ids:
+                    await corev1api.delete_namespaced_pod(
+                        name=wid,
+                        namespace=namespace,
+                    )
+                logger.info(
+                    f"Scaled worker group {name} down to {desired_workers} workers."
                 )
-            logger.info(
-                f"Scaled worker group {name} up to {spec['worker']['replicas']} workers."
-            )
-        if workers_needed < 0:
-            worker_ids = await retire_workers(
-                n_workers=-workers_needed,
-                scheduler_service_name=f"{spec['cluster']}-scheduler",
-                worker_group_name=name,
-                namespace=namespace,
-                logger=logger,
-            )
-            logger.info(f"Workers to close: {worker_ids}")
-            for wid in worker_ids:
-                await corev1api.delete_namespaced_pod(
-                    name=wid,
-                    namespace=namespace,
-                )
-            logger.info(
-                f"Scaled worker group {name} down to {spec['worker']['replicas']} workers."
-            )
+
+
+@kopf.on.delete("daskworkergroup.kubernetes.dask.org")
+async def daskworkergroup_remove(name, namespace, **kwargs):
+    lock_key = f"{name}/{namespace}"
+    if lock_key in worker_group_scale_locks:
+        del worker_group_scale_locks[lock_key]
 
 
 @kopf.on.create("daskjob.kubernetes.dask.org")
