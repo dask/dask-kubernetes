@@ -1,3 +1,5 @@
+from .controller import *
+
 from .kubecluster import (
     KubeCluster,
     make_cluster_spec,

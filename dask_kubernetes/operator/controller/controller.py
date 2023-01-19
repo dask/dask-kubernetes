@@ -1,3 +1,4 @@
+import time
 from contextlib import suppress
 from datetime import datetime
 from uuid import uuid4
@@ -7,6 +8,8 @@ import kopf
 import kubernetes_asyncio as kubernetes
 import pykube
 from dask.compatibility import entry_points
+from kubernetes_asyncio.client import ApiException
+
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc
@@ -18,6 +21,7 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
 
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
 PLUGINS = []
@@ -628,33 +632,114 @@ async def daskautoscaler_create(spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskautoscaler.kubernetes.dask.org", interval=5.0)
 async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
-    # Ask the scheduler for the desired number of worker
-    try:
-        desired_workers = await get_desired_workers(
-            scheduler_service_name=f"{spec['cluster']}-scheduler",
-            namespace=namespace,
-            logger=logger,
-        )
-    except SchedulerCommError:
-        logger.error("Unable to get desired number of workers from scheduler.")
-        return
-
-    # Ensure the desired number is within the min and max
-    desired_workers = max(spec["minimum"], desired_workers)
-    desired_workers = min(spec["maximum"], desired_workers)
-
-    # Update the default DaskWorkerGroup
-    # TODO Only update if the value has changed
     async with kubernetes.client.api_client.ApiClient() as api_client:
+        coreapi = kubernetes.client.CoreV1Api(api_client)
+
+        pod_ready = False
+        try:
+            scheduler_pod = await coreapi.read_namespaced_pod(
+                f"{spec['cluster']}-scheduler", namespace
+            )
+            if scheduler_pod.status.phase == "Running":
+                pod_ready = True
+        except ApiException as e:
+            if e.status != 404:
+                raise e
+
+        if not pod_ready:
+            logger.info("Scheduler not ready, skipping autoscaling")
+            return
+
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         customobjectsapi.api_client.set_default_header(
             "content-type", "application/merge-patch+json"
         )
-        await customobjectsapi.patch_namespaced_custom_object_scale(
+
+        autoscaler_resource = await customobjectsapi.get_namespaced_custom_object(
+            group="kubernetes.dask.org",
+            version="v1",
+            plural="daskautoscalers",
+            namespace=namespace,
+            name=name,
+        )
+
+        worker_group_resource = await customobjectsapi.get_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
             plural="daskworkergroups",
             namespace=namespace,
             name=f"{spec['cluster']}-default",
-            body={"spec": {"replicas": desired_workers}},
         )
+
+        current_replicas = int(worker_group_resource["spec"]["worker"]["replicas"])
+        cooldown_until = float(
+            autoscaler_resource.get("metadata", {})
+            .get("annotations", {})
+            .get(DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION, time.time())
+        )
+
+        # Cooldown autoscaling to prevent thrashing
+        if time.time() < cooldown_until:
+            logger.debug("Autoscaler for %s is in cooldown", spec["cluster"])
+            return
+
+        # Ask the scheduler for the desired number of worker
+        try:
+            desired_workers = await get_desired_workers(
+                scheduler_service_name=f"{spec['cluster']}-scheduler",
+                namespace=namespace,
+                logger=logger,
+            )
+        except SchedulerCommError:
+            logger.error("Unable to get desired number of workers from scheduler.")
+            return
+
+        # Ensure the desired number is within the min and max
+        desired_workers = max(spec["minimum"], desired_workers)
+        desired_workers = min(spec["maximum"], desired_workers)
+
+        if current_replicas > 0:
+            max_scale_down = int(current_replicas * 0.25)
+            max_scale_down = 1 if max_scale_down == 0 else max_scale_down
+            desired_workers = max(current_replicas - max_scale_down, desired_workers)
+
+        # Update the default DaskWorkerGroup
+        if desired_workers != current_replicas:
+            await customobjectsapi.patch_namespaced_custom_object_scale(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskworkergroups",
+                namespace=namespace,
+                name=f"{spec['cluster']}-default",
+                body={"spec": {"replicas": desired_workers}},
+            )
+
+            cooldown_until = time.time() + 15
+
+            await customobjectsapi.patch_namespaced_custom_object(
+                group="kubernetes.dask.org",
+                version="v1",
+                plural="daskautoscalers",
+                namespace=namespace,
+                name=name,
+                body={
+                    "metadata": {
+                        "annotations": {
+                            DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: str(
+                                cooldown_until
+                            )
+                        }
+                    }
+                },
+            )
+
+            logger.info(
+                "Autoscaler updated %s worker count from %d to %d",
+                spec["cluster"],
+                current_replicas,
+                desired_workers,
+            )
+        else:
+            logger.debug(
+                "Not autoscaling %s with %d workers", spec["cluster"], current_replicas
+            )
