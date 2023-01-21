@@ -18,6 +18,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `nameOverride` | Override release name (not including random UUID) | `""` |
 | `fullnameOverride` | Override full release name | `""` |
 | `serviceAccount.create` | Create a service account for the operator to use | `true` |
+| `serviceAccount.createClusterRole` | Create a cluster role needed by the operator and bind it to the service account | `true` |
 | `serviceAccount.annotations` | Annotations to add to the service account | `{}` |
 | `serviceAccount.name` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""` |
 | `podAnnotations` | Extra annotations for the operator pod | `{}` |
