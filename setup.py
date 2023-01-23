@@ -10,7 +10,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     version=versioneer.get_version(),
     description="Native Kubernetes integration for Dask",
-    maintainer="Jacob Tomlinson"
+    maintainer="Jacob Tomlinson",
     url="https://github.com/dask/dask-kubernetes",
     keywords="dask,kubernetes,distributed",
     license="BSD",
