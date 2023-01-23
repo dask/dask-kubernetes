@@ -27,6 +27,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `nodeSelector` | Node selector | `{}` |
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity | `{}` |
+| `kopfArgs` | Command line flags to pass to kopf on start up | `["--all-namespaces"]` |
 
 
 
