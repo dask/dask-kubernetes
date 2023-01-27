@@ -9,9 +9,11 @@ fullnameOverride: ""  # Override full release name
 
 serviceAccount:
   create: true  # Create a service account for the operator to use
-  createClusterRole: true  # Create a cluster role needed by the operator and bind it to the service account
   annotations: {}  # Annotations to add to the service account
   name: ""  # The name of the service account to use. If not set and create is true, a name is generated using the fullname template.
+
+rbac:
+  create: true # Create a cluster role needed by the operator and bind it to the service account
 
 podAnnotations: {}  # Extra annotations for the operator pod
 
