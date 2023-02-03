@@ -262,6 +262,23 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
 
 
+@pytest.mark.timeout(180)
+@pytest.mark.asyncio
+async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as cluster_name:
+            worker_pod_name = "simple-default-worker"
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "get",
+                "pods",
+                "--selector=dask.org/component=worker"
+            )
+            print(k8s_cluster)
+            assert False
+
+
 def _get_job_status(k8s_cluster):
     return json.loads(
         k8s_cluster.kubectl(
