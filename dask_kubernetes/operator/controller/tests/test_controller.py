@@ -270,8 +270,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_pod_name = "simple-default-worker"
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            k8s_cluster.kubectl("get", "pods", "--selector=dask.org/component=worker")
-            print(k8s_cluster)
+            pods = k8s_cluster.kubectl("get", "pods", "--selector=dask.org/component=worker")
+            print("foobar", pods)
             assert False
 
 
