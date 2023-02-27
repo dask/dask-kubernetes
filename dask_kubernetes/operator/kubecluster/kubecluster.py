@@ -35,7 +35,7 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
-from dask_kubernetes.operator.controller import DaskClusters
+from dask_kubernetes.aiopykube.dask import DaskCluster
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +379,7 @@ class KubeCluster(Cluster):
         """Wait for the operator to set the status.phase."""
         start = time.time()
         while start + self._resource_timeout > time.time():
-            cluster = await DaskClusters.objects(
+            cluster = await DaskCluster.objects(
                 self.k8s_api, namespace=self.namespace
             ).get_by_name(self.name)
             if (

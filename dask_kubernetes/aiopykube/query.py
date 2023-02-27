@@ -45,14 +45,22 @@ class Query(_Query):
 
     @property
     def query_cache(self):
-        raise NotImplementedError()
+        raise NotImplementedError(
+            "Properties cannot make async HTTP requests to populate the cache. "
+            "Also the shim currently does not implement a cache at all."
+        )
 
     @property
     def response(self):
-        raise NotImplementedError()
+        raise NotImplementedError(
+            "Properties cannot make HTTP requests. Use ``response = (await Query.execute()).json()`` instead."
+        )
 
     def __len__(self):
-        raise TypeError("Cannot call len on async objects")
+        raise TypeError(
+            "Cannot call len directly on async objects. "
+            "Instead you can use ``len([_ async for _ in Query(...)])``."
+        )
 
 
 class WatchQuery(_WatchQuery):

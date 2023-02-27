@@ -9,7 +9,7 @@ from dask.compatibility import entry_points
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.objects import NamespacedAPIObject
+from dask_kubernetes.aiopykube.dask import DaskCluster
 from distributed.core import rpc
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
@@ -29,18 +29,6 @@ for ep in entry_points(group="dask_operator_plugin"):
 
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
-
-
-class DaskClusters(NamespacedAPIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskclusters"
-    kind = "DaskCluster"
-
-
-class DaskWorkerGroups(NamespacedAPIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskworkergroups"
-    kind = "DaskWorkerGroup"
 
 
 def _get_dask_cluster_annotations(meta):
@@ -285,7 +273,7 @@ async def handle_scheduler_service_status(
         phase = "Running"
 
     api = HTTPClient(KubeConfig.from_env())
-    cluster = await DaskClusters.objects(api, namespace=namespace).get_by_name(
+    cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
         labels["dask.org/cluster-name"]
     )
     await cluster.patch({"status": {"phase": phase}})
