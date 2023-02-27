@@ -1,12 +1,9 @@
-import asyncio
-import functools
 from typing import Optional
 
 from requests import Response
 
 
 from pykube.http import HTTPClient
-from pykube.mixins import ScalableMixin
 from pykube.objects import (
     ObjectManager,
     APIObject as _APIObject,
@@ -42,20 +39,7 @@ from pykube.objects import (
     CustomResourceDefinition as _CustomResourceDefinition,
 )
 from dask_kubernetes.aiopykube.query import Query
-
-
-class AsyncScalableMixin(ScalableMixin):
-    async def scale(self, replicas=None):
-        count = self.scalable if replicas is None else replicas
-        await self.exists(ensure=True)
-        if self.scalable != count:
-            self.scalable = count
-            await self.update()
-            while True:
-                await self.reload()
-                if self.scalable == count:
-                    break
-                await asyncio.sleep(1)
+from dask_kubernetes.aiopykube.mixins import AsyncScalableMixin, AsyncMixin
 
 
 class AsyncObjectManager(ObjectManager):
@@ -64,13 +48,8 @@ class AsyncObjectManager(ObjectManager):
         return query._clone(Query)
 
 
-class AsyncMixin:
+class AsyncObjectMixin(AsyncMixin):
     objects = AsyncObjectManager()
-
-    async def _sync(self, func, *args, **kwargs):
-        return await asyncio.get_event_loop().run_in_executor(
-            None, functools.partial(func, *args, **kwargs)
-        )
 
     async def exists(self, ensure=False):
         return await self._sync(super().exists, ensure=ensure)
@@ -81,8 +60,8 @@ class AsyncMixin:
     async def reload(self):
         return await self._sync(super().reload)
 
-    async def watch(self):
-        return await self._sync(super().watch)
+    def watch(self):
+        return super().watch()
 
     async def patch(self, strategic_merge_patch, *, subresource=None):
         return await self._sync(
@@ -104,27 +83,27 @@ class AsyncMixin:
     delete.__doc__ = _APIObject.delete.__doc__
 
 
-class APIObject(AsyncMixin, _APIObject):
+class APIObject(AsyncObjectMixin, _APIObject):
     """APIObject."""
 
 
-class NamespacedAPIObject(AsyncMixin, _NamespacedAPIObject):
+class NamespacedAPIObject(AsyncObjectMixin, _NamespacedAPIObject):
     """APIObject."""
 
 
-class ConfigMap(AsyncMixin, _ConfigMap):
+class ConfigMap(AsyncObjectMixin, _ConfigMap):
     """ConfigMap."""
 
 
-class CronJob(AsyncMixin, _CronJob):
+class CronJob(AsyncObjectMixin, _CronJob):
     """CronJob."""
 
 
-class DaemonSet(AsyncMixin, _DaemonSet):
+class DaemonSet(AsyncObjectMixin, _DaemonSet):
     """DaemonSet."""
 
 
-class Deployment(AsyncScalableMixin, AsyncMixin, _Deployment):
+class Deployment(AsyncScalableMixin, AsyncObjectMixin, _Deployment):
     """Deployment."""
 
     async def rollout_undo(self, target_revision=None):
@@ -133,43 +112,43 @@ class Deployment(AsyncScalableMixin, AsyncMixin, _Deployment):
     rollout_undo.__doc__ = _Deployment.rollout_undo.__doc__
 
 
-class Endpoint(AsyncMixin, _Endpoint):
+class Endpoint(AsyncObjectMixin, _Endpoint):
     """Endpoint."""
 
 
-class Event(AsyncMixin, _Event):
+class Event(AsyncObjectMixin, _Event):
     """Event."""
 
 
-class LimitRange(AsyncMixin, _LimitRange):
+class LimitRange(AsyncObjectMixin, _LimitRange):
     """LimitRange."""
 
 
-class ResourceQuota(AsyncMixin, _ResourceQuota):
+class ResourceQuota(AsyncObjectMixin, _ResourceQuota):
     """ResourceQuota."""
 
 
-class ServiceAccount(AsyncMixin, _ServiceAccount):
+class ServiceAccount(AsyncObjectMixin, _ServiceAccount):
     """ServiceAccount."""
 
 
-class Ingress(AsyncMixin, _Ingress):
+class Ingress(AsyncObjectMixin, _Ingress):
     """Ingress."""
 
 
-class Job(AsyncScalableMixin, AsyncMixin, _Job):
+class Job(AsyncScalableMixin, AsyncObjectMixin, _Job):
     """Job."""
 
 
-class Namespace(AsyncMixin, _Namespace):
+class Namespace(AsyncObjectMixin, _Namespace):
     """Namespace."""
 
 
-class Node(AsyncMixin, _Node):
+class Node(AsyncObjectMixin, _Node):
     """Node."""
 
 
-class Pod(AsyncMixin, _Pod):
+class Pod(AsyncObjectMixin, _Pod):
     """Pod"""
 
     async def logs(self, *args, **kwargs):
@@ -178,19 +157,21 @@ class Pod(AsyncMixin, _Pod):
     logs.__doc__ = _Pod.logs.__doc__
 
 
-class ReplicationController(AsyncScalableMixin, AsyncMixin, _ReplicationController):
+class ReplicationController(
+    AsyncScalableMixin, AsyncObjectMixin, _ReplicationController
+):
     """ReplicationController."""
 
 
-class ReplicaSet(AsyncScalableMixin, AsyncMixin, _ReplicaSet):
+class ReplicaSet(AsyncScalableMixin, AsyncObjectMixin, _ReplicaSet):
     """ReplicaSet."""
 
 
-class Secret(AsyncMixin, _Secret):
+class Secret(AsyncObjectMixin, _Secret):
     """Secret."""
 
 
-class Service(AsyncMixin, _Service):
+class Service(AsyncObjectMixin, _Service):
     """Service."""
 
     async def proxy_http_request(self, *args, **kwargs):
@@ -223,45 +204,45 @@ class Service(AsyncMixin, _Service):
     proxy_http_delete.__doc__ = _Service.proxy_http_delete.__doc__
 
 
-class PersistentVolume(AsyncMixin, _PersistentVolume):
+class PersistentVolume(AsyncObjectMixin, _PersistentVolume):
     """PersistentVolume."""
 
 
-class PersistentVolumeClaim(AsyncMixin, _PersistentVolumeClaim):
+class PersistentVolumeClaim(AsyncObjectMixin, _PersistentVolumeClaim):
     """PersistentVolumeClaim."""
 
 
-class HorizontalPodAutoscaler(AsyncMixin, _HorizontalPodAutoscaler):
+class HorizontalPodAutoscaler(AsyncObjectMixin, _HorizontalPodAutoscaler):
     """HorizontalPodAutoscaler."""
 
 
-class StatefulSet(AsyncScalableMixin, AsyncMixin, _StatefulSet):
+class StatefulSet(AsyncScalableMixin, AsyncObjectMixin, _StatefulSet):
     """StatefulSet."""
 
 
-class Role(AsyncMixin, _Role):
+class Role(AsyncObjectMixin, _Role):
     """Role."""
 
 
-class RoleBinding(AsyncMixin, _RoleBinding):
+class RoleBinding(AsyncObjectMixin, _RoleBinding):
     """RoleBinding."""
 
 
-class ClusterRole(AsyncMixin, _ClusterRole):
+class ClusterRole(AsyncObjectMixin, _ClusterRole):
     """ClusterRole."""
 
 
-class ClusterRoleBinding(AsyncMixin, _ClusterRoleBinding):
+class ClusterRoleBinding(AsyncObjectMixin, _ClusterRoleBinding):
     """ClusterRoleBinding."""
 
 
-class PodSecurityPolicy(AsyncMixin, _PodSecurityPolicy):
+class PodSecurityPolicy(AsyncObjectMixin, _PodSecurityPolicy):
     """PodSecurityPolicy."""
 
 
-class PodDisruptionBudget(AsyncMixin, _PodDisruptionBudget):
+class PodDisruptionBudget(AsyncObjectMixin, _PodDisruptionBudget):
     """PodDisruptionBudget."""
 
 
-class CustomResourceDefinition(AsyncMixin, _CustomResourceDefinition):
+class CustomResourceDefinition(AsyncObjectMixin, _CustomResourceDefinition):
     """CustomResourceDefinition."""

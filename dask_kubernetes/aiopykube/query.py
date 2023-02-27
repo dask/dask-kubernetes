@@ -1,17 +1,9 @@
 """An asyncio shim for pykube-ng."""
-
-import asyncio
-import functools
-
 from pykube.query import now, Table, Query as _Query, WatchQuery as _WatchQuery
+from dask_kubernetes.aiopykube.mixins import AsyncMixin
 
 
-class Query(_Query):
-    async def _sync(self, func, *args, **kwargs):
-        return await asyncio.get_event_loop().run_in_executor(
-            None, functools.partial(func, *args, **kwargs)
-        )
-
+class Query(_Query, AsyncMixin):
     async def execute(self, **kwargs):
         return await self._sync(super().execute, **kwargs)
 
@@ -39,9 +31,13 @@ class Query(_Query):
         return Table(self.api_obj_class, response.json())
 
     def watch(self, since=None, *, params=None):
+        query = self._clone(WatchQuery)
+        query.params = params
         if since is now:
             raise ValueError("now is not a supported since value in async version")
-        return super().query(since, params=params)._clone(WatchQuery)
+        elif since is not None:
+            query.resource_version = since
+        return query
 
     @property
     def query_cache(self):
@@ -63,9 +59,10 @@ class Query(_Query):
         )
 
 
-class WatchQuery(_WatchQuery):
+class WatchQuery(_WatchQuery, AsyncMixin):
     async def object_stream(self):
-        object_stream = iter(super().object_stream())
+        f = super().object_stream
+        object_stream = await self._sync(lambda: iter(f()))
         while True:
             try:
                 yield await self._sync(next, object_stream)
