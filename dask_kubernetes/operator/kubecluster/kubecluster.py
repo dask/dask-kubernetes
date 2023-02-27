@@ -13,6 +13,13 @@ import warnings
 import weakref
 import uuid
 
+from rich import box
+from rich.live import Live
+from rich.table import Table
+from rich.console import Group
+from rich.text import Text
+from rich.panel import Panel
+import pykube.exceptions
 import kubernetes_asyncio as kubernetes
 import yaml
 
@@ -36,7 +43,8 @@ from dask_kubernetes.common.networking import (
 )
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.dask import DaskCluster
+from dask_kubernetes.aiopykube.dask import DaskCluster, DaskWorkerGroup
+from dask_kubernetes.aiopykube.objects import Pod, Service
 
 logger = logging.getLogger(__name__)
 
@@ -230,12 +238,19 @@ class KubeCluster(Cluster):
             self._loop_runner.start()
             self.sync(self._start)
 
+    def _log(self, log):
+        temp = self.quiet
+        self.quiet = True
+        super()._log(log)
+        self.quiet = temp
+
     @property
     def dashboard_link(self):
         host = self.scheduler_address.split("://")[1].split("/")[0].split(":")[0]
         return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     async def _start(self):
+        status_task = asyncio.create_task(self._show_status())
         await ClusterAuth.load_first(self.auth)
         cluster_exists = (await self._get_cluster()) is not None
 
@@ -244,6 +259,7 @@ class KubeCluster(Cluster):
                 f"Cluster {self.name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
             )
         elif cluster_exists:
+            self._log("Connecting to existing cluster")
             await self._connect_cluster()
         elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
             raise ValueError(
@@ -251,9 +267,12 @@ class KubeCluster(Cluster):
                 f"mode is '{CreateMode.CONNECT_ONLY}'"
             )
         else:
+            self._log("Creating cluster")
             await self._create_cluster()
 
         await super()._start()
+        self._log(f"Ready, dashboard available at {self.dashboard_link}")
+        await status_task
 
     def __await__(self):
         async def _():
@@ -271,6 +290,7 @@ class KubeCluster(Cluster):
             custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
 
             if not self._custom_cluster_spec:
+                self._log("Generating cluster spec")
                 data = make_cluster_spec(
                     name=self.name,
                     env=self.env,
@@ -283,6 +303,7 @@ class KubeCluster(Cluster):
             else:
                 data = self._custom_cluster_spec
             try:
+                self._log("Creating DaskCluster object")
                 await custom_objects_api.create_namespaced_custom_object(
                     group="kubernetes.dask.org",
                     version="v1",
@@ -298,18 +319,23 @@ class KubeCluster(Cluster):
                 ) from e
 
             try:
+                self._log("Waiting for controller to action cluster")
                 await self._wait_for_controller()
             except TimeoutError as e:
                 await self._close()
                 raise e
+            self._log("Waiting for scheduler pod")
             await wait_for_scheduler(self.name, self.namespace)
+            self._log("Waiting for scheduler service")
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
+            self._log("Connecting to scheduler")
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
             local_port = self.scheduler_forward_port
             if local_port:
                 local_port = int(local_port)
+            self._log("Getting dashboard URL")
             dashboard_address = await get_scheduler_address(
                 f"{self.name}-scheduler",
                 self.namespace,
@@ -337,14 +363,18 @@ class KubeCluster(Cluster):
             else:
                 self.env = {}
             service_name = f"{cluster_spec['metadata']['name']}-scheduler"
+            self._log("Waiting for scheduler pod")
             await wait_for_scheduler(self.name, self.namespace)
+            self._log("Waiting for scheduler service")
             await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
+            self._log("Connecting to scheduler")
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
             local_port = self.scheduler_forward_port
             if local_port:
                 local_port = int(local_port)
+            self._log("Getting dashboard URL")
             dashboard_address = await get_scheduler_address(
                 service_name,
                 self.namespace,
@@ -393,6 +423,89 @@ class KubeCluster(Cluster):
         raise TimeoutError(
             f"Dask Cluster resource not actioned after {self._resource_timeout} seconds, is the Dask Operator running?"
         )
+
+    async def get_component_status(self, component):
+        try:
+            if component == "cluster":
+                cluster = await DaskCluster.objects(
+                    self.k8s_api, namespace=self.namespace
+                ).get_by_name(self.name)
+                return cluster.obj["status"]["phase"]
+            elif component == "schedulerpod":
+                pods = Pod.objects(self.k8s_api, namespace=self.namespace).filter(
+                    selector={
+                        "dask.org/cluster-name": self.name,
+                        "dask.org/component": "scheduler",
+                    },
+                )
+                [pod] = [pod async for pod in pods]
+                phase = pod.obj["status"]["phase"]
+                if phase == "Running":
+                    conditions = {
+                        c["type"]: c["status"] for c in pod.obj["status"]["conditions"]
+                    }
+                    if "Ready" in conditions and conditions["Ready"] == "True":
+                        return phase
+                    else:
+                        return "Health Checking"
+                return phase
+
+            elif component == "schedulerservice":
+                await Service.objects(self.k8s_api).get_by_name(
+                    self.name + "-scheduler"
+                )
+                return "Created"
+            elif component == "workergroup":
+                workergroups = DaskWorkerGroup.objects(self.k8s_api).filter(
+                    namespace=self.namespace,
+                    selector={
+                        "dask.org/cluster-name": self.name,
+                    },
+                )
+                if not len([wg async for wg in workergroups]):
+                    raise pykube.exceptions.ObjectDoesNotExist()
+                return "Created"
+        except (pykube.exceptions.ObjectDoesNotExist, ValueError):
+            return "-"
+
+    async def _show_status(self):
+        async def generate_table() -> Table:
+            table = Table(show_header=False, box=box.SIMPLE, expand=True)
+            table.add_column("Component")
+            table.add_column("Status", justify="right")
+
+            for (label, component) in [
+                ("DaskCluster", "cluster"),
+                ("Scheduler Pod", "schedulerpod"),
+                ("Scheduler Service", "schedulerservice"),
+                ("Default Worker Group", "workergroup"),
+            ]:
+                status = await self.get_component_status(component)
+                if status in ["Running", "Created"]:
+                    status = "[green]" + status
+                if status in ["Pending", "Health Checking"]:
+                    status = "[yellow]" + status
+                if status in ["CrashLoopBackOff", "Error"]:
+                    status = "[red]" + status
+                table.add_row(label, status)
+
+            status = Text(
+                "  " + self._cluster_manager_logs[-1][1]
+                if self._cluster_manager_logs
+                else "  "
+            )
+            return Panel(
+                Group(table, status),
+                title=f"Creating KubeCluster '{self.name}'",
+                width=80,
+            )
+
+        with Live(await generate_table(), auto_refresh=False) as live:
+            while True:
+                await asyncio.sleep(1)
+                live.update(await generate_table(), refresh=True)
+                if self.status == Status.running:
+                    break
 
     def get_logs(self):
         """Get logs for Dask scheduler and workers.
@@ -837,8 +950,9 @@ def make_scheduler_spec(
                     },
                     "livenessProbe": {
                         "httpGet": {"port": "http-dashboard", "path": "/health"},
-                        "initialDelaySeconds": 15,
-                        "periodSeconds": 20,
+                        "initialDelaySeconds": 0,
+                        "periodSeconds": 1,
+                        "timeoutSeconds": 300,
                     },
                 }
             ]

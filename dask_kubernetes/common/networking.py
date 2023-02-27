@@ -30,7 +30,7 @@ async def get_internal_address_for_scheduler_service(
         with suppress(socket.gaierror):
             # Try to resolve the service name. If we are inside the cluster this should succeed.
             host = f"{service.metadata.name}.{service.metadata.namespace}"
-            if _is_service_available(
+            if await _is_service_available(
                 host=host, port=port, retries=service_name_resolution_retries
             ):
                 return f"tcp://{host}:{port}"
@@ -69,7 +69,7 @@ async def get_external_address_for_scheduler_service(
             with suppress(socket.gaierror):
                 # Try to resolve the service name. If we are inside the cluster this should succeed.
                 host = f"{service.metadata.name}.{service.metadata.namespace}"
-                if _is_service_available(
+                if await _is_service_available(
                     host=host, port=port, retries=service_name_resolution_retries
                 ):
                     return f"tcp://{host}:{port}"
@@ -83,14 +83,14 @@ async def get_external_address_for_scheduler_service(
     return f"tcp://{host}:{port}"
 
 
-def _is_service_available(host, port, retries=20):
+async def _is_service_available(host, port, retries=20):
     for i in range(retries):
         try:
-            return socket.getaddrinfo(host, port)
+            return await asyncio.get_event_loop().getaddrinfo(host, port)
         except socket.gaierror as e:
             if i >= retries - 1:
                 raise e
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
 
 
 def _port_in_use(port):
