@@ -35,6 +35,7 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
+from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import DaskCluster
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ class KubeCluster(Cluster):
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
-
+        self.k8s_api = HTTPClient(KubeConfig.from_env())
         self._instances.add(self)
 
         super().__init__(name=name, **kwargs)
