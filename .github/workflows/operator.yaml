@@ -6,6 +6,7 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
   push:
     paths:
@@ -13,6 +14,7 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
 
 concurrency:
@@ -61,7 +63,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator
+        run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
       - name: Debug k8s resources
         if: success() || failure()
         run: kubectl get all -A
