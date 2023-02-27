@@ -385,7 +385,7 @@ class KubeCluster(Cluster):
             if (
                 "status" in cluster.obj
                 and "phase" in cluster.obj["status"]
-                and cluster.obj["status"]["phase"] in ["Pending", "Running"]
+                and cluster.obj["status"]["phase"] == "Running"
             ):
                 return
             await asyncio.sleep(0.1)
