@@ -5,10 +5,11 @@ from uuid import uuid4
 import aiohttp
 import kopf
 import kubernetes_asyncio as kubernetes
-import pykube
 from dask.compatibility import entry_points
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
+from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
+from dask_kubernetes.aiopykube.dask import DaskCluster
 from distributed.core import rpc
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
@@ -28,12 +29,6 @@ for ep in entry_points(group="dask_operator_plugin"):
 
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
-
-
-class DaskClusters(pykube.objects.NamespacedAPIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskclusters"
-    kind = "DaskCluster"
 
 
 def _get_dask_cluster_annotations(meta):
@@ -265,7 +260,9 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
 
 
 @kopf.on.field("service", field="status", labels={"dask.org/component": "scheduler"})
-def handle_scheduler_service_status(spec, labels, status, namespace, logger, **kwargs):
+async def handle_scheduler_service_status(
+    spec, labels, status, namespace, logger, **kwargs
+):
     # If the Service is a LoadBalancer with no ingress endpoints mark the cluster as Pending
     if spec["type"] == "LoadBalancer" and not len(
         status.get("load_balancer", {}).get("ingress", [])
@@ -275,11 +272,11 @@ def handle_scheduler_service_status(spec, labels, status, namespace, logger, **k
     else:
         phase = "Running"
 
-    api = pykube.HTTPClient(pykube.KubeConfig.from_env())
-    cluster = DaskClusters.objects(api, namespace=namespace).get_by_name(
+    api = HTTPClient(KubeConfig.from_env())
+    cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
         labels["dask.org/cluster-name"]
     )
-    cluster.patch({"status": {"phase": phase}})
+    await cluster.patch({"status": {"phase": phase}})
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
