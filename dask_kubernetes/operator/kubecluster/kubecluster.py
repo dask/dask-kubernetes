@@ -12,6 +12,7 @@ from typing import ClassVar
 import warnings
 import weakref
 import uuid
+import sys
 
 import kubernetes_asyncio as kubernetes
 import yaml
@@ -37,6 +38,7 @@ from dask_kubernetes.common.networking import (
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import DaskCluster
+from dask_kubernetes.exceptions import CrashLoopBackOffError
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +96,12 @@ class KubeCluster(Cluster):
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
     resource_timeout: int (optional)
-        Time in seconds to wait for the controller to take action before giving up.
-        If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase`` by the controller
-        then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
-        useful error.
+        Time in seconds to wait for Kubernetes resources to enter their expected state.
+        Example: If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase``
+        by the controller then it is likely the controller isn't running or is malfunctioning and we time
+        out and clean up with a useful error.
+        Example 2: If the scheduler Pod enters a ``CrashBackoffLoop`` state for longer than this timeout we
+        give up with a useful error.
         Defaults to ``60`` seconds.
     scheduler_service_type: str (optional)
         Kubernetes service type to use for the scheduler. Defaults to ``ClusterIP``.
@@ -302,7 +306,18 @@ class KubeCluster(Cluster):
             except TimeoutError as e:
                 await self._close()
                 raise e
-            await wait_for_scheduler(self.name, self.namespace)
+            try:
+                await wait_for_scheduler(
+                    self.k8s_api,
+                    self.name,
+                    self.namespace,
+                    timeout=self._resource_timeout,
+                )
+            except CrashLoopBackOffError as e:
+                logs = await self._get_logs()
+                print(logs[self.name + "-scheduler"], file=sys.stderr)
+                await self._close()
+                raise e
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
@@ -337,7 +352,9 @@ class KubeCluster(Cluster):
             else:
                 self.env = {}
             service_name = f"{cluster_spec['metadata']['name']}-scheduler"
-            await wait_for_scheduler(self.name, self.namespace)
+            await wait_for_scheduler(
+                self.k8s_api, self.name, self.namespace, timeout=self._resource_timeout
+            )
             await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
