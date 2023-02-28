@@ -252,34 +252,35 @@ class KubeCluster(Cluster):
         return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     async def _start(self):
-        # TODO wrap tasks in try finally
-        watch_component_status_task = asyncio.create_task(
-            self._watch_component_status()
-        )
-        show_rich_output_task = asyncio.create_task(self._show_rich_output())
-        await ClusterAuth.load_first(self.auth)
-        cluster_exists = (await self._get_cluster()) is not None
-
-        if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
-            raise ValueError(
-                f"Cluster {self.name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
+        try:
+            watch_component_status_task = asyncio.create_task(
+                self._watch_component_status()
             )
-        elif cluster_exists:
-            self._log("Connecting to existing cluster")
-            await self._connect_cluster()
-        elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
-            raise ValueError(
-                f"Cluster {self.name} doesn't already exist and create "
-                f"mode is '{CreateMode.CONNECT_ONLY}'"
-            )
-        else:
-            self._log("Creating cluster")
-            await self._create_cluster()
+            show_rich_output_task = asyncio.create_task(self._show_rich_output())
+            await ClusterAuth.load_first(self.auth)
+            cluster_exists = (await self._get_cluster()) is not None
 
-        await super()._start()
-        self._log(f"Ready, dashboard available at {self.dashboard_link}")
-        await watch_component_status_task
-        await show_rich_output_task
+            if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
+                raise ValueError(
+                    f"Cluster {self.name} already exists and create mode is '{CreateMode.CREATE_ONLY}'"
+                )
+            elif cluster_exists:
+                self._log("Connecting to existing cluster")
+                await self._connect_cluster()
+            elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
+                raise ValueError(
+                    f"Cluster {self.name} doesn't already exist and create "
+                    f"mode is '{CreateMode.CONNECT_ONLY}'"
+                )
+            else:
+                self._log("Creating cluster")
+                await self._create_cluster()
+
+            await super()._start()
+            self._log(f"Ready, dashboard available at {self.dashboard_link}")
+        finally:
+            watch_component_status_task.cancel()
+            show_rich_output_task.cancel()
 
     def __await__(self):
         async def _():
@@ -432,7 +433,7 @@ class KubeCluster(Cluster):
         )
 
     async def _watch_component_status(self):
-        while self.status in [Status.created, Status.init, Status.starting]:
+        while True:
             # Get DaskCluster status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
                 cluster = await DaskCluster.objects(
@@ -510,7 +511,7 @@ class KubeCluster(Cluster):
 
     async def _show_rich_output(self):
         with Live(await self.generate_rich_output(), auto_refresh=False) as live:
-            while self.status in [Status.created, Status.init, Status.starting]:
+            while True:
                 await asyncio.sleep(0.25)
                 live.update(await self.generate_rich_output(), refresh=True)
 
