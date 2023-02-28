@@ -946,14 +946,14 @@ def make_scheduler_spec(
                     ],
                     "readinessProbe": {
                         "httpGet": {"port": "http-dashboard", "path": "/health"},
-                        "initialDelaySeconds": 5,
-                        "periodSeconds": 10,
-                    },
-                    "livenessProbe": {
-                        "httpGet": {"port": "http-dashboard", "path": "/health"},
                         "initialDelaySeconds": 0,
                         "periodSeconds": 1,
                         "timeoutSeconds": 300,
+                    },
+                    "livenessProbe": {
+                        "httpGet": {"port": "http-dashboard", "path": "/health"},
+                        "initialDelaySeconds": 15,
+                        "periodSeconds": 20,
                     },
                 }
             ]
