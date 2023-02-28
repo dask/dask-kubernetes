@@ -12,7 +12,6 @@ from typing import ClassVar
 import warnings
 import weakref
 import uuid
-import sys
 
 import kubernetes_asyncio as kubernetes
 import yaml
@@ -38,7 +37,7 @@ from dask_kubernetes.common.networking import (
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import DaskCluster
-from dask_kubernetes.exceptions import CrashLoopBackOffError
+from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 
 logger = logging.getLogger(__name__)
 
@@ -315,9 +314,12 @@ class KubeCluster(Cluster):
                 )
             except CrashLoopBackOffError as e:
                 logs = await self._get_logs()
-                print(logs[self.name + "-scheduler"], file=sys.stderr)
                 await self._close()
-                raise e
+                raise SchedulerStartupError(
+                    "Scheduler failed to start.",
+                    "Scheduler Pod logs:",
+                    logs[self.name + "-scheduler"],
+                ) from e
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
