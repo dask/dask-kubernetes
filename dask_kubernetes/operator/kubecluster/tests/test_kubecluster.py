@@ -4,6 +4,7 @@ from dask.distributed import Client
 from distributed.utils import TimeoutError
 
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
+from dask_kubernetes.exceptions import SchedulerStartupError
 
 
 def test_experimental_shim():
@@ -117,6 +118,15 @@ def test_additional_worker_groups(kopf_runner, docker_image):
 def test_cluster_without_operator(docker_image):
     with pytest.raises(TimeoutError, match="is the Dask Operator running"):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
+
+
+def test_cluster_crashloopbackoff(kopf_runner, docker_image):
+    with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
+        spec = make_cluster_spec(name="foo", n_workers=1)
+        spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
+            0
+        ] = "dask-schmeduler"
+        KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
 
 
 def test_adapt(kopf_runner, docker_image):
