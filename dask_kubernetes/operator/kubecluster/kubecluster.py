@@ -252,6 +252,7 @@ class KubeCluster(Cluster):
         return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     async def _start(self):
+        # TODO wrap tasks in try finally
         watch_component_status_task = asyncio.create_task(
             self._watch_component_status()
         )
@@ -453,6 +454,11 @@ class KubeCluster(Cluster):
                     }
                     if "Ready" not in conditions or conditions["Ready"] != "True":
                         phase = "Health Checking"
+                    if "containerStatuses" in pod.obj["status"]:
+                        for container in pod.obj["status"]["containerStatuses"]:
+                            if "waiting" in container["state"]:
+                                phase = container["state"]["waiting"]["reason"]
+
                 self._startup_component_status["schedulerpod"] = phase
 
             # Get Scheduler Service status
