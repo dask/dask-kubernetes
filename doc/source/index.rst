@@ -28,7 +28,7 @@ Welcome to the documentation for ``dask-kubernetes``.
    Dask on Kubernetes new users should head to the
    `Dask documentation page on Kubernetes <https://docs.dask.org/en/latest/deploying-kubernetes.html>`_.
 
-The package ``dask-kubernetes`` provides cluster managers for Kubernetes.
+The package ``dask-kubernetes`` provides cluster managers for Kubernetes. ``dask-kubernetes`` is one of many options for deploying Dask clusters, see `Deploying Dask <https://docs.dask.org/en/stable/deploying.html#distributed-computing>`_ in the Dask documentation for an overview of additional options.
 
 KubeCluster
 -----------
