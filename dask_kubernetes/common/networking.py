@@ -1,10 +1,9 @@
 import asyncio
+import aiohttp
 from contextlib import suppress
 import random
 import socket
-import subprocess
 import time
-from weakref import finalize
 import kubernetes_asyncio as kubernetes
 from tornado.iostream import StreamClosedError
 
@@ -124,25 +123,96 @@ async def port_forward_service(service_name, namespace, remote_port, local_port=
         local_port = _random_free_port(49152, 65535)  # IANA suggested range
     elif _port_in_use(local_port):
         raise ConnectionError("Specified Port already in use.")
-    kproc = subprocess.Popen(
-        [
-            "kubectl",
-            "port-forward",
-            "--address",
-            "0.0.0.0",
-            "--namespace",
-            f"{namespace}",
-            f"service/{service_name}",
-            f"{local_port}:{remote_port}",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    finalize(kproc, kproc.kill)
+
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        api = kubernetes.client.CoreV1Api(api_client)
+        service = await api.read_namespaced_service(service_name, namespace)
+        pods = await api.list_namespaced_pod(
+            namespace=namespace,
+            label_selector=",".join(
+                [f"{key}={value}" for key, value in service.spec.selector.items()]
+            ),
+        )
+        pod_name = pods.items[0].metadata.name
+
+    # TODO Move this loop into a task that is tied to the KubeCluster object
+    # When the cluster is closed this task should be cancelled.
+    while True:
+        async with kubernetes.stream.WsApiClient() as ws_api_client:
+            api = kubernetes.client.CoreV1Api(ws_api_client)
+            ws = await api.connect_get_namespaced_pod_portforward(
+                pod_name,
+                namespace,
+                ports=remote_port,
+                _preload_content=False,
+            )
+            port_forward = PortForward(ws, local_port)
+            await port_forward.run()
 
     if await is_comm_open("localhost", local_port, retries=2000):
         return local_port
     raise ConnectionError("kubectl port forward failed")
+
+
+class ConnectionClosedError(Exception):
+    """A connection has been closed."""
+
+
+class PortForward:
+    def __init__(self, websocket, port):
+        self.websocket = websocket
+        self.port = port
+        self.server = None
+        self.channels = []
+
+    async def run(self):
+        """Start a server on a local port and sync it with the websocket."""
+        self.server = await asyncio.start_server(self.sync_sockets, port=self.port)
+        async with self.server:
+            await self.server.start_serving()
+            await self.server.wait_closed()
+
+    async def sync_sockets(self, reader, writer):
+        """Start two tasks to copy bytes from tcp=>websocket and websocket=>tcp."""
+        try:
+            tasks = [
+                asyncio.create_task(self.tcp_to_ws(reader)),
+                asyncio.create_task(self.ws_to_tcp(writer)),
+            ]
+            await asyncio.gather(*tasks)
+        except ConnectionClosedError:
+            for task in tasks:
+                task.cancel()
+        finally:
+            writer.close()
+            self.server.close()
+
+    async def tcp_to_ws(self, reader):
+        while self.server.is_serving():
+            data = await reader.read(1024 * 1024)
+            # TODO Figure out why `data` is empty the first time this is called
+            # This indicates the socket is cloed, but it isn't and on the second read it works fine.
+            if not data:
+                raise ConnectionClosedError("TCP socket closed")
+            else:
+                # Send data to channel 0 of the websocket.
+                await self.websocket.send_bytes(b"\x00" + data)
+
+    async def ws_to_tcp(self, writer):
+        while self.server.is_serving():
+            message = await self.websocket.receive()
+            if message.type == aiohttp.WSMsgType.CLOSED:
+                # TODO Figure out why this websocket closes after 4 messages.
+                raise ConnectionClosedError("Websocket closed")
+            elif message.type == aiohttp.WSMsgType.BINARY:
+                # Kubernetes portforward protocol prefixes all frames with a byte to represent
+                # the channel. Channel 0 is rw for data and channel 1 is ro for errors.
+                if message.data[0] not in self.channels:
+                    # Keep track of our channels. Could be useful later for listening to multiple ports.
+                    self.channels.append(message.data[0])
+                else:
+                    writer.write(message.data[1:])
+                    await writer.drain()
 
 
 async def is_comm_open(ip, port, retries=200):
@@ -155,11 +225,6 @@ async def is_comm_open(ip, port, retries=200):
             time.sleep(0.1)
             retries -= 1
     return False
-
-
-async def port_forward_dashboard(service_name, namespace):
-    port = await port_forward_service(service_name, namespace, 8787)
-    return port
 
 
 async def get_scheduler_address(
