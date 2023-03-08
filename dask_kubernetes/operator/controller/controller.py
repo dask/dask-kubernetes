@@ -344,10 +344,12 @@ async def retire_workers(
             allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
-            return await scheduler_comm.workers_to_close(
+            workers_to_close = await scheduler_comm.workers_to_close(
                 n=n_workers,
                 attribute="name",
             )
+            await scheduler_comm.retire_workers(names=workers_to_close)
+            return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
     logger.info(
