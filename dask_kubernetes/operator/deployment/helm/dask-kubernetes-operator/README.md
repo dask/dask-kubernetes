@@ -20,6 +20,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `serviceAccount.create` | Create a service account for the operator to use | `true` |
 | `serviceAccount.annotations` | Annotations to add to the service account | `{}` |
 | `serviceAccount.name` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""` |
+| `rbac.create` | Create a cluster role needed by the operator and bind it to the service account | `true` |
 | `podAnnotations` | Extra annotations for the operator pod | `{}` |
 | `podSecurityContext` | Security context for the operator pod | `{}` |
 | `securityContext` | Security context for the operator container | `{}` |

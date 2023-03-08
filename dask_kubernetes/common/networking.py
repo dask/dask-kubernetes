@@ -10,7 +10,9 @@ from tornado.iostream import StreamClosedError
 
 from distributed.core import rpc
 
-from .utils import check_dependency
+from dask_kubernetes.common.utils import check_dependency
+from dask_kubernetes.aiopykube.objects import Pod
+from dask_kubernetes.exceptions import CrashLoopBackOffError
 
 
 async def get_internal_address_for_scheduler_service(
@@ -30,7 +32,7 @@ async def get_internal_address_for_scheduler_service(
         with suppress(socket.gaierror):
             # Try to resolve the service name. If we are inside the cluster this should succeed.
             host = f"{service.metadata.name}.{service.metadata.namespace}"
-            if _is_service_available(
+            if await _is_service_available(
                 host=host, port=port, retries=service_name_resolution_retries
             ):
                 return f"tcp://{host}:{port}"
@@ -69,7 +71,7 @@ async def get_external_address_for_scheduler_service(
             with suppress(socket.gaierror):
                 # Try to resolve the service name. If we are inside the cluster this should succeed.
                 host = f"{service.metadata.name}.{service.metadata.namespace}"
-                if _is_service_available(
+                if await _is_service_available(
                     host=host, port=port, retries=service_name_resolution_retries
                 ):
                     return f"tcp://{host}:{port}"
@@ -83,14 +85,14 @@ async def get_external_address_for_scheduler_service(
     return f"tcp://{host}:{port}"
 
 
-def _is_service_available(host, port, retries=20):
+async def _is_service_available(host, port, retries=20):
     for i in range(retries):
         try:
-            return socket.getaddrinfo(host, port)
+            return await asyncio.get_event_loop().getaddrinfo(host, port)
         except socket.gaierror as e:
             if i >= retries - 1:
                 raise e
-            time.sleep(0.5)
+            await asyncio.sleep(0.5)
 
 
 def _port_in_use(port):
@@ -191,23 +193,34 @@ async def get_scheduler_address(
         return address
 
 
-async def wait_for_scheduler(cluster_name, namespace):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        watch = kubernetes.watch.Watch()
-        async for event in watch.stream(
-            func=api.list_namespaced_pod,
-            namespace=namespace,
-            label_selector=f"dask.org/cluster-name={cluster_name},dask.org/component=scheduler",
-            timeout_seconds=60,
-        ):
-            if event["object"].status.conditions:
-                conditions = {
-                    c.type: c.status for c in event["object"].status.conditions
-                }
-                if "Ready" in conditions and conditions["Ready"] == "True":
-                    watch.stop()
-            await asyncio.sleep(0.1)
+async def wait_for_scheduler(api, cluster_name, namespace, timeout=None):
+    pod_start_time = None
+    while True:
+        pod = await Pod.objects(api, namespace=namespace).get_by_name(
+            cluster_name + "-scheduler"
+        )
+        phase = pod.obj["status"]["phase"]
+        if phase == "Running":
+            if not pod_start_time:
+                pod_start_time = time.time()
+            conditions = {
+                c["type"]: c["status"] for c in pod.obj["status"]["conditions"]
+            }
+            if "Ready" in conditions and conditions["Ready"] == "True":
+                return
+            if "containerStatuses" in pod.obj["status"]:
+                for container in pod.obj["status"]["containerStatuses"]:
+                    if (
+                        "waiting" in container["state"]
+                        and container["state"]["waiting"]["reason"]
+                        == "CrashLoopBackOff"
+                        and timeout
+                        and pod_start_time + timeout < time.time()
+                    ):
+                        raise CrashLoopBackOffError(
+                            f"Scheduler in CrashLoopBackOff for more than {timeout} seconds."
+                        )
+        await asyncio.sleep(0.25)
 
 
 async def wait_for_scheduler_comm(address):
