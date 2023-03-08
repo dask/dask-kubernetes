@@ -60,12 +60,12 @@ We can also check the operator pod is running:
 Single namespace
 ^^^^^^^^^^^^^^^^
 
-By default the controller is installed with a ``ClusterRole`` and watches all namespaced.
+By default the controller is installed with a ``ClusterRole`` and watches all namespaces.
 You can also just install it into a single namespace by setting the following options.
 
 .. code-block:: console
 
-    $ helm install -n my-namespace --generate-name dask/dask-kubernetes-operator --set rbac.cluster=false --set kopfArgs="{--namespace=my-namespace}"
+   $ helm install -n my-namespace --generate-name dask/dask-kubernetes-operator --set rbac.cluster=false --set kopfArgs="{--namespace=my-namespace}"
    NAME: dask-kubernetes-operator-1749875935
    NAMESPACE: my-namespace
    STATUS: deployed
