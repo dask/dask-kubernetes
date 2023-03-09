@@ -4,6 +4,7 @@ from dask.distributed import Client
 from distributed.utils import TimeoutError
 
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
+from dask_kubernetes.exceptions import SchedulerStartupError
 
 
 def test_experimental_shim():
@@ -119,6 +120,16 @@ def test_cluster_without_operator(docker_image):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
 
 
+def test_cluster_crashloopbackoff(kopf_runner, docker_image):
+    with kopf_runner:
+        with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
+            spec = make_cluster_spec(name="foo", n_workers=1)
+            spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
+                0
+            ] = "dask-schmeduler"
+            KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
+
+
 def test_adapt(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
@@ -128,7 +139,8 @@ def test_adapt(kopf_runner, docker_image):
         ) as cluster:
             cluster.adapt(minimum=0, maximum=1)
             with Client(cluster) as client:
-                assert client.submit(lambda x: x + 1, 10).result() == 11
+                f = client.submit(lambda x: x + 1, 10)
+                assert f.result() == 11
 
             # Need to clean up the DaskAutoscaler object
             # See https://github.com/dask/dask-kubernetes/issues/546
