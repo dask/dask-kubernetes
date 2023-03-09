@@ -493,7 +493,7 @@ async def daskworkergroup_replica_update(
                 )
 
 
-@kopf.on.delete("daskworkergroup.kubernetes.dask.org")
+@kopf.on.delete("daskworkergroup.kubernetes.dask.org", optional=True)
 async def daskworkergroup_remove(name, namespace, **kwargs):
     lock_key = f"{name}/{namespace}"
     if lock_key in worker_group_scale_locks:
