@@ -1,8 +1,8 @@
-{{- if and .Values.rbac.create .Values.rbac.cluster }}
+{{- if and .Values.rbac.create (not .Values.rbac.cluster) }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: {{ include "dask_kubernetes_operator.serviceAccountName" . }}-role-cluster
+  name: {{ include "dask_kubernetes_operator.serviceAccountName" . }}-role
 rules:
   # Framework: knowing which other operators are running (i.e. peering).
   - apiGroups: [kopf.dev]

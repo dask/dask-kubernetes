@@ -57,6 +57,23 @@ We can also check the operator pod is running:
     Please note that `Helm does not support updating or deleting CRDs. <https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations>`_ If updates
     are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs or delete/reinstall the Dask Operator.
 
+Single namespace
+^^^^^^^^^^^^^^^^
+
+By default the controller is installed with a ``ClusterRole`` and watches all namespaces.
+You can also just install it into a single namespace by setting the following options.
+
+.. code-block:: console
+
+   $ helm install -n my-namespace --generate-name dask/dask-kubernetes-operator --set rbac.cluster=false --set kopfArgs="{--namespace=my-namespace}"
+   NAME: dask-kubernetes-operator-1749875935
+   NAMESPACE: my-namespace
+   STATUS: deployed
+   REVISION: 1
+   TEST SUITE: None
+   NOTES:
+   Operator has been installed successfully.
+
 Installing with Manifests
 -------------------------
 
