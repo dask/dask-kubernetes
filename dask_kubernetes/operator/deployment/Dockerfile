@@ -11,4 +11,5 @@ WORKDIR /src/dask_kubernetes
 RUN pip install .
 
 # Start operator
-CMD kopf run -m dask_kubernetes.operator.controller --verbose --all-namespaces
+ENTRYPOINT ["/usr/local/bin/kopf", "run", "-m", "dask_kubernetes.operator.controller"]
+CMD ["--liveness=http://0.0.0.0:8080/healthz", "--verbose", "--all-namespaces"]

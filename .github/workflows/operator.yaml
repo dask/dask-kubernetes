@@ -6,6 +6,7 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
   push:
     paths:
@@ -13,9 +14,25 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
+      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Lint Helm Chart
+        run: helm lint dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
+      - name: Download Pluto
+        uses: FairwindsOps/pluto/github-action@v5.11.1
+      - name: Check for deprecated APIs
+        run: helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator | pluto detect -
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -46,7 +63,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/operator
+        run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
       - name: Debug k8s resources
-        if: success() || failure()
+        if: always()
         run: kubectl get all -A

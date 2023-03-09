@@ -138,3 +138,7 @@ credentials.csv
 *.pub
 *.rdp
 *_rsa
+
+# IDEs
+.idea/
+.vscode/

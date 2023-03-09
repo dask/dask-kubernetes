@@ -3,6 +3,8 @@ kind: DaskCluster
 metadata:
   name: simple
   namespace: default
+  labels:
+    test-label: "label-value"
   annotations:
     test-annotation: "annotation-value"
     "kopf.zalando.org/foobar": "should-not-be-propagated"

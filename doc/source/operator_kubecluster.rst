@@ -90,8 +90,8 @@ Additional worker groups can also be deleted in Python.
 
 Any additional worker groups you create will be deleted when the cluster is deleted.
 
-Custom cluster spec
--------------------
+Customising your cluster
+------------------------
 
 The ``KubeCluster`` class can take a selection of keyword arguments to make it quick and easy to get started, however the underlying :doc:`DaskCluster <operator_resources>` resource can be much more complex and configured in many ways.
 Rather than exposing every possibility via keyword arguments instead you can pass a valid ``DaskCluster`` resource spec which will be used when creating the cluster.
@@ -136,6 +136,36 @@ The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`
 
    cluster.add_worker_group(custom_spec=worker_spec)
 
+Private container registry
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+One common use case where ``make_cluster_spec`` comes in handy is when pulling container images from a private registry.
+The `Kubernetes documentation <https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/>`_ suggests creating a ``Secret`` with your registry credentials and then set the ``imagePullSecrets`` option in the ``Pod`` spec.
+The ``KubeCluster`` class doesn't expose any way to set ``imagePullSecrets`` so we will need to generate a spec and update it before creating the cluster.
+Thankfully ``make_pod_spec`` makes this quick and painless.
+
+.. code-block:: console
+
+   $ kubectl create secret docker-registry regcred \
+         --docker-server=<your-registry-server> \
+         --docker-username=<your-name> \
+         --docker-password=<your-pword> \
+         --docker-email=<your-email>
+
+.. code-block:: python
+
+   from dask_kubernetes.operator import KubeCluster, make_cluster_spec
+
+   # Generate the spec
+   spec = make_cluster_spec(name="custom", image="foo.com/jacobtomlinson/dask:latest")
+
+   # Set the imagePullSecrets for the scheduler and worker pods
+   spec["spec"]["worker"]["spec"]["imagePullSecrets"] = [{"name": "regcred"}]
+   spec["spec"]["scheduler"]["spec"]["imagePullSecrets"] = [{"name": "regcred"}]
+
+   # Create the cluster
+   cluster = KubeCluster(custom_cluster_spec=spec)
+
 Role-Based Access Control (RBAC)
 --------------------------------
 
@@ -164,7 +194,7 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
        - "list"
        - "watch"
 
-     - apiGroups: 
+     - apiGroups:
        - ""  # indicates the core API group
        resources: [services]
        verbs:
@@ -183,7 +213,7 @@ following ClusterRole to that ServiceAccount via a ClusterRoleBinding:
    subjects:
      - kind: ServiceAccount
        name: dask-sa  # adjust name based on the service account you created
-  
+
 
 .. _api:
 

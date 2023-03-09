@@ -12,6 +12,9 @@ serviceAccount:
   annotations: {}  # Annotations to add to the service account
   name: ""  # The name of the service account to use. If not set and create is true, a name is generated using the fullname template.
 
+rbac:
+  create: true # Create a cluster role needed by the operator and bind it to the service account
+
 podAnnotations: {}  # Extra annotations for the operator pod
 
 podSecurityContext: {}  # Security context for the operator pod
@@ -42,3 +45,6 @@ nodeSelector: {}  # Node selector
 tolerations: []  # Tolerations
 
 affinity: {}  # Affinity
+
+kopfArgs: # Command line flags to pass to kopf on start up
+  - --all-namespaces

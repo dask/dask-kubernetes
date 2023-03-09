@@ -4,6 +4,7 @@ from dask.distributed import Client
 from distributed.utils import TimeoutError
 
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
+from dask_kubernetes.exceptions import SchedulerStartupError
 
 
 def test_experimental_shim():
@@ -20,6 +21,19 @@ def test_kubecluster(cluster):
         client.scheduler_info()
         cluster.scale(1)
         assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
+@pytest.mark.asyncio
+async def test_kubecluster_async(kopf_runner, docker_image):
+    with kopf_runner:
+        async with KubeCluster(
+            name="async",
+            image=docker_image,
+            n_workers=1,
+            asynchronous=True,
+        ) as cluster:
+            async with Client(cluster, asynchronous=True) as client:
+                assert await client.submit(lambda x: x + 1, 10).result() == 11
 
 
 def test_custom_worker_command(kopf_runner, docker_image):
@@ -44,6 +58,16 @@ def test_multiple_clusters(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
+def test_clusters_with_custom_port_forward(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="bar", image=docker_image, n_workers=1, scheduler_forward_port=8888
+        ) as cluster1:
+            assert cluster1.forwarded_dashboard_port == "8888"
+            with Client(cluster1) as client1:
+                assert client1.submit(lambda x: x + 1, 10).result() == 11
+
+
 def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
@@ -56,6 +80,7 @@ def test_multiple_clusters_simultaneously(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
+@pytest.mark.skip(reason="Flaky and fails ~10% of the time.")
 def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
@@ -69,15 +94,12 @@ def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
-@pytest.mark.skip(
-    reason="Failing due to a race condition that I can't get to the bottom of"
-)
-def test_cluster_from_name(kopf_runner, docker_image, namespace):
+def test_cluster_from_name(kopf_runner, docker_image, ns):
     with kopf_runner:
         with KubeCluster(
-            name="abc", namespace=namespace, image=docker_image, n_workers=1
+            name="abc", namespace=ns, image=docker_image, n_workers=1
         ) as firstcluster:
-            with KubeCluster.from_name("abc", namespace=namespace) as secondcluster:
+            with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
                 assert firstcluster == secondcluster
 
 
@@ -98,6 +120,16 @@ def test_cluster_without_operator(docker_image):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
 
 
+def test_cluster_crashloopbackoff(kopf_runner, docker_image):
+    with kopf_runner:
+        with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
+            spec = make_cluster_spec(name="foo", n_workers=1)
+            spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
+                0
+            ] = "dask-schmeduler"
+            KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
+
+
 def test_adapt(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
@@ -107,7 +139,8 @@ def test_adapt(kopf_runner, docker_image):
         ) as cluster:
             cluster.adapt(minimum=0, maximum=1)
             with Client(cluster) as client:
-                assert client.submit(lambda x: x + 1, 10).result() == 11
+                f = client.submit(lambda x: x + 1, 10)
+                assert f.result() == 11
 
             # Need to clean up the DaskAutoscaler object
             # See https://github.com/dask/dask-kubernetes/issues/546

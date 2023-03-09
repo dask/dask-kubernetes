@@ -5,6 +5,7 @@ import atexit
 from contextlib import suppress
 from enum import Enum
 import getpass
+import logging
 import os
 import time
 from typing import ClassVar
@@ -24,11 +25,9 @@ from distributed.utils import (
     TimeoutError,
     format_dashboard_link,
 )
+from kubernetes_asyncio.client.exceptions import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.operator.controller import (
-    wait_for_service,
-)
 
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
@@ -36,6 +35,11 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
+from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
+from dask_kubernetes.aiopykube.dask import DaskCluster
+from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
+
+logger = logging.getLogger(__name__)
 
 
 class CreateMode(Enum):
@@ -91,16 +95,21 @@ class KubeCluster(Cluster):
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
     resource_timeout: int (optional)
-        Time in seconds to wait for the controller to take action before giving up.
-        If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase`` by the controller
-        then it is likely the controller isn't running or is malfunctioning and we time out and clean up with a
-        useful error.
+        Time in seconds to wait for Kubernetes resources to enter their expected state.
+        Example: If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase``
+        by the controller then it is likely the controller isn't running or is malfunctioning and we time
+        out and clean up with a useful error.
+        Example 2: If the scheduler Pod enters a ``CrashBackoffLoop`` state for longer than this timeout we
+        give up with a useful error.
         Defaults to ``60`` seconds.
     scheduler_service_type: str (optional)
         Kubernetes service type to use for the scheduler. Defaults to ``ClusterIP``.
     custom_cluster_spec: str | dict (optional)
         Path to a YAML manifest or a dictionary representation of a ``DaskCluster`` resource object which will be
         used to create the cluster instead of generating one from the other keyword arguments.
+    scheduler_forward_port: int (optional)
+        The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
+
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
 
@@ -156,6 +165,7 @@ class KubeCluster(Cluster):
         resource_timeout=None,
         scheduler_service_type=None,
         custom_cluster_spec=None,
+        scheduler_forward_port=None,
         **kwargs,
     ):
 
@@ -199,6 +209,9 @@ class KubeCluster(Cluster):
         self.scheduler_service_type = dask.config.get(
             "kubernetes.scheduler-service-type", override_with=scheduler_service_type
         )
+        self.scheduler_forward_port = dask.config.get(
+            "kubernetes.scheduler-forward-port", override_with=scheduler_forward_port
+        )
 
         if self._custom_cluster_spec:
             if isinstance(self._custom_cluster_spec, str):
@@ -212,7 +225,7 @@ class KubeCluster(Cluster):
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
-
+        self.k8s_api = HTTPClient(KubeConfig.from_env())
         self._instances.add(self)
 
         super().__init__(name=name, **kwargs)
@@ -237,12 +250,21 @@ class KubeCluster(Cluster):
             await self._connect_cluster()
         elif not cluster_exists and self.create_mode == CreateMode.CONNECT_ONLY:
             raise ValueError(
-                f"Cluster {self.name} doesn't and create mode is '{CreateMode.CONNECT_ONLY}'"
+                f"Cluster {self.name} doesn't already exist and create "
+                f"mode is '{CreateMode.CONNECT_ONLY}'"
             )
         else:
             await self._create_cluster()
 
         await super()._start()
+
+    def __await__(self):
+        async def _():
+            if self.status == Status.created:
+                await self._start()
+            return self
+
+        return _().__await__()
 
     async def _create_cluster(self):
         if self.shutdown_on_close is None:
@@ -283,16 +305,34 @@ class KubeCluster(Cluster):
             except TimeoutError as e:
                 await self._close()
                 raise e
-            await wait_for_scheduler(self.name, self.namespace)
+            try:
+                await wait_for_scheduler(
+                    self.k8s_api,
+                    self.name,
+                    self.namespace,
+                    timeout=self._resource_timeout,
+                )
+            except CrashLoopBackOffError as e:
+                logs = await self._get_logs()
+                await self._close()
+                raise SchedulerStartupError(
+                    "Scheduler failed to start.",
+                    "Scheduler Pod logs:",
+                    logs[self.name + "-scheduler"],
+                ) from e
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
+            local_port = self.scheduler_forward_port
+            if local_port:
+                local_port = int(local_port)
             dashboard_address = await get_scheduler_address(
                 f"{self.name}-scheduler",
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -314,16 +354,22 @@ class KubeCluster(Cluster):
             else:
                 self.env = {}
             service_name = f"{cluster_spec['metadata']['name']}-scheduler"
-            await wait_for_scheduler(self.name, self.namespace)
+            await wait_for_scheduler(
+                self.k8s_api, self.name, self.namespace, timeout=self._resource_timeout
+            )
             await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
             await wait_for_scheduler_comm(scheduler_address)
             self.scheduler_comm = rpc(scheduler_address)
+            local_port = self.scheduler_forward_port
+            if local_port:
+                local_port = int(local_port)
             dashboard_address = await get_scheduler_address(
                 service_name,
                 self.namespace,
                 port_name="http-dashboard",
                 port_forward_cluster_ip=self.port_forward_cluster_ip,
+                local_port=local_port,
             )
             self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
@@ -351,22 +397,18 @@ class KubeCluster(Cluster):
 
     async def _wait_for_controller(self):
         """Wait for the operator to set the status.phase."""
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            watch = kubernetes.watch.Watch()
-            async for event in watch.stream(
-                func=custom_objects_api.list_namespaced_custom_object,
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace=self.namespace,
-                field_selector=f"metadata.name={self.name}",
-                timeout_seconds=self._resource_timeout,
+        start = time.time()
+        while start + self._resource_timeout > time.time():
+            cluster = await DaskCluster.objects(
+                self.k8s_api, namespace=self.namespace
+            ).get_by_name(self.name)
+            if (
+                "status" in cluster.obj
+                and "phase" in cluster.obj["status"]
+                and cluster.obj["status"]["phase"] == "Running"
             ):
-                cluster = event["object"]
-                if "status" in cluster and "phase" in cluster["status"]:
-                    return
-                await asyncio.sleep(0.1)
+                return
+            await asyncio.sleep(0.1)
         raise TimeoutError(
             f"Dask Cluster resource not actioned after {self._resource_timeout} seconds, is the Dask Operator running?"
         )
@@ -543,13 +585,21 @@ class KubeCluster(Cluster):
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
                 custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-                await custom_objects_api.delete_namespaced_custom_object(
-                    group="kubernetes.dask.org",
-                    version="v1",
-                    plural="daskclusters",
-                    namespace=self.namespace,
-                    name=self.name,
-                )
+                try:
+                    await custom_objects_api.delete_namespaced_custom_object(
+                        group="kubernetes.dask.org",
+                        version="v1",
+                        plural="daskclusters",
+                        namespace=self.namespace,
+                        name=self.name,
+                    )
+                except ApiException as e:
+                    if e.reason == "Not Found":
+                        logger.warning(
+                            "Failed to delete DaskCluster, looks like it has already been deleted."
+                        )
+                    else:
+                        raise
             start = time.time()
             while (await self._get_cluster()) is not None:
                 if time.time() > start + timeout:
@@ -801,8 +851,9 @@ def make_scheduler_spec(
                     ],
                     "readinessProbe": {
                         "httpGet": {"port": "http-dashboard", "path": "/health"},
-                        "initialDelaySeconds": 5,
-                        "periodSeconds": 10,
+                        "initialDelaySeconds": 0,
+                        "periodSeconds": 1,
+                        "timeoutSeconds": 300,
                     },
                     "livenessProbe": {
                         "httpGet": {"port": "http-dashboard", "path": "/health"},
@@ -834,6 +885,26 @@ def make_scheduler_spec(
             ],
         },
     }
+
+
+async def wait_for_service(api, service_name, namespace):
+    """Block until service is available."""
+    while True:
+        try:
+            service = await api.read_namespaced_service(service_name, namespace)
+
+            # If the service is of type LoadBalancer, also wait until it's ready.
+            if (
+                service.spec.type == "LoadBalancer"
+                and len(service.status.load_balancer.ingress or []) == 0
+            ):
+                pass
+            else:
+                break
+        except Exception:
+            pass
+        finally:
+            await asyncio.sleep(0.1)
 
 
 @atexit.register
