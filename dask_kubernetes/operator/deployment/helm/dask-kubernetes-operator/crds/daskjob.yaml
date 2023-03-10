@@ -29,6 +29,9 @@ spec:
                 properties:
                   spec:
                     properties:
+                      autoCleanupTimeout:
+                        default: 0
+                        type: integer
                       scheduler:
                         properties:
                           service:

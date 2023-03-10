@@ -43,6 +43,10 @@ definitions:
         - scheduler
         - worker
         properties:
+          autoCleanupTimeout:
+            type: integer
+            description: Delete cluster if scheduler is idle for longer than this timeout. Set to 0 to never auto cleanup.
+            default: 0
           scheduler:
             $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskScheduler'
           worker:
