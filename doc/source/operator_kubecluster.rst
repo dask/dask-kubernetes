@@ -123,6 +123,17 @@ You can also modify the spec before passing it to ``KubeCluster``, for example i
 
    cluster = KubeCluster(custom_cluster_spec=spec)
 
+You could also have the scheduler run a Jupyter server. With this configuration you can access a Jupyter server via the Dask dashboard.
+
+.. code-block:: python
+
+   from dask_kubernetes.operator import KubeCluster, make_cluster_spec
+
+   spec = make_cluster_spec(name="jupyter-example", n_workers=2, env={"EXTRA_PIP_PACKAGES": "jupyterlab"})
+   spec["spec"]["scheduler"]["spec"]["containers"][0]["args"].append("--jupyter")
+
+   cluster = KubeCluster(custom_cluster_spec=spec)
+
 The ``cluster.add_worker_group()`` method also supports passing a ``custom_spec`` keyword argument which can be generated with :func:`make_worker_spec`.
 
 .. code-block:: python
