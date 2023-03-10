@@ -129,8 +129,8 @@ You could also have the scheduler run a Jupyter server. With this configuration 
 
    from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
-   config = make_cluster_spec(name="jupyter-example", n_workers=2, env={"EXTRA_PIP_PACKAGES": "jupyterlab"})
-   config["spec"]["scheduler"]["spec"]["containers"][0]["args"].append("--jupyter")
+   spec = make_cluster_spec(name="jupyter-example", n_workers=2, env={"EXTRA_PIP_PACKAGES": "jupyterlab"})
+   spec["spec"]["scheduler"]["spec"]["containers"][0]["args"].append("--jupyter")
 
    cluster = KubeCluster(custom_cluster_spec=spec)
 
