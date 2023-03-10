@@ -16,7 +16,8 @@ from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import DaskCluster
-from distributed.core import rpc
+from distributed.core import rpc, clean_exception
+from distributed.protocol.pickle import dumps
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -784,3 +785,36 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
             logger.debug(
                 "Not autoscaling %s with %d workers", spec["cluster"], current_replicas
             )
+
+
+@kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
+async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
+    if spec["autoCleanupTimeout"]:
+        comm_address = await get_scheduler_address(
+            f"{name}-scheduler",
+            namespace,
+            allow_external=False,
+        )
+        async with rpc(comm_address) as scheduler_comm:
+
+            def idle_since(dask_scheduler=None, timeout=None):
+                if not dask_scheduler.idle_timeout:
+                    dask_scheduler.idle_timeout = timeout
+                dask_scheduler.check_idle()
+                return dask_scheduler.idle_since
+
+            response = await scheduler_comm.run_function(
+                function=dumps(idle_since),
+                kwargs=dumps({"timeout": spec["autoCleanupTimeout"]}),
+            )
+            if response["status"] == "error":
+                typ, exc, tb = clean_exception(**response)
+                raise exc.with_traceback(tb)
+            else:
+                idle_since = response["result"]
+            if time.time() > idle_since + spec["autoCleanupTimeout"]:
+                api = HTTPClient(KubeConfig.from_env())
+                cluster = await DaskCluster.objects(
+                    api, namespace=namespace
+                ).get_by_name(name)
+                await cluster.delete()
