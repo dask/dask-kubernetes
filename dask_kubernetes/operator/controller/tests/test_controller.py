@@ -120,6 +120,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 "get", "pods", scheduler_pod_name
             ):
                 await asyncio.sleep(0.1)
+            await asyncio.sleep(10)  # Wait for all components to be ready
             with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
@@ -155,7 +156,11 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-
+            while "Running" not in k8s_cluster.kubectl(
+                "get", "pods", scheduler_pod_name
+            ):
+                await asyncio.sleep(0.1)
+            await asyncio.sleep(10)  # Wait for all components to be ready
             with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
