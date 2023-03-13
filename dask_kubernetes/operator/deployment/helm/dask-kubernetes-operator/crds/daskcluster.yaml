@@ -19,7 +19,7 @@ spec:
         properties:
           spec:
             properties:
-              autoCleanupTimeout:
+              idleTimeout:
                 default: 0
                 type: integer
               scheduler:

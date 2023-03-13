@@ -383,7 +383,7 @@ async def retire_workers(
 
 
 async def check_scheduler_idle(scheduler_service_name, namespace, logger):
-    # Try gracefully retiring via the HTTP API
+    # Try getting idle time via HTTP API
     dashboard_address = await get_scheduler_address(
         scheduler_service_name,
         namespace,
@@ -404,7 +404,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
                 await resp.text(),
             )
 
-    # Otherwise try gracefully retiring via the RPC
+    # Otherwise try gracefully checking via the RPC
     logger.info(
         f"Checking {scheduler_service_name} idleness failed via the HTTP API, falling back to the Dask RPC"
     )
@@ -423,7 +423,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
 
     # Finally fall back to code injection via the Dask RPC for distributed<=2023.3.1
     logger.info(
-        f"Checking {scheduler_service_name} idleness failed via the Dask RPC, falling back to LIFO scaling"
+        f"Checking {scheduler_service_name} idleness failed via the Dask RPC, falling back to run_on_scheduler"
     )
 
     def idle_since(dask_scheduler=None):
@@ -858,13 +858,13 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
-    if spec["autoCleanupTimeout"]:
+    if spec["idleTimeout"]:
         idle, idle_since = await check_scheduler_idle(
             scheduler_service_name=f"{name}-scheduler",
             namespace=namespace,
             logger=logger,
         )
-        if idle and time.time() > idle_since + spec["autoCleanupTimeout"]:
+        if idle and time.time() > idle_since + spec["idleTimeout"]:
             api = HTTPClient(KubeConfig.from_env())
             cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
                 name

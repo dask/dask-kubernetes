@@ -893,7 +893,7 @@ def make_cluster_spec(
         "kind": "DaskCluster",
         "metadata": {"name": name},
         "spec": {
-            "autoCleanupTimeout": idle_timeout,
+            "idleTimeout": idle_timeout,
             "worker": make_worker_spec(
                 env=env,
                 resources=resources,

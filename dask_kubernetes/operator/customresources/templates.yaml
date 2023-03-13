@@ -43,7 +43,7 @@ definitions:
         - scheduler
         - worker
         properties:
-          autoCleanupTimeout:
+          idleTimeout:
             type: integer
             description: Delete cluster if scheduler is idle for longer than this timeout. Set to 0 to never auto cleanup.
             default: 0
