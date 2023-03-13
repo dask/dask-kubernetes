@@ -382,6 +382,75 @@ async def retire_workers(
         return [w["metadata"]["name"] for w in workers.items[:-n_workers]]
 
 
+async def check_scheduler_idle(scheduler_service_name, namespace, logger):
+    # Try gracefully retiring via the HTTP API
+    dashboard_address = await get_scheduler_address(
+        scheduler_service_name,
+        namespace,
+        port_name="http-dashboard",
+        allow_external=False,
+    )
+    async with aiohttp.ClientSession() as session:
+        url = f"{dashboard_address}/api/v1/check_idle"
+        async with session.get(url) as resp:
+            if resp.status <= 300:
+                idle, idle_since = await resp.json().values()
+                if idle:
+                    logger.debug("Scheduler idle since: %s", idle_since)
+                return idle, idle_since
+            logger.debug(
+                "Received %d response from scheduler API with body %s",
+                resp.status,
+                await resp.text(),
+            )
+
+    # Otherwise try gracefully retiring via the RPC
+    logger.info(
+        f"Checking {scheduler_service_name} idleness failed via the HTTP API, falling back to the Dask RPC"
+    )
+    # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
+    with suppress(Exception):
+        comm_address = await get_scheduler_address(
+            scheduler_service_name,
+            namespace,
+            allow_external=False,
+        )
+        async with rpc(comm_address) as scheduler_comm:
+            idle, idle_since = await scheduler_comm.check_idle()
+            if idle:
+                logger.debug("Scheduler idle since: %s", idle_since)
+            return idle, idle_since
+
+    # Finally fall back to code injection via the Dask RPC for distributed<=2023.3.1
+    logger.info(
+        f"Checking {scheduler_service_name} idleness failed via the Dask RPC, falling back to LIFO scaling"
+    )
+
+    def idle_since(dask_scheduler=None):
+        if not dask_scheduler.idle_timeout:
+            dask_scheduler.idle_timeout = 300
+        dask_scheduler.check_idle()
+        return dask_scheduler.idle_since is not None, dask_scheduler.idle_since
+
+    comm_address = await get_scheduler_address(
+        scheduler_service_name,
+        namespace,
+        allow_external=False,
+    )
+    async with rpc(comm_address) as scheduler_comm:
+        response = await scheduler_comm.run_function(
+            function=dumps(idle_since),
+        )
+        if response["status"] == "error":
+            typ, exc, tb = clean_exception(**response)
+            raise exc.with_traceback(tb)
+        else:
+            idle, idle_since = response["result"]
+            if idle:
+                logger.debug("Scheduler idle since: %s", idle_since)
+            return idle, idle_since
+
+
 async def get_desired_workers(scheduler_service_name, namespace, logger):
     # Try gracefully retiring via the HTTP API
     dashboard_address = await get_scheduler_address(
@@ -790,31 +859,14 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
     if spec["autoCleanupTimeout"]:
-        comm_address = await get_scheduler_address(
-            f"{name}-scheduler",
-            namespace,
-            allow_external=False,
+        idle, idle_since = await check_scheduler_idle(
+            scheduler_service_name=f"{name}-scheduler",
+            namespace=namespace,
+            logger=logger,
         )
-        async with rpc(comm_address) as scheduler_comm:
-
-            def idle_since(dask_scheduler=None, timeout=None):
-                if not dask_scheduler.idle_timeout:
-                    dask_scheduler.idle_timeout = timeout
-                dask_scheduler.check_idle()
-                return dask_scheduler.idle_since
-
-            response = await scheduler_comm.run_function(
-                function=dumps(idle_since),
-                kwargs=dumps({"timeout": spec["autoCleanupTimeout"]}),
+        if idle and time.time() > idle_since + spec["autoCleanupTimeout"]:
+            api = HTTPClient(KubeConfig.from_env())
+            cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
+                name
             )
-            if response["status"] == "error":
-                typ, exc, tb = clean_exception(**response)
-                raise exc.with_traceback(tb)
-            else:
-                idle_since = response["result"]
-            if time.time() > idle_since + spec["autoCleanupTimeout"]:
-                api = HTTPClient(KubeConfig.from_env())
-                cluster = await DaskCluster.objects(
-                    api, namespace=namespace
-                ).get_by_name(name)
-                await cluster.delete()
+            await cluster.delete()
