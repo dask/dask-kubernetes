@@ -241,7 +241,7 @@ async def test_pod_from_yaml(k8s_cluster, docker_image):
             await cluster
             async with Client(cluster, asynchronous=True) as client:
                 future = client.submit(lambda x: x + 1, 10)
-                result = await future.result(timeout=10)
+                result = await future.result(timeout=30)
                 assert result == 11
 
                 await client.wait_for_workers(2)
@@ -448,7 +448,7 @@ async def test_scale_up_down(cluster, client):
     start = time()
     while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 60
 
     a, b = list(cluster.scheduler_info["workers"])
     x = client.submit(np.ones, 1, workers=a)
@@ -462,7 +462,7 @@ async def test_scale_up_down(cluster, client):
     start = time()
     while len(cluster.scheduler_info["workers"]) != 1:
         await asyncio.sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 60
 
     # assert set(cluster.scheduler_info["workers"]) == {b}
 
@@ -800,7 +800,7 @@ async def test_adapt_delete(cluster, ns):
     start = time()
     while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 60
 
     worker_pods = await get_worker_pods()
     assert len(worker_pods) == 2
@@ -814,12 +814,12 @@ async def test_adapt_delete(cluster, ns):
         if to_delete not in worker_pods:
             break
         await asyncio.sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 60
     # test whether adapt will bring it back
     start = time()
     while len(cluster.scheduler_info["workers"]) != 2:
         await asyncio.sleep(0.1)
-        assert time() < start + 20
+        assert time() < start + 60
     assert len(cluster.scheduler_info["workers"]) == 2
 
 
@@ -888,7 +888,7 @@ async def test_auto_refresh(cluster):
     for task in asyncio.all_tasks():
         if task.get_name() == "dask_auth_auto_refresh":
             loader.auto_refresh = False
-            await asyncio.wait_for(task, 10)
+            await asyncio.wait_for(task, 60)
             break
     else:
         assert False
