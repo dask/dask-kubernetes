@@ -61,7 +61,7 @@ Worker Groups
 A ``DaskWorkerGroup`` represents a homogenous group of workers that can be scaled. The resource is similar to a native Kubernetes ``Deployment`` in that it manages a group of workers
 with some intelligence around the ``Pod`` lifecycle. A worker group must be attached to a Dask Cluster resource in order to function.
 
-All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>` on the
+All `Kubernetes annotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`__ on the
 ``DaskWorkerGroup`` resource will be passed onto worker ``Pod`` resources. Annotations created by `kopf` or
 `kubectl` (i.e. starting with "kopf.zalando.org" or "kubectl.kubernetes.io") will not be passed on.
 
