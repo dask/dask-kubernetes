@@ -12,6 +12,13 @@ spec:
     spec:
       containers:
         - name: job
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: 500Mi
+            requests:
+              cpu: "0.5"
+              memory: 500Mi
           image: "dask-kubernetes:dev"
           imagePullPolicy: "IfNotPresent"
           args:
@@ -26,6 +33,13 @@ spec:
         spec:
           containers:
             - name: worker
+              resources:
+                limits:
+                  cpu: "0.5"
+                  memory: 500Mi
+                requests:
+                  cpu: "0.5"
+                  memory: 500Mi
               image: "dask-kubernetes:dev"
               imagePullPolicy: "IfNotPresent"
               args:
@@ -39,6 +53,13 @@ spec:
         spec:
           containers:
             - name: scheduler
+              resources:
+                limits:
+                  cpu: "0.5"
+                  memory: 500Mi
+                requests:
+                  cpu: "0.5"
+                  memory: 500Mi
               image: "dask-kubernetes:dev"
               imagePullPolicy: "IfNotPresent"
               args:
