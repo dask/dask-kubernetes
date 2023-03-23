@@ -317,8 +317,30 @@ def _assert_final_job_status(job, job_status, expected_status):
     }
 
 
+@pytest.fixture
+def default_resource_quota(k8s_cluster, tmp_path):
+    quota_file = tmp_path / "default_resource_quota.yaml"
+    with quota_file.open("w") as f:
+        f.write(
+            """
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: default-quota
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 1Gi
+            """
+        )
+
+    k8s_cluster.kubectl("apply", "-n", "default", "-f", str(quota_file))
+    yield
+    k8s_cluster.kubectl("delete", "-n", "default", "quota/default-quota")
+
+
 @pytest.mark.asyncio
-async def test_job(k8s_cluster, kopf_runner, gen_job):
+async def test_job(k8s_cluster, default_resource_quota, kopf_runner, gen_job):
     with kopf_runner as runner:
         async with gen_job("simplejob.yaml") as job:
             assert job
