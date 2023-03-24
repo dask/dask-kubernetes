@@ -9,7 +9,7 @@ from uuid import uuid4
 import aiohttp
 import kopf
 import kubernetes_asyncio as kubernetes
-from dask.compatibility import entry_points
+from importlib_metadata import entry_points
 from kubernetes_asyncio.client import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
