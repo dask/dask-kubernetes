@@ -1,0 +1,41 @@
+{{- if and .Values.metrics.scheduler.enabled .Values.metrics.scheduler.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "dask_kubernetes_operator.fullname" . }}-scheduler-servicemonitor
+  {{- with .Values.metrics.scheduler.serviceMonitor.namespace }}
+  namespace: {{ . | quote }}
+  {{- end }}
+  labels:
+    {{- include "dask_kubernetes_operator.labels" . | nindent 4 }}
+    dask.org/component: scheduler
+    {{- with .Values.metrics.scheduler.serviceMonitor.additionalLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - interval: {{ .Values.metrics.scheduler.serviceMonitor.interval }}
+      port: http-dashboard
+      {{- with .Values.metrics.scheduler.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- . | toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.metrics.scheduler.serviceMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- .Values.metrics.scheduler.serviceMonitor.namespaceSelector | toYaml | nindent 4 }}
+  {{ else }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- end }}
+  {{- with .Values.metrics.scheduler.serviceMonitor.jobLabel }}
+  jobLabel: {{ . }}
+  {{- end }}
+  {{- with .Values.metrics.scheduler.serviceMonitor.targetLabels }}
+  targetLabels:
+    {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      dask.org/component: "scheduler"
+{{- end }}
