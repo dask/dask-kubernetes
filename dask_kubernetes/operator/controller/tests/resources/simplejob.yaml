@@ -37,7 +37,7 @@ spec:
                 - "8788"
               ports:
                 - name: http-dashboard
-                  containerPort: 8787
+                  containerPort: 8788
                   protocol: TCP
               env:
                 - name: WORKER_ENV

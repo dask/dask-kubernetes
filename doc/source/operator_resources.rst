@@ -69,7 +69,7 @@ Let's create an example called ``cluster.yaml`` with the following configuration
               - "8788"
             ports:
               - name: http-dashboard
-                containerPort: 8787
+                containerPort: 8788
                 protocol: TCP
       scheduler:
         spec:
@@ -276,7 +276,7 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
               - "8788"
             ports:
               - name: http-dashboard
-                containerPort: 8787
+                containerPort: 8788
                 protocol: TCP
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
@@ -382,6 +382,13 @@ Let's create an example called ``job.yaml`` with the following configuration:
                     - dask-worker
                     - --name
                     - $(DASK_WORKER_NAME)
+                    - --dashboard
+                    - --dashboard-address
+                    - "8788"
+                  ports:
+                    - name: http-dashboard
+                      containerPort: 8788
+                      protocol: TCP
                   env:
                     - name: WORKER_ENV
                       value: hello-world # We dont test the value, just the name
