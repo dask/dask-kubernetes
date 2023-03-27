@@ -28,6 +28,13 @@ spec:
                 - dask-worker
                 - --name
                 - $(DASK_WORKER_NAME)
+                - --dashboard
+                - --dashboard-address
+                - "8788"
+              ports:
+                - name: http-dashboard
+                  containerPort: 8787
+                  protocol: TCP
       scheduler:
         spec:
           containers:
