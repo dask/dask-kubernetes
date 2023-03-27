@@ -21,6 +21,13 @@ spec:
             - dask-worker
             - --name
             - $(DASK_WORKER_NAME)
+            - --dashboard
+            - --dashboard-address
+            - "8788"
+          ports:
+            - name: http-dashboard
+              containerPort: 8788
+              protocol: TCP
           env:
             - name: WORKER_ENV
               value: hello-world # We don't test the value, just the name

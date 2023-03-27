@@ -64,6 +64,13 @@ Let's create an example called ``cluster.yaml`` with the following configuration
               - dask-worker
               - --name
               - $(DASK_WORKER_NAME)
+              - --dashboard
+              - --dashboard-address
+              - "8788"
+            ports:
+              - name: http-dashboard
+                containerPort: 8788
+                protocol: TCP
       scheduler:
         spec:
           containers:
@@ -264,6 +271,13 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
               - $(DASK_WORKER_NAME)
               - --resources
               - MEMORY=32e9
+              - --dashboard
+              - --dashboard-address
+              - "8788"
+            ports:
+              - name: http-dashboard
+                containerPort: 8788
+                protocol: TCP
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
 the workers to join that cluster.
@@ -368,6 +382,13 @@ Let's create an example called ``job.yaml`` with the following configuration:
                     - dask-worker
                     - --name
                     - $(DASK_WORKER_NAME)
+                    - --dashboard
+                    - --dashboard-address
+                    - "8788"
+                  ports:
+                    - name: http-dashboard
+                      containerPort: 8788
+                      protocol: TCP
                   env:
                     - name: WORKER_ENV
                       value: hello-world # We dont test the value, just the name

@@ -916,7 +916,13 @@ def make_worker_spec(
     if isinstance(worker_command, str):
         worker_command = worker_command.split(" ")
 
-    args = worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+    args = worker_command + [
+        "--name",
+        "$(DASK_WORKER_NAME)",
+        "--dashboard",
+        "--dashboard-address",
+        "8788",
+    ]
 
     return {
         "replicas": n_workers,
@@ -928,6 +934,13 @@ def make_worker_spec(
                     "args": args,
                     "env": env,
                     "resources": resources,
+                    "ports": [
+                        {
+                            "name": "http-dashboard",
+                            "containerPort": 8788,
+                            "protocol": "TCP",
+                        },
+                    ],
                 }
             ]
         },
