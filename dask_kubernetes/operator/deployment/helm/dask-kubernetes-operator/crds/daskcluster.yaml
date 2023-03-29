@@ -21,6 +21,17 @@ spec:
             properties:
               scheduler:
                 properties:
+                  metadata:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
                   service:
                     properties:
                       allocateLoadBalancerNodePorts:
@@ -3000,6 +3011,17 @@ spec:
                 type: object
               worker:
                 properties:
+                  metadata:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
                   replicas:
                     default: 1
                     type: integer

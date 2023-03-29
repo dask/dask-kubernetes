@@ -19,6 +19,8 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
+            metadata:
+              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.SimpleObjectMeta'
             status:
               properties:
                 clusterName:
