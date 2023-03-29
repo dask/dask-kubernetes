@@ -74,6 +74,32 @@ You can also just install it into a single namespace by setting the following op
    NOTES:
    Operator has been installed successfully.
 
+Prometheus
+^^^^^^^^^^
+
+The operator helm chart also contains some optional `ServiceMonitor` and `PodMonitor` resources to enable Prometheus scraping of Dask components.
+As not all clusters have the Prometheus operator installed these are disabled by default. You can enable them with the following comfig options.
+
+.. code-block:: yaml
+
+   metrics:
+      scheduler:
+         enabled: true
+         serviceMonitor:
+            enabled: true
+      worker:
+         enabled: true
+         serviceMonitor:
+            enabled: true
+
+You'll also need to ensure the container images you choose for your Dask components have the ``prometheus_client`` library installed.
+If you're using the official Dask images you can install this at runtime.
+
+.. code-block:: python
+
+   from dask_kubernetes.operator import KubeCluster
+   cluster = KubeCluster(name="monitored", env={"EXTRA_PIP_PACKAGES": "prometheus_client"})
+
 Installing with Manifests
 -------------------------
 

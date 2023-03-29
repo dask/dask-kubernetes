@@ -1,0 +1,41 @@
+{{- if and .Values.metrics.worker.enabled .Values.metrics.worker.podMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "dask_kubernetes_operator.fullname" . }}-worker-podmonitor
+  {{- with .Values.metrics.worker.podMonitor.namespace }}
+  namespace: {{ . | quote }}
+  {{- end }}
+  labels:
+    {{- include "dask_kubernetes_operator.labels" . | nindent 4 }}
+    dask.org/component: worker
+    {{- with .Values.metrics.worker.podMonitor.additionalLabels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  podMetricsEndpoints:
+    - interval: {{ .Values.metrics.worker.podMonitor.interval }}
+      port: http-dashboard
+      {{- with .Values.metrics.worker.podMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- . | toYaml | nindent 8 }}
+      {{- end }}
+  {{- if .Values.metrics.worker.podMonitor.namespaceSelector }}
+  namespaceSelector:
+    {{- .Values.metrics.worker.podMonitor.namespaceSelector | toYaml | nindent 4 }}
+  {{- else }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  {{- end }}
+  {{- with .Values.metrics.worker.podMonitor.jobLabel }}
+  jobLabel: {{ . }}
+  {{- end }}
+  {{- with .Values.metrics.worker.podMonitor.targetLabels }}
+  podTargetLabels:
+    {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      dask.org/component: "worker"
+{{- end }}
