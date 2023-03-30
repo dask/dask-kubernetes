@@ -19,8 +19,6 @@ spec:
         openAPIV3Schema:
           type: object
           properties:
-            metadata:
-              $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.SimpleObjectMeta'
             status:
               properties:
                 clusterName:
@@ -51,6 +49,8 @@ spec:
                 job:
                   type: object
                   properties:
+                    metadata:
+                      $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.SimpleObjectMeta'
                     spec:
                       $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
                 cluster:
