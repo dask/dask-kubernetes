@@ -100,6 +100,11 @@ If you're using the official Dask images you can install this at runtime.
    from dask_kubernetes.operator import KubeCluster
    cluster = KubeCluster(name="monitored", env={"EXTRA_PIP_PACKAGES": "prometheus_client"})
 
+Chart Configuration Reference
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. frigate:: dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
+
 Installing with Manifests
 -------------------------
 
