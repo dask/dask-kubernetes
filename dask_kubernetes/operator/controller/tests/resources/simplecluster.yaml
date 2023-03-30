@@ -12,6 +12,11 @@ metadata:
 spec:
   worker:
     replicas: 2
+    metadata:
+      labels:
+        worker-sublabel: "label-value"
+      annotations:
+        worker-subannotation: "annotation-value"
     spec:
       containers:
         - name: worker
@@ -34,9 +39,9 @@ spec:
   scheduler:
     metadata:
       labels:
-        test-sublabel: "label-value"
+        scheduler-sublabel: "label-value"
       annotations:
-        test-subannotation: "annotation-value"
+        scheduler-subannotation: "annotation-value"
     spec:
       containers:
         - name: scheduler
