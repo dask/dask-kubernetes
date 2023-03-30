@@ -32,6 +32,11 @@ spec:
             - name: WORKER_ENV
               value: hello-world # We don't test the value, just the name
   scheduler:
+    metadata:
+      labels:
+        test-sublabel: "label-value"
+      annotations:
+        test-subannotation: "annotation-value"
     spec:
       containers:
         - name: scheduler

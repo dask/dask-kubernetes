@@ -22,6 +22,7 @@ _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
     "kubectl.kubernetes.io",
 )
+_LABEL_NAMESPACES_TO_IGNORE = ()
 
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -38,7 +39,7 @@ class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
 
 
-def _get_dask_cluster_annotations(meta):
+def _get_annotations(meta):
     return {
         annotation_key: annotation_value
         for annotation_key, annotation_value in meta.annotations.items()
@@ -49,33 +50,47 @@ def _get_dask_cluster_annotations(meta):
     }
 
 
-def build_scheduler_pod_spec(cluster_name, spec, annotations):
+def _get_labels(meta):
+    return {
+        label_key: label_value
+        for label_key, label_value in meta.labels.items()
+        if not any(
+            label_key.startswith(namespace) for namespace in _LABEL_NAMESPACES_TO_IGNORE
+        )
+    }
+
+
+def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
+    pod_labels = {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "scheduler",
+        "sidecar.istio.io/inject": "false",
+    }
+    pod_labels.update(**labels)
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": f"{cluster_name}-scheduler",
-            "labels": {
-                "dask.org/cluster-name": cluster_name,
-                "dask.org/component": "scheduler",
-                "sidecar.istio.io/inject": "false",
-            },
+            "labels": pod_labels,
             "annotations": annotations,
         },
         "spec": spec,
     }
 
 
-def build_scheduler_service_spec(cluster_name, spec, annotations):
+def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
+    service_labels = {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "scheduler",
+    }
+    service_labels.update(**labels)
     return {
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
             "name": f"{cluster_name}-scheduler",
-            "labels": {
-                "dask.org/cluster-name": cluster_name,
-                "dask.org/component": "scheduler",
-            },
+            "labels": service_labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -83,22 +98,24 @@ def build_scheduler_service_spec(cluster_name, spec, annotations):
 
 
 def build_worker_pod_spec(
-    worker_group_name, namespace, cluster_name, uuid, spec, annotations
+    worker_group_name, namespace, cluster_name, uuid, spec, annotations, labels
 ):
     spec = copy.deepcopy(spec)
 
+    pod_labels = {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/workergroup-name": worker_group_name,
+        "dask.org/component": "worker",
+        "sidecar.istio.io/inject": "false",
+    }
+    pod_labels.update(**labels)
     worker_name = f"{worker_group_name}-worker-{uuid}"
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": worker_name,
-            "labels": {
-                "dask.org/cluster-name": cluster_name,
-                "dask.org/workergroup-name": worker_group_name,
-                "dask.org/component": "worker",
-                "sidecar.istio.io/inject": "false",
-            },
+            "labels": pod_labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -125,17 +142,19 @@ def get_job_runner_pod_name(job_name):
     return f"{job_name}-runner"
 
 
-def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations):
+def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, labels):
+    pod_labels = {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "job-runner",
+        "sidecar.istio.io/inject": "false",
+    }
+    pod_labels.update(**labels)
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": get_job_runner_pod_name(job_name),
-            "labels": {
-                "dask.org/cluster-name": cluster_name,
-                "dask.org/component": "job-runner",
-                "sidecar.istio.io/inject": "false",
-            },
+            "labels": pod_labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -154,16 +173,18 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations):
     return pod_spec
 
 
-def build_default_worker_group_spec(cluster_name, spec, annotations):
+def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
+    wg_labels = {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "workergroup",
+    }
+    wg_labels.update(**labels)
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
         "metadata": {
             "name": f"{cluster_name}-default",
-            "labels": {
-                "dask.org/cluster-name": cluster_name,
-                "dask.org/component": "workergroup",
-            },
+            "labels": wg_labels,
             "annotations": annotations,
         },
         "spec": {
@@ -173,15 +194,18 @@ def build_default_worker_group_spec(cluster_name, spec, annotations):
     }
 
 
-def build_cluster_spec(name, worker_spec, scheduler_spec):
+def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
+    cluster_labels = {
+        "dask.org/cluster-name": name,
+    }
+    cluster_labels.update(**labels)
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
         "metadata": {
             "name": name,
-            "labels": {
-                "dask.org/cluster-name": name,
-            },
+            "labels": cluster_labels,
+            "annotations": annotations,
         },
         "spec": {"worker": worker_spec, "scheduler": scheduler_spec},
     }
@@ -224,17 +248,27 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
 
 
 @kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Created")
-async def daskcluster_create_components(spec, name, namespace, logger, patch, **kwargs):
+async def daskcluster_create_components(
+    spec, name, namespace, logger, patch, meta, **kwargs
+):
     """When the DaskCluster status.phase goes into Created create the cluster components."""
     logger.info("Creating Dask cluster components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
         api = kubernetes.client.CoreV1Api(api_client)
         custom_api = kubernetes.client.CustomObjectsApi(api_client)
 
-        annotations = _get_dask_cluster_annotations(kwargs["meta"])
+        annotations = _get_annotations(meta)
+        labels = _get_labels(meta)
         # TODO Check for existing scheduler pod
         scheduler_spec = spec.get("scheduler", {})
-        data = build_scheduler_pod_spec(name, scheduler_spec.get("spec"), annotations)
+        if "metadata" in scheduler_spec:
+            if "annotations" in scheduler_spec["metadata"]:
+                annotations.update(**scheduler_spec["metadata"]["annotations"])
+            if "labels" in scheduler_spec["metadata"]:
+                labels.update(**scheduler_spec["metadata"]["labels"])
+        data = build_scheduler_pod_spec(
+            name, scheduler_spec.get("spec"), annotations, labels
+        )
         kopf.adopt(data)
         await api.create_namespaced_pod(
             namespace=namespace,
@@ -244,7 +278,7 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
 
         # TODO Check for existing scheduler service
         data = build_scheduler_service_spec(
-            name, scheduler_spec.get("service"), annotations
+            name, scheduler_spec.get("service"), annotations, labels
         )
         kopf.adopt(data)
         await api.create_namespaced_service(
@@ -256,7 +290,14 @@ async def daskcluster_create_components(spec, name, namespace, logger, patch, **
         )
 
         worker_spec = spec.get("worker", {})
-        data = build_default_worker_group_spec(name, worker_spec, annotations)
+        annotations = _get_annotations(meta)
+        labels = _get_labels(meta)
+        if "metadata" in worker_spec:
+            if "annotations" in worker_spec["metadata"]:
+                annotations.update(**worker_spec["metadata"]["annotations"])
+            if "labels" in worker_spec["metadata"]:
+                labels.update(**worker_spec["metadata"]["labels"])
+        data = build_default_worker_group_spec(name, worker_spec, annotations, labels)
         await custom_api.create_namespaced_custom_object(
             group="kubernetes.dask.org",
             version="v1",
@@ -454,7 +495,14 @@ async def daskworkergroup_replica_update(
             )
             desired_workers = new
             workers_needed = desired_workers - current_workers
-            annotations = _get_dask_cluster_annotations(meta)
+            labels = _get_labels(meta)
+            annotations = _get_annotations(meta)
+            worker_spec = spec["worker"]
+            if "metadata" in worker_spec:
+                if "annotations" in worker_spec["metadata"]:
+                    annotations.update(**worker_spec["metadata"]["annotations"])
+                if "labels" in worker_spec["metadata"]:
+                    labels.update(**worker_spec["metadata"]["labels"])
             if workers_needed > 0:
                 for _ in range(workers_needed):
                     data = build_worker_pod_spec(
@@ -462,8 +510,9 @@ async def daskworkergroup_replica_update(
                         namespace=namespace,
                         cluster_name=cluster_name,
                         uuid=uuid4().hex[:10],
-                        spec=spec["worker"]["spec"],
+                        spec=worker_spec["spec"],
                         annotations=annotations,
+                        labels=labels,
                     )
                     kopf.adopt(data, owner=body)
                     kopf.label(data, labels=cluster_labels)
@@ -509,17 +558,29 @@ async def daskjob_create(name, namespace, logger, patch, **kwargs):
 @kopf.on.field(
     "daskjob.kubernetes.dask.org", field="status.jobStatus", new="JobCreated"
 )
-async def daskjob_create_components(spec, name, namespace, logger, patch, **kwargs):
+async def daskjob_create_components(
+    spec, name, namespace, logger, patch, meta, **kwargs
+):
     logger.info("Creating Dask job components.")
     async with kubernetes.client.api_client.ApiClient() as api_client:
         customobjectsapi = kubernetes.client.CustomObjectsApi(api_client)
         corev1api = kubernetes.client.CoreV1Api(api_client)
 
         cluster_name = f"{name}"
+        labels = _get_labels(meta)
+        annotations = _get_annotations(meta)
+        cluster_spec = spec["cluster"]
+        if "metadata" in cluster_spec:
+            if "annotations" in cluster_spec["metadata"]:
+                annotations.update(**cluster_spec["metadata"]["annotations"])
+            if "labels" in cluster_spec["metadata"]:
+                labels.update(**cluster_spec["metadata"]["labels"])
         cluster_spec = build_cluster_spec(
             cluster_name,
-            spec["cluster"]["spec"]["worker"],
-            spec["cluster"]["spec"]["scheduler"],
+            cluster_spec["spec"]["worker"],
+            cluster_spec["spec"]["scheduler"],
+            annotations,
+            labels,
         )
         kopf.adopt(cluster_spec)
         await customobjectsapi.create_namespaced_custom_object(
@@ -533,13 +594,21 @@ async def daskjob_create_components(spec, name, namespace, logger, patch, **kwar
             f"Cluster {cluster_spec['metadata']['name']} for job {name} created in {namespace}."
         )
 
-        annotations = _get_dask_cluster_annotations(kwargs["meta"])
+        labels = _get_labels(meta)
+        annotations = _get_annotations(meta)
+        job_spec = spec["job"]
+        if "metadata" in job_spec:
+            if "annotations" in job_spec["metadata"]:
+                annotations.update(**job_spec["metadata"]["annotations"])
+            if "labels" in job_spec["metadata"]:
+                labels.update(**job_spec["metadata"]["labels"])
         job_pod_spec = build_job_pod_spec(
             job_name=name,
             cluster_name=cluster_name,
             namespace=namespace,
-            spec=spec["job"]["spec"],
+            spec=job_spec["spec"],
             annotations=annotations,
+            labels=labels,
         )
         kopf.adopt(job_pod_spec)
         await corev1api.create_namespaced_pod(

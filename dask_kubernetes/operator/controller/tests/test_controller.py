@@ -269,6 +269,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 )[1:-1]
             )
             assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert "test-sublabel" in workergroup_labels.items()
 
 
 def _get_job_status(k8s_cluster):
