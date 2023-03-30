@@ -1,5 +1,25 @@
 definitions:
 
+  dask.k8s.api.v1.SimpleObjectMeta:
+    type: object
+    description: SimpleObjectMeta is a subset of io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta.
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: 'Annotations is an unstructured key value map stored with a resource
+          that may be set by external tools to store and retrieve arbitrary metadata.
+          They are not queryable and should be preserved when modifying objects. More
+          info: http://kubernetes.io/docs/user-guide/annotations'
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        description: 'Map of string keys and values that can be used to organize and categorize
+          (scope and select) objects. May match selectors of replication controllers and
+          services. More info: http://kubernetes.io/docs/user-guide/labels'
+        type: object
+
   dask.k8s.api.v1.DaskWorker:
     type: object
     description: Dask Worker configuration
@@ -10,6 +30,8 @@ definitions:
         type: integer
         default: 1
         description: Number of workers to start
+      metadata:
+        $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.SimpleObjectMeta'
       spec:
         $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
 
@@ -20,6 +42,8 @@ definitions:
     - spec
     - service
     properties:
+      metadata:
+        $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.SimpleObjectMeta'
       spec:
         $ref: 'python://k8s_crd_resolver/schemata/k8s-1.21.1.json#/definitions/io.k8s.api.core.v1.PodSpec'
       service:

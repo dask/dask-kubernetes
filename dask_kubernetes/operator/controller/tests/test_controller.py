@@ -245,6 +245,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 )[1:-1]
             )
             assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert "worker-sublabel" in workergroup_labels
 
             # Assert labels from the dask cluster are propagated into the dask scheduler
             scheduler_labels = json.loads(
@@ -256,7 +257,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.labels}'",
                 )[1:-1]
             )
-            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert _EXPECTED_LABELS.items() <= scheduler_labels.items()
+            assert "scheduler-sublabel" in scheduler_labels
 
             # Assert labels from the dask cluster are propagated into the dask worker pod
             worker_labels = json.loads(
@@ -268,7 +270,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.labels}'",
                 )[1:-1]
             )
-            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert _EXPECTED_LABELS.items() <= worker_labels.items()
+            assert "worker-sublabel" in workergroup_labels
 
 
 def _get_job_status(k8s_cluster):
