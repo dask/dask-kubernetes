@@ -61,18 +61,19 @@ def _get_labels(meta):
 
 
 def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
-    pod_labels = {
-        "dask.org/cluster-name": cluster_name,
-        "dask.org/component": "scheduler",
-        "sidecar.istio.io/inject": "false",
-    }
-    pod_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": cluster_name,
+            "dask.org/component": "scheduler",
+            "sidecar.istio.io/inject": "false",
+        }
+    )
     return {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": f"{cluster_name}-scheduler",
-            "labels": pod_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -80,17 +81,18 @@ def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
 
 
 def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
-    service_labels = {
-        "dask.org/cluster-name": cluster_name,
-        "dask.org/component": "scheduler",
-    }
-    service_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": cluster_name,
+            "dask.org/component": "scheduler",
+        }
+    )
     return {
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
             "name": f"{cluster_name}-scheduler",
-            "labels": service_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -101,21 +103,21 @@ def build_worker_pod_spec(
     worker_group_name, namespace, cluster_name, uuid, spec, annotations, labels
 ):
     spec = copy.deepcopy(spec)
-
-    pod_labels = {
-        "dask.org/cluster-name": cluster_name,
-        "dask.org/workergroup-name": worker_group_name,
-        "dask.org/component": "worker",
-        "sidecar.istio.io/inject": "false",
-    }
-    pod_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": cluster_name,
+            "dask.org/workergroup-name": worker_group_name,
+            "dask.org/component": "worker",
+            "sidecar.istio.io/inject": "false",
+        }
+    )
     worker_name = f"{worker_group_name}-worker-{uuid}"
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": worker_name,
-            "labels": pod_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -143,18 +145,19 @@ def get_job_runner_pod_name(job_name):
 
 
 def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, labels):
-    pod_labels = {
-        "dask.org/cluster-name": cluster_name,
-        "dask.org/component": "job-runner",
-        "sidecar.istio.io/inject": "false",
-    }
-    pod_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": cluster_name,
+            "dask.org/component": "job-runner",
+            "sidecar.istio.io/inject": "false",
+        }
+    )
     pod_spec = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
             "name": get_job_runner_pod_name(job_name),
-            "labels": pod_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": spec,
@@ -174,17 +177,18 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
 
 
 def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
-    wg_labels = {
-        "dask.org/cluster-name": cluster_name,
-        "dask.org/component": "workergroup",
-    }
-    wg_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": cluster_name,
+            "dask.org/component": "workergroup",
+        }
+    )
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
         "metadata": {
             "name": f"{cluster_name}-default",
-            "labels": wg_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": {
@@ -195,16 +199,17 @@ def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
 
 
 def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
-    cluster_labels = {
-        "dask.org/cluster-name": name,
-    }
-    cluster_labels.update(**labels)
+    labels.update(
+        **{
+            "dask.org/cluster-name": name,
+        }
+    )
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
         "metadata": {
             "name": name,
-            "labels": cluster_labels,
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": {"worker": worker_spec, "scheduler": scheduler_spec},
