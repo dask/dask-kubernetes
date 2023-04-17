@@ -394,10 +394,10 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
         url = f"{dashboard_address}/api/v1/check_idle"
         async with session.get(url) as resp:
             if resp.status <= 300:
-                idle, idle_since = await resp.json().values()
-                if idle:
+                idle_since = (await resp.json())["idle_since"]
+                if idle_since:
                     logger.debug("Scheduler idle since: %s", idle_since)
-                return idle, idle_since
+                return idle_since
             logger.debug(
                 "Received %d response from scheduler API with body %s",
                 resp.status,
@@ -416,10 +416,10 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
             allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
-            idle, idle_since = await scheduler_comm.check_idle()
-            if idle:
+            idle_since = await scheduler_comm.check_idle()
+            if idle_since:
                 logger.debug("Scheduler idle since: %s", idle_since)
-            return idle, idle_since
+            return idle_since
 
     # Finally fall back to code injection via the Dask RPC for distributed<=2023.3.1
     logger.info(
@@ -430,7 +430,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
         if not dask_scheduler.idle_timeout:
             dask_scheduler.idle_timeout = 300
         dask_scheduler.check_idle()
-        return dask_scheduler.idle_since is not None, dask_scheduler.idle_since
+        return dask_scheduler.idle_since
 
     comm_address = await get_scheduler_address(
         scheduler_service_name,
@@ -445,10 +445,10 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
             typ, exc, tb = clean_exception(**response)
             raise exc.with_traceback(tb)
         else:
-            idle, idle_since = response["result"]
-            if idle:
+            idle_since = response["result"]
+            if idle_since:
                 logger.debug("Scheduler idle since: %s", idle_since)
-            return idle, idle_since
+            return idle_since
 
 
 async def get_desired_workers(scheduler_service_name, namespace, logger):
@@ -859,12 +859,12 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
     if spec["idleTimeout"]:
-        idle, idle_since = await check_scheduler_idle(
+        idle_since = await check_scheduler_idle(
             scheduler_service_name=f"{name}-scheduler",
             namespace=namespace,
             logger=logger,
         )
-        if idle and time.time() > idle_since + spec["idleTimeout"]:
+        if idle_since and time.time() > idle_since + spec["idleTimeout"]:
             api = HTTPClient(KubeConfig.from_env())
             cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
                 name
