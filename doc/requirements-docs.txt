@@ -3,5 +3,4 @@ sphinx
 sphinx-reredirects
 sphinxcontrib-mermaid
 dask-sphinx-theme>=3.0.0
-# Required until frigate==0.7.0 is released
-git+https://github.com/rapidsai/frigate.git@branch-0.7
+frigate>=0.7.0
