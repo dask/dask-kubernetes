@@ -12,7 +12,12 @@ spec:
     singular: daskworkergroup
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: The number of desired worker Pods
+      jsonPath: .spec.worker.replicas
+      name: Workers
+      type: integer
+    name: v1
     schema:
       openAPIV3Schema:
         properties:

@@ -15,6 +15,11 @@ spec:
     - name: v1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: Workers
+          type: integer
+          description: The number of desired worker Pods
+          jsonPath: .spec.worker.replicas
       schema:
         openAPIV3Schema:
           type: object

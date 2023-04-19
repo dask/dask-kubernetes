@@ -16,6 +16,14 @@ spec:
     - name: v1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: Workers
+          type: integer
+          description: The number of desired worker Pods
+          jsonPath: .spec.worker.replicas
+        - name: Status
+          type: string
+          jsonPath: .status.phase
       schema:
         openAPIV3Schema:
           $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskCluster'

@@ -13,7 +13,15 @@ spec:
     singular: daskcluster
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: The number of desired worker Pods
+      jsonPath: .spec.worker.replicas
+      name: Workers
+      type: integer
+    - jsonPath: .status.phase
+      name: Status
+      type: string
+    name: v1
     schema:
       openAPIV3Schema:
         properties:
