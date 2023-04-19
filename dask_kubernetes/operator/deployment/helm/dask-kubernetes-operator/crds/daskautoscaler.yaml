@@ -10,7 +10,21 @@ spec:
     singular: daskautoscaler
   scope: Namespaced
   versions:
-  - name: v1
+  - additionalPrinterColumns:
+    - description: Cluster to autoscale
+      jsonPath: .spec.cluster
+      name: Cluster
+      type: string
+    - jsonPath: .spec.minimum
+      name: Minimum
+      type: integer
+    - jsonPath: .spec.maximum
+      name: Maximum
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
     schema:
       openAPIV3Schema:
         properties:

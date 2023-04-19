@@ -20,6 +20,9 @@ spec:
           type: integer
           description: The number of desired worker Pods
           jsonPath: .spec.worker.replicas
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           type: object

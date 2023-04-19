@@ -19,6 +19,9 @@ spec:
     - jsonPath: .spec.cluster.spec.worker.replicas
       name: Number Of Workers
       type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1
     schema:
       openAPIV3Schema:

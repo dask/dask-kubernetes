@@ -24,10 +24,12 @@ spec:
         - name: Status
           type: string
           jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskCluster'
-
       subresources:
         scale:
           specReplicasPath: .spec.worker.replicas
