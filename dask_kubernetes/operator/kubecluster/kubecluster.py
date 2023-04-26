@@ -230,6 +230,19 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
+        if self.n_workers is not None and not isinstance(self.n_workers, int):
+            raise TypeError(f"n_workers must be an integer, got {type(self.n_workers)}")
+
+        try:
+            # Validate input resources
+            assert "limits" in resources
+            assert isinstance(resources["limits"], dict)
+            assert "CPU" in resources["limits"]
+            assert isinstance(resources["limits"]["CPU"], str)
+        except AssertionError:
+            print("Invalid resource limits format")
+            raise
+
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
