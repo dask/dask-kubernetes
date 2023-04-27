@@ -234,13 +234,17 @@ class KubeCluster(Cluster):
             raise TypeError(f"n_workers must be an integer, got {type(self.n_workers)}")
 
         try:
-            # Validate input resources
-            assert "limits" in resources
-            assert isinstance(resources["limits"], dict)
-            assert "CPU" in resources["limits"]
-            assert isinstance(resources["limits"]["CPU"], str)
-        except AssertionError:
-            print("Invalid resource limits format")
+            # Validate `resources` param is a dictionary whose
+            # keys must either be 'limits' or 'requests'
+            assert isinstance(resources, dict)
+
+            for field in ("limits", "requests"):
+                if field in resources:
+                    assert isinstance(field, dict)
+                else:
+                    print("fields must either be 'limits' or 'requests'")
+        except ValueError:
+            print("Invalid resources field format")
             raise
 
         name = name.format(

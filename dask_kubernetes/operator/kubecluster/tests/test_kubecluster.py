@@ -155,7 +155,7 @@ def test_custom_spec(kopf_runner, docker_image):
                 assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-def test_for_integer_n_workers(kopf_runner):
+def test_for_noninteger_n_workers(kopf_runner):
     with kopf_runner:
         with pytest.raises(TypeError, match="n_workers must be an integer"):
             KubeCluster(name="foo", n_workers="1")
@@ -163,7 +163,7 @@ def test_for_integer_n_workers(kopf_runner):
 
 def test_typo_resource_limits(kopf_runner):
     with kopf_runner:
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError):
             KubeCluster(
                 name="foo",
                 resources={
