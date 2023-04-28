@@ -238,13 +238,13 @@ class KubeCluster(Cluster):
             # keys must either be 'limits' or 'requests'
             assert isinstance(self.resources, dict)
 
-            for field in ("limits", "requests"):
-                if field in self.resources:
+            for field in self.resources:
+                if field in ("limits", "requests"):
                     assert isinstance(self.resources[field], dict)
-                elif field not in self.resources:
+                else:
                     raise ValueError(f"Unknown field '{field}' in resources")
         except TypeError:
-            print("Invalid resources type")
+            print(f"resources must be dict, got '{type(resources)}' type")
             raise
 
         name = name.format(
