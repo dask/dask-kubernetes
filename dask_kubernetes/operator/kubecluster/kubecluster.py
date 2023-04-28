@@ -244,7 +244,7 @@ class KubeCluster(Cluster):
                 else:
                     raise ValueError(f"Unknown field '{field}' in resources")
         except TypeError:
-            print(f"resources must be dict, got '{type(resources)}' type")
+            print(f"invalid '{type(resources)}' for resources type")
             raise
 
         name = name.format(
