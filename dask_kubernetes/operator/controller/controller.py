@@ -81,13 +81,20 @@ def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
 
 
 def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
-    # create new pr
     labels.update(
         **{
             "dask.org/cluster-name": cluster_name,
             "dask.org/component": "scheduler",
         }
     )
+
+    if spec.get("type") == "NodePort":
+        try:
+            node_port = spec["ports"]["nodePort"]
+            assert node_port in range(30000, 32768)
+        except ValueError as e:
+            raise ValueError(f"invalid port '{node_port}' out of range") from e
+
     return {
         "apiVersion": "v1",
         "kind": "Service",
