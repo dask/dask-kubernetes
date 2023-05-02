@@ -243,9 +243,8 @@ class KubeCluster(Cluster):
                     assert isinstance(self.resources[field], dict)
                 else:
                     raise ValueError(f"Unknown field '{field}' in resources")
-        except TypeError:
-            print(f"invalid '{type(resources)}' for resources type")
-            raise
+        except TypeError as e:
+            raise TypeError(f"invalid '{type(resources)}' for resources type") from e
 
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
