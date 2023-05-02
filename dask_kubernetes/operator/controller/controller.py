@@ -87,6 +87,15 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
             "dask.org/component": "scheduler",
         }
     )
+
+    if spec.get("type") == "NodePort":
+        try:
+            for port in spec["ports"]:
+                node_port = port.get("nodePort")
+                assert node_port in range(30000, 32768)
+        except ValueError as e:
+            raise ValueError("Invalid nodePort value") from e
+
     return {
         "apiVersion": "v1",
         "kind": "Service",

@@ -433,3 +433,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job failed, deleting Dask cluster." in runner.stdout
+
+
+# def test_node_port_out_of_range():
+#     with kopf_runner as runner:
