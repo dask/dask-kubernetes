@@ -436,11 +436,27 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
     assert "Job failed, deleting Dask cluster." in runner.stdout
 
 
-def test_node_port_out_of_range(kopf_runner):
+def custom_nodeport_spec(port, name="foo", scheduler_service_type="NodePort"):
+    try:
+        port = int(port)
+    except ValueError as e:
+        raise ValueError(f"'{port}' is not a valid integer") from e
 
-    spec = make_cluster_spec(name="foo", scheduler_service_type="NodePort")
-    spec["spec"]["scheduler"]["service"]["ports"][0]["nodePort"] = "38967"
+    spec = make_cluster_spec(name, scheduler_service_type)
+    spec["spec"]["scheduler"]["service"]["ports"][0]["nodePort"] = port
+    return spec
 
+
+def test_nodeport_valid(kopf_runner):
     with kopf_runner:
-        with pytest.raises(ValueError):
+        spec = custom_nodeport_spec("30007")
+        with KubeCluster(custom_cluster_spec=spec, n_workers=1) as cluster:
+            with Client(cluster) as client:
+                assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
+def test_nodeport_out_of_range(kopf_runner):
+    with kopf_runner:
+        spec = custom_nodeport_spec("38967")
+        with pytest.raises(ValueError, match="NodePort out of range"):
             KubeCluster(custom_cluster_spec=spec, n_workers=1)
