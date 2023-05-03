@@ -439,8 +439,8 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 def custom_nodeport_spec(port, name="foo", scheduler_service_type="NodePort"):
     try:
         port = int(port)
-    except ValueError as e:
-        raise ValueError(f"'{port}' is not a valid integer") from e
+    except ValueError:
+        raise ValueError(f"{port} is not a valid integer")
 
     spec = make_cluster_spec(name, scheduler_service_type)
     spec["spec"]["scheduler"]["service"]["ports"][0]["nodePort"] = port
