@@ -9,6 +9,7 @@ import pytest
 import yaml
 from dask.distributed import Client
 
+from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
@@ -433,3 +434,13 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job failed, deleting Dask cluster." in runner.stdout
+
+
+def test_node_port_out_of_range(kopf_runner):
+
+    spec = make_cluster_spec(name="foo", scheduler_service_type="NodePort")
+    spec["spec"]["scheduler"]["service"]["ports"][0]["nodePort"] = "38967"
+
+    with kopf_runner:
+        with pytest.raises(ValueError):
+            KubeCluster(custom_cluster_spec=spec, n_workers=1)
