@@ -89,14 +89,11 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
     )
 
     # Check if NodePort is out of range
-    try:
-        for port in spec.get("ports", []):
-            if port.get("nodePort", None) and (
-                port["nodePort"] < 30000 or port["nodePort"] > 32767
-            ):
-                raise ValueError("NodePort out of range")
-    except ValueError as e:
-        raise ValueError("Invalid nodePort value") from e
+    for port in spec.get("ports", []):
+        if port.get("nodePort", None) and (
+            port["nodePort"] < 30000 or port["nodePort"] > 32767
+        ):
+            raise ValueError("NodePort out of range")
 
     return {
         "apiVersion": "v1",
