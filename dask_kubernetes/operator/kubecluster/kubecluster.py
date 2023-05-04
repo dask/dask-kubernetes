@@ -336,15 +336,14 @@ class KubeCluster(Cluster):
                     body=data,
                 )
             except kubernetes.client.ApiException as e:
-                if e.status == 422:
-                    # unsure how to extract the invalid kwarg from the API response
-                    raise ValueError("unable to process invalid kwargs")
-                elif e.status == 404:
+                if e.status == 404:
                     raise RuntimeError(
                         "Failed to create DaskCluster resource. "
                         "Are the Dask Custom Resource Definitions installed? "
                         "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
                     ) from e
+                else:
+                    raise e
 
             try:
                 self._log("Waiting for controller to action cluster")

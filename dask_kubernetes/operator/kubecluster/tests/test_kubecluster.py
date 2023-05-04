@@ -168,7 +168,7 @@ def test_typo_resource_limits(kopf_runner):
             )
 
 
-def test_handling_for_invalid_kwargs(kopf_runner):
+def test_handling_invalid_kwargs(kopf_runner):
     with kopf_runner:
         with pytest.raises(ValueError, match="unable to process invalid kwargs"):
             KubeCluster(name="foo", n_workers="1")
