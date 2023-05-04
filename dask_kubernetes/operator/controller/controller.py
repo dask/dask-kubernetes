@@ -230,6 +230,7 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
     settings.watching.server_timeout = 120
     settings.watching.client_timeout = 150
     settings.watching.connect_timeout = 5
+    settings.admission.server = kopf.WebhookServer()  # defaults to localhost:9443
 
     # The default timeout is 300s which is usually to long
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
@@ -244,7 +245,9 @@ def get_current_timestamp(**kwargs):
 
 
 @kopf.on.validate("daskcluster.kubernetes.dask.org")
-async def daskcluster_validate_nodeport(spec, warnings, **kwargs):
+async def daskcluster_validate_nodeport(
+    spec, settings: kopf.OperatorSettings, warnings, **kwargs
+):
     """Ensure that `nodePort` defined in DaskCluster resource is
     within a valid range"""
 
