@@ -1,4 +1,5 @@
 import pytest
+import kubernetes_asyncio as kubernetes
 
 from dask.distributed import Client
 from distributed.utils import TimeoutError
@@ -170,5 +171,5 @@ def test_typo_resource_limits(kopf_runner):
 
 def test_handling_invalid_kwargs(kopf_runner):
     with kopf_runner:
-        with pytest.raises(ValueError, match="unable to process invalid kwargs"):
+        with pytest.raises(kubernetes.client.ApiException):
             KubeCluster(name="foo", n_workers="1")
