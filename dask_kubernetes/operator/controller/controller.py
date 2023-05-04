@@ -88,13 +88,6 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
         }
     )
 
-    # Check if NodePort is out of range
-    for port in spec.get("ports", []):
-        if port.get("nodePort", None) and (
-            port["nodePort"] < 30000 or port["nodePort"] > 32767
-        ):
-            raise ValueError("NodePort out of range")
-
     return {
         "apiVersion": "v1",
         "kind": "Service",
@@ -248,6 +241,19 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
 @kopf.on.probe(id="now")
 def get_current_timestamp(**kwargs):
     return datetime.utcnow().isoformat()
+
+
+@kopf.on.validate("daskcluster.kubernetes.dask.org")
+async def daskcluster_validate_nodeport(spec, warnings, **kwargs):
+    """Ensure that `nodePort` defined in DaskCluster resource is
+    within a valid range"""
+
+    # Check if NodePort is out of range
+    for port in spec.get("ports", []):
+        if port.get("nodePort", None) and (
+            port["nodePort"] < 30000 or port["nodePort"] > 32767
+        ):
+            raise kopf.AdmissionError("nodePort must be between 30000 and 32767.")
 
 
 @kopf.on.create("daskcluster.kubernetes.dask.org")
