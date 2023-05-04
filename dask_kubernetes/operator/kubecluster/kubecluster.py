@@ -230,9 +230,6 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
-        if self.n_workers is not None and not isinstance(self.n_workers, int):
-            raise TypeError(f"n_workers must be an integer, got {type(self.n_workers)}")
-
         try:
             # Validate `resources` param is a dictionary whose
             # keys must either be 'limits' or 'requests'
@@ -340,9 +337,8 @@ class KubeCluster(Cluster):
                 )
             except kubernetes.client.ApiException as e:
                 if e.status == 422:
-                    # unsure how to extract the value of the invalid kwarg
-                    # from the API response to populate below
-                    raise ValueError("unable to process invalid kwarg(s)")
+                    # unsure how to extract the invalid kwarg from the API response
+                    raise ValueError("unable to process invalid kwargs")
                 elif e.status == 404:
                     raise RuntimeError(
                         "Failed to create DaskCluster resource. "
