@@ -31,8 +31,6 @@ for ep in entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
-kubernetes = api()
-
 
 class DaskCluster(APIObject):
     version = "kubernetes.dask.org/v1"
@@ -426,7 +424,7 @@ async def retire_workers(
     logger.info(
         f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
     )
-    workers = await kubernetes.get(
+    workers = await api().get(
         "pods",
         label_selector=f"dask.org/workergroup-name={worker_group_name}",
         namespace=namespace,
@@ -479,7 +477,7 @@ async def daskworkergroup_replica_update(
     async with worker_group_scale_locks[f"{namespace}/{name}"]:
         cluster = await DaskCluster.get(cluster_name, namespace=namespace)
 
-        workers = await kubernetes.get(
+        workers = await api().get(
             "pods",
             namespace=namespace,
             label_selector=f"dask.org/workergroup-name={name}",
