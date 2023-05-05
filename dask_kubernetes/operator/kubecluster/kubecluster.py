@@ -338,7 +338,7 @@ class KubeCluster(Cluster):
             except kubernetes.client.ApiException as e:
                 if e.status == 404:
                     raise RuntimeError(
-                        "Failed to create DaskCluster resource. "
+                        "Failed to create DaskCluster resource."
                         "Are the Dask Custom Resource Definitions installed? "
                         "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
                     ) from e
