@@ -9,8 +9,8 @@ from uuid import uuid4
 import aiohttp
 import kopf
 from importlib_metadata import entry_points
-from kr8s import Kr8sApi
-from kr8s.objects import APIObject, Pod, Service
+from kr8s.asyncio import api
+from kr8s.asyncio.objects import APIObject, Pod, Service
 
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc
@@ -31,7 +31,7 @@ for ep in entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
-kubernetes = Kr8sApi()
+kubernetes = api()
 
 
 class DaskCluster(APIObject):
@@ -310,7 +310,7 @@ async def daskcluster_create_components(
         name, scheduler_spec.get("spec"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_pod = Pod(data, api=kubernetes)
+    scheduler_pod = Pod(data)
     await scheduler_pod.create()
     logger.info(f"Scheduler pod {scheduler_pod.name} created in {namespace}.")
 
@@ -319,7 +319,7 @@ async def daskcluster_create_components(
         name, scheduler_spec.get("service"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_service = Service(data, api=kubernetes)
+    scheduler_service = Service(data)
     await scheduler_service.create()
     logger.info(f"Scheduler service {scheduler_service.name} created in {namespace}.")
 
@@ -332,7 +332,7 @@ async def daskcluster_create_components(
         if "labels" in worker_spec["metadata"]:
             labels.update(**worker_spec["metadata"]["labels"])
     data = build_default_worker_group_spec(name, worker_spec, annotations, labels)
-    dask_worker_group = DaskWorkerGroup(data, api=kubernetes)
+    dask_worker_group = DaskWorkerGroup(data)
     await dask_worker_group.create()
     logger.info(f"Worker group {dask_worker_group.name} created in {namespace}.")
 
@@ -353,20 +353,18 @@ async def handle_scheduler_service_status(
         phase = "Running"
 
     cluster = await DaskCluster.get(
-        labels["dask.org/cluster-name"], namespace=namespace, api=kubernetes
+        labels["dask.org/cluster-name"], namespace=namespace
     )
     await cluster.patch({"status": {"phase": phase}})
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_create(body, spec, name, namespace, logger, **kwargs):
-    cluster = await DaskCluster.get(
-        spec["cluster"], namespace=namespace, api=kubernetes
-    )
+    cluster = await DaskCluster.get(spec["cluster"], namespace=namespace)
     new_spec = dict(spec)
     kopf.adopt(new_spec, owner=cluster.raw)
 
-    await DaskWorkerGroup(body, api=kubernetes).patch(new_spec)
+    await DaskWorkerGroup(body).patch(new_spec)
     logger.info(f"Successfully adopted by {cluster.name}")
 
     del kwargs["new"]
@@ -479,9 +477,7 @@ async def daskworkergroup_replica_update(
     # Replica updates can come in quick succession and the changes must be applied atomically to ensure
     # the number of workers ends in the correct state
     async with worker_group_scale_locks[f"{namespace}/{name}"]:
-        cluster = await DaskCluster.get(
-            cluster_name, namespace=namespace, api=kubernetes
-        )
+        cluster = await DaskCluster.get(cluster_name, namespace=namespace)
 
         workers = await kubernetes.get(
             "pods",
@@ -514,7 +510,7 @@ async def daskworkergroup_replica_update(
                 )
                 kopf.adopt(data, owner=body)
                 kopf.label(data, labels=cluster.labels)
-                await Pod(data, api=kubernetes).create()
+                await Pod(data).create()
             logger.info(f"Scaled worker group {name} up to {desired_workers} workers.")
         if workers_needed < 0:
             worker_ids = await retire_workers(
@@ -526,7 +522,7 @@ async def daskworkergroup_replica_update(
             )
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
-                worker = await Pod.get(wid, namespace=namespace, api=kubernetes)
+                worker = await Pod.get(wid, namespace=namespace)
                 await worker.delete()
             logger.info(
                 f"Scaled worker group {name} down to {desired_workers} workers."
@@ -570,7 +566,7 @@ async def daskjob_create_components(
         labels,
     )
     kopf.adopt(cluster_spec)
-    cluster = DaskCluster(cluster_spec, api=kubernetes)
+    cluster = DaskCluster(cluster_spec)
     await cluster.create()
     logger.info(f"Cluster {cluster.name} for job {name} created in {namespace}.")
 
@@ -591,7 +587,7 @@ async def daskjob_create_components(
         labels=labels,
     )
     kopf.adopt(job_pod_spec)
-    job_pod = Pod(job_pod_spec, api=kubernetes)
+    job_pod = Pod(job_pod_spec)
     await job_pod.create()
     patch.status["clusterName"] = cluster_name
     patch.status["jobStatus"] = "ClusterCreated"
@@ -606,9 +602,7 @@ async def daskjob_create_components(
 )
 async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
     logger.info("Job now in running")
-    job = DaskJob.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace, api=kubernetes
-    )
+    job = DaskJob.get(meta["labels"]["dask.org/cluster-name"], namespace=namespace)
     await job.patch(
         {
             "status": {
@@ -628,8 +622,8 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job succeeded, deleting Dask cluster.")
     cluster_name = meta["labels"]["dask.org/cluster-name"]
-    cluster = DaskCluster.get(cluster_name, namespace=namespace, api=kubernetes)
-    job = DaskJob.get(cluster_name, namespace=namespace, api=kubernetes)
+    cluster = DaskCluster.get(cluster_name, namespace=namespace)
+    job = DaskJob.get(cluster_name, namespace=namespace)
     await cluster.delete()
     await job.patch(
         {
@@ -650,8 +644,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job failed, deleting Dask cluster.")
     cluster_name = meta["labels"]["dask.org/cluster-name"]
-    cluster = DaskCluster.get(cluster_name, namespace=namespace, api=kubernetes)
-    job = DaskJob.get(cluster_name, namespace=namespace, api=kubernetes)
+    cluster = DaskCluster.get(cluster_name, namespace=namespace)
+    job = DaskJob.get(cluster_name, namespace=namespace)
     await cluster.delete()
     await job.patch(
         {
@@ -666,8 +660,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 @kopf.on.create("daskautoscaler.kubernetes.dask.org")
 async def daskautoscaler_create(body, spec, name, namespace, logger, **kwargs):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
-    autoscaler = DaskAutoscaler(body, api=kubernetes)
-    cluster = DaskCluster.get(spec["cluster"], namespace=namespace, api=kubernetes)
+    autoscaler = DaskAutoscaler(body)
+    cluster = DaskCluster.get(spec["cluster"], namespace=namespace)
     new_spec = dict(spec)
     kopf.adopt(new_spec, owner=cluster.raw)
     await autoscaler.patch(new_spec)
@@ -676,16 +670,14 @@ async def daskautoscaler_create(body, spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskautoscaler.kubernetes.dask.org", interval=5.0)
 async def daskautoscaler_adapt(body, spec, name, namespace, logger, **kwargs):
-    scheduler_pod = Pod.get(
-        f"{spec['cluster']}-scheduler", namespace=namespace, api=kubernetes
-    )
+    scheduler_pod = Pod.get(f"{spec['cluster']}-scheduler", namespace=namespace)
     if not scheduler_pod.ready():
         logger.info("Scheduler not ready, skipping autoscaling")
         return
 
-    autoscaler = DaskAutoscaler(body, api=kubernetes)
+    autoscaler = DaskAutoscaler(body)
     worker_group = await DaskWorkerGroup.get(
-        f"{spec['cluster']}-default", namespace=namespace, api=kubernetes
+        f"{spec['cluster']}-default", namespace=namespace
     )
     current_replicas = int(worker_group.spec["worker"]["replicas"])
     cooldown_until = float(
