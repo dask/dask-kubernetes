@@ -233,15 +233,18 @@ class KubeCluster(Cluster):
         try:
             # Validate `resources` param is a dictionary whose
             # keys must either be 'limits' or 'requests'
-            assert isinstance(self.resources, dict)
-
+            assert isinstance(
+                self.resources, dict
+            ), f"resources must be dict type, found {type(resources)}"
             for field in self.resources:
                 if field in ("limits", "requests"):
-                    assert isinstance(self.resources[field], dict)
+                    assert isinstance(
+                        self.resources[field], dict
+                    ), f"key of '{field}' must be dict type"
                 else:
-                    raise ValueError(f"Unknown field '{field}' in resources")
-        except TypeError as e:
-            raise TypeError(f"invalid '{type(resources)}' for resources type") from e
+                    raise ValueError(f"resources has unknown field '{field}'")
+        except AssertionError as e:
+            raise e
 
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
