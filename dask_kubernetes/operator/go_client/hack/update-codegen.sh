@@ -19,19 +19,22 @@ set -o nounset
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
+PACKAGE_ROOT="github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg"
 
 # generate the code with:
-${SCRIPT_ROOT}/hack/generate-groups.sh "deepcopy" \
-  github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/client \
-  github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/apis \
+${SCRIPT_ROOT}/hack/generate-groups.sh \
+  "deepcopy" \
+  ${PACKAGE_ROOT}/client \
+  ${PACKAGE_ROOT}/apis \
   kubernetes.dask.org:v1 \
   --go-header-file "$(dirname ${BASH_SOURCE})/custom-boilerplate.go.txt" \
   --output-base "$(dirname ${BASH_SOURCE})/../../../.."
 
-# generate the code with:
-${SCRIPT_ROOT}/hack/generate-groups.sh "client" \
-  github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/client \
-  github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/apis \
-  kubernetes.dask.org:v1 \
-  --go-header-file "$(dirname ${BASH_SOURCE})/custom-boilerplate.go.txt" \
-  --output-base "$(dirname ${BASH_SOURCE})/../../../.."
+# FIXME
+## generate the code with:
+#${SCRIPT_ROOT}/hack/generate-groups.sh "client" \
+#  ${PACKAGE_ROOT}/client \
+#  ${PACKAGE_ROOT}/apis \
+#  kubernetes.dask.org:v1 \
+#  --go-header-file "$(dirname ${BASH_SOURCE})/custom-boilerplate.go.txt" \
+#  --output-base "$(dirname ${BASH_SOURCE})/../../../.."

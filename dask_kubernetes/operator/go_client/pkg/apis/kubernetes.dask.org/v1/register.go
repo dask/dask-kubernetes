@@ -1,7 +1,6 @@
 package v1
 
 import (
-	daskoperator "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -17,7 +16,7 @@ var (
 )
 
 // SchemeGroupVersion is the group version used to register these objects.
-var SchemeGroupVersion = schema.GroupVersion{Group: daskoperator.GroupName, Version: Version}
+var SchemeGroupVersion = schema.GroupVersion{Group: "kubernetes.dask.org", Version: Version}
 
 // Resource takes an unqualified resource and returns a Group-qualified GroupResource.
 func Resource(resource string) schema.GroupResource {
