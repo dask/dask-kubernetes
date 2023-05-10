@@ -5,7 +5,7 @@ package fake
 import (
 	"context"
 
-	kubernetesdaskorgv1 "github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

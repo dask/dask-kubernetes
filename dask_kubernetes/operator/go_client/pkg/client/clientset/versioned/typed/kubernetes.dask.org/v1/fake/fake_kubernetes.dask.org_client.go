@@ -3,7 +3,7 @@
 package fake
 
 import (
-	v1 "github.com/bstadlbauer/dask-k8s-operator-go-client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
+	v1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )

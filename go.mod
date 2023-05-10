@@ -1,4 +1,4 @@
-module github.com/bstadlbauer/dask-k8s-operator-go-client
+module github.com/dask/dask-kubernetes
 
 go 1.18
 
