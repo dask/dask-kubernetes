@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client/applyconfiguration/kubernetes.dask.org/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeDaskAutoscalers struct {
 	ns   string
 }
 
-var daskautoscalersResource = schema.GroupVersionResource{Group: "kubernetes.dask.org", Version: "v1", Resource: "daskautoscalers"}
+var daskautoscalersResource = v1.SchemeGroupVersion.WithResource("daskautoscalers")
 
-var daskautoscalersKind = schema.GroupVersionKind{Group: "kubernetes.dask.org", Version: "v1", Kind: "DaskAutoscaler"}
+var daskautoscalersKind = v1.SchemeGroupVersion.WithKind("DaskAutoscaler")
 
 // Get takes name of the daskAutoscaler, and returns the corresponding daskAutoscaler object, and an error if there is any.
-func (c *FakeDaskAutoscalers) Get(ctx context.Context, name string, options v1.GetOptions) (result *kubernetesdaskorgv1.DaskAutoscaler, err error) {
+func (c *FakeDaskAutoscalers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.DaskAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(daskautoscalersResource, c.ns, name), &kubernetesdaskorgv1.DaskAutoscaler{})
+		Invokes(testing.NewGetAction(daskautoscalersResource, c.ns, name), &v1.DaskAutoscaler{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskAutoscaler), err
+	return obj.(*v1.DaskAutoscaler), err
 }
 
 // List takes label and field selectors, and returns the list of DaskAutoscalers that match those selectors.
-func (c *FakeDaskAutoscalers) List(ctx context.Context, opts v1.ListOptions) (result *kubernetesdaskorgv1.DaskAutoscalerList, err error) {
+func (c *FakeDaskAutoscalers) List(ctx context.Context, opts metav1.ListOptions) (result *v1.DaskAutoscalerList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daskautoscalersResource, daskautoscalersKind, c.ns, opts), &kubernetesdaskorgv1.DaskAutoscalerList{})
+		Invokes(testing.NewListAction(daskautoscalersResource, daskautoscalersKind, c.ns, opts), &v1.DaskAutoscalerList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeDaskAutoscalers) List(ctx context.Context, opts v1.ListOptions) (re
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &kubernetesdaskorgv1.DaskAutoscalerList{ListMeta: obj.(*kubernetesdaskorgv1.DaskAutoscalerList).ListMeta}
-	for _, item := range obj.(*kubernetesdaskorgv1.DaskAutoscalerList).Items {
+	list := &v1.DaskAutoscalerList{ListMeta: obj.(*v1.DaskAutoscalerList).ListMeta}
+	for _, item := range obj.(*v1.DaskAutoscalerList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,57 +60,79 @@ func (c *FakeDaskAutoscalers) List(ctx context.Context, opts v1.ListOptions) (re
 }
 
 // Watch returns a watch.Interface that watches the requested daskAutoscalers.
-func (c *FakeDaskAutoscalers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDaskAutoscalers) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(daskautoscalersResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a daskAutoscaler and creates it.  Returns the server's representation of the daskAutoscaler, and an error, if there is any.
-func (c *FakeDaskAutoscalers) Create(ctx context.Context, daskAutoscaler *kubernetesdaskorgv1.DaskAutoscaler, opts v1.CreateOptions) (result *kubernetesdaskorgv1.DaskAutoscaler, err error) {
+func (c *FakeDaskAutoscalers) Create(ctx context.Context, daskAutoscaler *v1.DaskAutoscaler, opts metav1.CreateOptions) (result *v1.DaskAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(daskautoscalersResource, c.ns, daskAutoscaler), &kubernetesdaskorgv1.DaskAutoscaler{})
+		Invokes(testing.NewCreateAction(daskautoscalersResource, c.ns, daskAutoscaler), &v1.DaskAutoscaler{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskAutoscaler), err
+	return obj.(*v1.DaskAutoscaler), err
 }
 
 // Update takes the representation of a daskAutoscaler and updates it. Returns the server's representation of the daskAutoscaler, and an error, if there is any.
-func (c *FakeDaskAutoscalers) Update(ctx context.Context, daskAutoscaler *kubernetesdaskorgv1.DaskAutoscaler, opts v1.UpdateOptions) (result *kubernetesdaskorgv1.DaskAutoscaler, err error) {
+func (c *FakeDaskAutoscalers) Update(ctx context.Context, daskAutoscaler *v1.DaskAutoscaler, opts metav1.UpdateOptions) (result *v1.DaskAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(daskautoscalersResource, c.ns, daskAutoscaler), &kubernetesdaskorgv1.DaskAutoscaler{})
+		Invokes(testing.NewUpdateAction(daskautoscalersResource, c.ns, daskAutoscaler), &v1.DaskAutoscaler{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskAutoscaler), err
+	return obj.(*v1.DaskAutoscaler), err
 }
 
 // Delete takes name of the daskAutoscaler and deletes it. Returns an error if one occurs.
-func (c *FakeDaskAutoscalers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeDaskAutoscalers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(daskautoscalersResource, c.ns, name, opts), &kubernetesdaskorgv1.DaskAutoscaler{})
+		Invokes(testing.NewDeleteActionWithOptions(daskautoscalersResource, c.ns, name, opts), &v1.DaskAutoscaler{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeDaskAutoscalers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeDaskAutoscalers) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(daskautoscalersResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &kubernetesdaskorgv1.DaskAutoscalerList{})
+	_, err := c.Fake.Invokes(action, &v1.DaskAutoscalerList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched daskAutoscaler.
-func (c *FakeDaskAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *kubernetesdaskorgv1.DaskAutoscaler, err error) {
+func (c *FakeDaskAutoscalers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DaskAutoscaler, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daskautoscalersResource, c.ns, name, pt, data, subresources...), &kubernetesdaskorgv1.DaskAutoscaler{})
+		Invokes(testing.NewPatchSubresourceAction(daskautoscalersResource, c.ns, name, pt, data, subresources...), &v1.DaskAutoscaler{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskAutoscaler), err
+	return obj.(*v1.DaskAutoscaler), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied daskAutoscaler.
+func (c *FakeDaskAutoscalers) Apply(ctx context.Context, daskAutoscaler *kubernetesdaskorgv1.DaskAutoscalerApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskAutoscaler, err error) {
+	if daskAutoscaler == nil {
+		return nil, fmt.Errorf("daskAutoscaler provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(daskAutoscaler)
+	if err != nil {
+		return nil, err
+	}
+	name := daskAutoscaler.Name
+	if name == nil {
+		return nil, fmt.Errorf("daskAutoscaler.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(daskautoscalersResource, c.ns, *name, types.ApplyPatchType, data), &v1.DaskAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.DaskAutoscaler), err
 }

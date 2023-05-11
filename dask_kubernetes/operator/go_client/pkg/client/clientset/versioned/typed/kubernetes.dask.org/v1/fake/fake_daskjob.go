@@ -4,11 +4,13 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
-	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client/applyconfiguration/kubernetes.dask.org/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -20,25 +22,25 @@ type FakeDaskJobs struct {
 	ns   string
 }
 
-var daskjobsResource = schema.GroupVersionResource{Group: "kubernetes.dask.org", Version: "v1", Resource: "daskjobs"}
+var daskjobsResource = v1.SchemeGroupVersion.WithResource("daskjobs")
 
-var daskjobsKind = schema.GroupVersionKind{Group: "kubernetes.dask.org", Version: "v1", Kind: "DaskJob"}
+var daskjobsKind = v1.SchemeGroupVersion.WithKind("DaskJob")
 
 // Get takes name of the daskJob, and returns the corresponding daskJob object, and an error if there is any.
-func (c *FakeDaskJobs) Get(ctx context.Context, name string, options v1.GetOptions) (result *kubernetesdaskorgv1.DaskJob, err error) {
+func (c *FakeDaskJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.DaskJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(daskjobsResource, c.ns, name), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewGetAction(daskjobsResource, c.ns, name), &v1.DaskJob{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskJob), err
+	return obj.(*v1.DaskJob), err
 }
 
 // List takes label and field selectors, and returns the list of DaskJobs that match those selectors.
-func (c *FakeDaskJobs) List(ctx context.Context, opts v1.ListOptions) (result *kubernetesdaskorgv1.DaskJobList, err error) {
+func (c *FakeDaskJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.DaskJobList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(daskjobsResource, daskjobsKind, c.ns, opts), &kubernetesdaskorgv1.DaskJobList{})
+		Invokes(testing.NewListAction(daskjobsResource, daskjobsKind, c.ns, opts), &v1.DaskJobList{})
 
 	if obj == nil {
 		return nil, err
@@ -48,8 +50,8 @@ func (c *FakeDaskJobs) List(ctx context.Context, opts v1.ListOptions) (result *k
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &kubernetesdaskorgv1.DaskJobList{ListMeta: obj.(*kubernetesdaskorgv1.DaskJobList).ListMeta}
-	for _, item := range obj.(*kubernetesdaskorgv1.DaskJobList).Items {
+	list := &v1.DaskJobList{ListMeta: obj.(*v1.DaskJobList).ListMeta}
+	for _, item := range obj.(*v1.DaskJobList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -58,69 +60,114 @@ func (c *FakeDaskJobs) List(ctx context.Context, opts v1.ListOptions) (result *k
 }
 
 // Watch returns a watch.Interface that watches the requested daskJobs.
-func (c *FakeDaskJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeDaskJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(daskjobsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a daskJob and creates it.  Returns the server's representation of the daskJob, and an error, if there is any.
-func (c *FakeDaskJobs) Create(ctx context.Context, daskJob *kubernetesdaskorgv1.DaskJob, opts v1.CreateOptions) (result *kubernetesdaskorgv1.DaskJob, err error) {
+func (c *FakeDaskJobs) Create(ctx context.Context, daskJob *v1.DaskJob, opts metav1.CreateOptions) (result *v1.DaskJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(daskjobsResource, c.ns, daskJob), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewCreateAction(daskjobsResource, c.ns, daskJob), &v1.DaskJob{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskJob), err
+	return obj.(*v1.DaskJob), err
 }
 
 // Update takes the representation of a daskJob and updates it. Returns the server's representation of the daskJob, and an error, if there is any.
-func (c *FakeDaskJobs) Update(ctx context.Context, daskJob *kubernetesdaskorgv1.DaskJob, opts v1.UpdateOptions) (result *kubernetesdaskorgv1.DaskJob, err error) {
+func (c *FakeDaskJobs) Update(ctx context.Context, daskJob *v1.DaskJob, opts metav1.UpdateOptions) (result *v1.DaskJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(daskjobsResource, c.ns, daskJob), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewUpdateAction(daskjobsResource, c.ns, daskJob), &v1.DaskJob{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskJob), err
+	return obj.(*v1.DaskJob), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDaskJobs) UpdateStatus(ctx context.Context, daskJob *kubernetesdaskorgv1.DaskJob, opts v1.UpdateOptions) (*kubernetesdaskorgv1.DaskJob, error) {
+func (c *FakeDaskJobs) UpdateStatus(ctx context.Context, daskJob *v1.DaskJob, opts metav1.UpdateOptions) (*v1.DaskJob, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(daskjobsResource, "status", c.ns, daskJob), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewUpdateSubresourceAction(daskjobsResource, "status", c.ns, daskJob), &v1.DaskJob{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskJob), err
+	return obj.(*v1.DaskJob), err
 }
 
 // Delete takes name of the daskJob and deletes it. Returns an error if one occurs.
-func (c *FakeDaskJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
+func (c *FakeDaskJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(daskjobsResource, c.ns, name, opts), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewDeleteActionWithOptions(daskjobsResource, c.ns, name, opts), &v1.DaskJob{})
 
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeDaskJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+func (c *FakeDaskJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(daskjobsResource, c.ns, listOpts)
 
-	_, err := c.Fake.Invokes(action, &kubernetesdaskorgv1.DaskJobList{})
+	_, err := c.Fake.Invokes(action, &v1.DaskJobList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched daskJob.
-func (c *FakeDaskJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *kubernetesdaskorgv1.DaskJob, err error) {
+func (c *FakeDaskJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DaskJob, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(daskjobsResource, c.ns, name, pt, data, subresources...), &kubernetesdaskorgv1.DaskJob{})
+		Invokes(testing.NewPatchSubresourceAction(daskjobsResource, c.ns, name, pt, data, subresources...), &v1.DaskJob{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*kubernetesdaskorgv1.DaskJob), err
+	return obj.(*v1.DaskJob), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied daskJob.
+func (c *FakeDaskJobs) Apply(ctx context.Context, daskJob *kubernetesdaskorgv1.DaskJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskJob, err error) {
+	if daskJob == nil {
+		return nil, fmt.Errorf("daskJob provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(daskJob)
+	if err != nil {
+		return nil, err
+	}
+	name := daskJob.Name
+	if name == nil {
+		return nil, fmt.Errorf("daskJob.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(daskjobsResource, c.ns, *name, types.ApplyPatchType, data), &v1.DaskJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.DaskJob), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeDaskJobs) ApplyStatus(ctx context.Context, daskJob *kubernetesdaskorgv1.DaskJobApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskJob, err error) {
+	if daskJob == nil {
+		return nil, fmt.Errorf("daskJob provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(daskJob)
+	if err != nil {
+		return nil, err
+	}
+	name := daskJob.Name
+	if name == nil {
+		return nil, fmt.Errorf("daskJob.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(daskjobsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1.DaskJob{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.DaskJob), err
 }

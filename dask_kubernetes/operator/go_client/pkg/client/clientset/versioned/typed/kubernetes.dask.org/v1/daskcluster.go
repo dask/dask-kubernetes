@@ -4,9 +4,12 @@ package v1
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client/applyconfiguration/kubernetes.dask.org/v1"
 	scheme "github.com/dask/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -31,6 +34,8 @@ type DaskClusterInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.DaskClusterList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.DaskCluster, err error)
+	Apply(ctx context.Context, daskCluster *kubernetesdaskorgv1.DaskClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskCluster, err error)
+	ApplyStatus(ctx context.Context, daskCluster *kubernetesdaskorgv1.DaskClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskCluster, err error)
 	DaskClusterExpansion
 }
 
@@ -172,6 +177,62 @@ func (c *daskClusters) Patch(ctx context.Context, name string, pt types.PatchTyp
 		Name(name).
 		SubResource(subresources...).
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied daskCluster.
+func (c *daskClusters) Apply(ctx context.Context, daskCluster *kubernetesdaskorgv1.DaskClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskCluster, err error) {
+	if daskCluster == nil {
+		return nil, fmt.Errorf("daskCluster provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(daskCluster)
+	if err != nil {
+		return nil, err
+	}
+	name := daskCluster.Name
+	if name == nil {
+		return nil, fmt.Errorf("daskCluster.Name must be provided to Apply")
+	}
+	result = &v1.DaskCluster{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("daskclusters").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *daskClusters) ApplyStatus(ctx context.Context, daskCluster *kubernetesdaskorgv1.DaskClusterApplyConfiguration, opts metav1.ApplyOptions) (result *v1.DaskCluster, err error) {
+	if daskCluster == nil {
+		return nil, fmt.Errorf("daskCluster provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(daskCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	name := daskCluster.Name
+	if name == nil {
+		return nil, fmt.Errorf("daskCluster.Name must be provided to Apply")
+	}
+
+	result = &v1.DaskCluster{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("daskclusters").
+		Name(*name).
+		SubResource("status").
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
 		Body(data).
 		Do(ctx).
 		Into(result)
