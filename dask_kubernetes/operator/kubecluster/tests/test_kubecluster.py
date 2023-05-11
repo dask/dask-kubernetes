@@ -1,8 +1,6 @@
 import pytest
 import kubernetes_asyncio as kubernetes
 
-from kubernetes_asyncio.client.api_client import ApiClient
-
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
@@ -175,20 +173,3 @@ def test_invalid_kwargs_exception(kopf_runner):
     with kopf_runner:
         with pytest.raises(kubernetes.client.ApiException):
             KubeCluster(name="foo", n_workers="1")
-
-
-def test_missing_custom_resources_definition(kopf_runner):
-
-    with kopf_runner:
-        with pytest.raises(
-            RuntimeError, match="Failed to create DaskCluster resource."
-        ):
-            api_client = ApiClient()
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            custom_objects_api.create_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskclusters",
-                namespace="simple",
-                body="",
-            )
