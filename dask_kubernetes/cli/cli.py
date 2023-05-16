@@ -1,8 +1,12 @@
 import click
 import yaml
 import json
+import time
+from rich.console import Console
 
-from dask_kubernetes.operator import make_cluster_spec
+from dask_kubernetes.operator import make_cluster_spec, KubeCluster
+
+console = Console()
 
 
 class NoAliasDumper(yaml.SafeDumper):
@@ -70,3 +74,24 @@ def cluster(**kwargs):
             Dumper=NoAliasDumper,
         )
     )
+
+
+@main.command(help="Port-forward the scheduler of a DaskCluster resource")
+@click.argument("cluster")
+def port_forward(cluster):
+    with console.status(f"Connecting to cluster {cluster}") as status:
+        try:
+            kcluster = KubeCluster.from_name(
+                cluster, shutdown_on_close=False, quiet=True
+            )
+        except ValueError:
+            raise click.ClickException(f"No such cluster {cluster}")
+    try:
+        console.print(f"Scheduler at: [magenta][not bold]{kcluster.scheduler_address}")
+        console.print(f"Dashboard at: [cyan][not bold]{kcluster.dashboard_link}")
+        console.print("Press ctrl+c to exit", style="bright_black")
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        console.print("Shutting down port-forward")
+        kcluster.close()
