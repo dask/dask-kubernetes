@@ -275,7 +275,8 @@ class KubeCluster(Cluster):
             watch_component_status_task = asyncio.create_task(
                 self._watch_component_status()
             )
-            show_rich_output_task = asyncio.create_task(self._show_rich_output())
+            if not self.quiet:
+                show_rich_output_task = asyncio.create_task(self._show_rich_output())
             await ClusterAuth.load_first(self.auth)
             cluster_exists = (await self._get_cluster()) is not None
 
@@ -299,7 +300,8 @@ class KubeCluster(Cluster):
             self._log(f"Ready, dashboard available at {self.dashboard_link}")
         finally:
             watch_component_status_task.cancel()
-            show_rich_output_task.cancel()
+            if not self.quiet:
+                show_rich_output_task.cancel()
 
     def __await__(self):
         async def _():
