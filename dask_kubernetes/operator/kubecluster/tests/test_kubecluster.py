@@ -123,7 +123,7 @@ def test_cluster_without_operator(docker_image):
 def test_cluster_crashloopbackoff(kopf_runner, docker_image):
     with kopf_runner:
         with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
-            spec = make_cluster_spec(name="foo", n_workers=1)
+            spec = make_cluster_spec(name="crashloopbackoff", n_workers=1)
             spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
                 0
             ] = "dask-schmeduler"
