@@ -20,7 +20,8 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `serviceAccount.create` | Create a service account for the operator to use | `true` |
 | `serviceAccount.annotations` | Annotations to add to the service account | `{}` |
 | `serviceAccount.name` | The name of the service account to use. If not set and create is true, a name is generated using the fullname template. | `""` |
-| `rbac.create` | Create a cluster role needed by the operator and bind it to the service account | `true` |
+| `rbac.create` | Create a Role/ClusterRole needed by the operator and bind it to the service account | `true` |
+| `rbac.cluster` | Creates a ClusterRole if true, else create a namespaced Role | `true` |
 | `podAnnotations` | Extra annotations for the operator pod | `{}` |
 | `podSecurityContext` | Security context for the operator pod | `{}` |
 | `securityContext` | Security context for the operator container | `{}` |
@@ -29,6 +30,24 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity | `{}` |
 | `kopfArgs` | Command line flags to pass to kopf on start up | `["--all-namespaces"]` |
+| `metrics.scheduler.enabled` | Enable scheduler metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on scheduler. | `false` |
+| `metrics.scheduler.serviceMonitor.enabled` | Enable scheduler servicemonitor. | `false` |
+| `metrics.scheduler.serviceMonitor.namespace` | Deploy servicemonitor in different namespace, e.g. monitoring. | `""` |
+| `metrics.scheduler.serviceMonitor.namespaceSelector` | Selector to select which namespaces the Endpoints objects are discovered from. | `{}` |
+| `metrics.scheduler.serviceMonitor.additionalLabels` | Additional labels to add to the ServiceMonitor metadata. | `{}` |
+| `metrics.scheduler.serviceMonitor.interval` | Interval at which metrics should be scraped. | `"15s"` |
+| `metrics.scheduler.serviceMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
+| `metrics.scheduler.serviceMonitor.targetLabels` | TargetLabels transfers labels on the Kubernetes Service onto the target. | `["dask.org/cluster-name"]` |
+| `metrics.scheduler.serviceMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
+| `metrics.worker.enabled` | Enable workers metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on workers. | `false` |
+| `metrics.worker.podMonitor.enabled` | Enable workers podmonitor | `false` |
+| `metrics.worker.podMonitor.namespace` | Deploy podmonitor in different namespace, e.g. monitoring. | `""` |
+| `metrics.worker.podMonitor.namespaceSelector` | Selector to select which namespaces the Endpoints objects are discovered from. | `{}` |
+| `metrics.worker.podMonitor.additionalLabels` | Additional labels to add to the PodMonitor metadata. | `{}` |
+| `metrics.worker.podMonitor.interval` | Interval at which metrics should be scraped. | `"15s"` |
+| `metrics.worker.podMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
+| `metrics.worker.podMonitor.podTargetLabels` | PodTargetLabels transfers labels on the Kubernetes Pod onto the target. | `["dask.org/cluster-name", "dask.org/workergroup-name"]` |
+| `metrics.worker.podMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
 
 
 

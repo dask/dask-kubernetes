@@ -57,6 +57,54 @@ We can also check the operator pod is running:
     Please note that `Helm does not support updating or deleting CRDs. <https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations>`_ If updates
     are made to the CRD templates in future releases (to support future k8s releases, for example) you may have to manually update the CRDs or delete/reinstall the Dask Operator.
 
+Single namespace
+^^^^^^^^^^^^^^^^
+
+By default the controller is installed with a ``ClusterRole`` and watches all namespaces.
+You can also just install it into a single namespace by setting the following options.
+
+.. code-block:: console
+
+   $ helm install -n my-namespace --generate-name dask/dask-kubernetes-operator --set rbac.cluster=false --set kopfArgs="{--namespace=my-namespace}"
+   NAME: dask-kubernetes-operator-1749875935
+   NAMESPACE: my-namespace
+   STATUS: deployed
+   REVISION: 1
+   TEST SUITE: None
+   NOTES:
+   Operator has been installed successfully.
+
+Prometheus
+^^^^^^^^^^
+
+The operator helm chart also contains some optional `ServiceMonitor` and `PodMonitor` resources to enable Prometheus scraping of Dask components.
+As not all clusters have the Prometheus operator installed these are disabled by default. You can enable them with the following comfig options.
+
+.. code-block:: yaml
+
+   metrics:
+      scheduler:
+         enabled: true
+         serviceMonitor:
+            enabled: true
+      worker:
+         enabled: true
+         serviceMonitor:
+            enabled: true
+
+You'll also need to ensure the container images you choose for your Dask components have the ``prometheus_client`` library installed.
+If you're using the official Dask images you can install this at runtime.
+
+.. code-block:: python
+
+   from dask_kubernetes.operator import KubeCluster
+   cluster = KubeCluster(name="monitored", env={"EXTRA_PIP_PACKAGES": "prometheus_client"})
+
+Chart Configuration Reference
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. frigate:: ../../dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
+
 Installing with Manifests
 -------------------------
 

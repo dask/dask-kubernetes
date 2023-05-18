@@ -116,10 +116,13 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            while "Running" not in k8s_cluster.kubectl(
-                "get", "pods", scheduler_pod_name
-            ):
-                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "wait",
+                "pods",
+                "--for=condition=Ready",
+                scheduler_pod_name,
+                "--timeout=120s",
+            )
             with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
@@ -155,7 +158,13 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-
+            k8s_cluster.kubectl(
+                "wait",
+                "pods",
+                "--for=condition=Ready",
+                scheduler_pod_name,
+                "--timeout=120s",
+            )
             with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
@@ -174,7 +183,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 "-o",
                 "jsonpath='{.items[0].spec.containers[0].env[0]}'",
             )
-            # Just check if its in the string, no need to parse the json
+            # Just check if it's in the string, no need to parse the json
             assert "SCHEDULER_ENV" in scheduler_env
 
             # Get the first annotation (the only one) of the scheduler
@@ -236,6 +245,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 )[1:-1]
             )
             assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert "worker-sublabel" in workergroup_labels
 
             # Assert labels from the dask cluster are propagated into the dask scheduler
             scheduler_labels = json.loads(
@@ -247,7 +257,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.labels}'",
                 )[1:-1]
             )
-            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert _EXPECTED_LABELS.items() <= scheduler_labels.items()
+            assert "scheduler-sublabel" in scheduler_labels
 
             # Assert labels from the dask cluster are propagated into the dask worker pod
             worker_labels = json.loads(
@@ -259,7 +270,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     "jsonpath='{.items[0].metadata.labels}'",
                 )[1:-1]
             )
-            assert _EXPECTED_LABELS.items() <= workergroup_labels.items()
+            assert _EXPECTED_LABELS.items() <= worker_labels.items()
+            assert "worker-sublabel" in workergroup_labels
 
 
 def _get_job_status(k8s_cluster):

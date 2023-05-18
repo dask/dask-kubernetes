@@ -64,6 +64,13 @@ Let's create an example called ``cluster.yaml`` with the following configuration
               - dask-worker
               - --name
               - $(DASK_WORKER_NAME)
+              - --dashboard
+              - --dashboard-address
+              - "8788"
+            ports:
+              - name: http-dashboard
+                containerPort: 8788
+                protocol: TCP
       scheduler:
         spec:
           containers:
@@ -264,6 +271,13 @@ Let's create an example called ``highmemworkers.yaml`` with the following config
               - $(DASK_WORKER_NAME)
               - --resources
               - MEMORY=32e9
+              - --dashboard
+              - --dashboard-address
+              - "8788"
+            ports:
+              - name: http-dashboard
+                containerPort: 8788
+                protocol: TCP
 
 The main thing we need to ensure is that the ``cluster`` option matches the name of the cluster we created earlier. This will cause
 the workers to join that cluster.
@@ -368,6 +382,13 @@ Let's create an example called ``job.yaml`` with the following configuration:
                     - dask-worker
                     - --name
                     - $(DASK_WORKER_NAME)
+                    - --dashboard
+                    - --dashboard-address
+                    - "8788"
+                  ports:
+                    - name: http-dashboard
+                      containerPort: 8788
+                      protocol: TCP
                   env:
                     - name: WORKER_ENV
                       value: hello-world # We dont test the value, just the name
@@ -550,6 +571,68 @@ set it to.
 
     The autoscaler will only scale the default ``WorkerGroup``. If you have additional worker groups configured they
     will not be taken into account.
+
+Labels and Annotations
+----------------------
+
+Labels and annotations are propagated to child resources, so labels applied to a ``DaskCluster`` will also be present on the ``Pod`` and ``Service`` resources it creates.
+
+- Labels/annotations on ``DaskCluster`` are propagated to the ``DaskWorkerGroup``, scheduler ``Pod`` and scheduler ``Service``.
+- Labels/annotations on ``DaskWorkerGroup`` are propagated to the worker ``Pod``.
+- Labels/annotations on ``DaskJob`` are propagated to the job ``Pod`` and ``DaskCluster``.
+
+Some resources also have subresource metadata options for setting labels and annotations on the resources it creates.
+
+- ``DaskCluster`` has ``spec.worker.metadata`` which is merged into the labels/annotations for the ``DaskWorkerGroup``.
+- ``DaskCluster`` has ``spec.scheduler.metadata`` which is merged into the labels/annotations for the scheduler ``Pod`` and scheduler ``Service``.
+- ``DaskJob`` has ``spec.job.metadata`` which is merged into the labels/annotations for the job ``Pod``.
+
+The order of label/annotation application is ``top_level <= subresource <= base``.
+So if the ``DaskCluster`` has a label of ``foo=bar`` but the ``spec.worker.metadata.labels`` had a label of ``foo=baz`` then the worker ``Pod`` would have ``foo=baz``.
+
+Equally, if the reserved base label ``dask.org/component`` is set at either the top-level or subresource-level this will be overridden by the controller.
+So ``setting dask.org/component=superworker`` in ``DaskCluster.spec.worker.metadata.labels`` will have no effect and the worker ``Pod`` will still have the expected label of ``dask.org/component=worker``.
+
+Example
+^^^^^^^
+
+The following ``DaskCluster`` has top-level annotations as well as worker and scheduler subresource annotations.
+
+.. code-block:: yaml
+
+    apiVersion: kubernetes.dask.org/v1
+    kind: DaskCluster
+    metadata:
+      name: example
+      annotations:
+        hello: world
+    spec:
+      worker:
+        replicas: 2
+        metadata:
+          annotations:
+            foo: bar
+        spec:
+          ...
+      scheduler:
+        metadata:
+          annotations:
+            fizz: buzz
+        spec:
+          ...
+
+The resulting scheduler ``Pod`` metadata annotations would be.
+
+.. code-block:: yaml
+
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: example-scheduler
+      annotations:
+        fizz: buzz
+        hello: world
+    ...
 
 Full Configuration Reference
 ----------------------------

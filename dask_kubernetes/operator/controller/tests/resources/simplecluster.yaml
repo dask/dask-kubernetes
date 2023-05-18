@@ -12,6 +12,11 @@ metadata:
 spec:
   worker:
     replicas: 2
+    metadata:
+      labels:
+        worker-sublabel: "label-value"
+      annotations:
+        worker-subannotation: "annotation-value"
     spec:
       containers:
         - name: worker
@@ -21,10 +26,22 @@ spec:
             - dask-worker
             - --name
             - $(DASK_WORKER_NAME)
+            - --dashboard
+            - --dashboard-address
+            - "8788"
+          ports:
+            - name: http-dashboard
+              containerPort: 8788
+              protocol: TCP
           env:
             - name: WORKER_ENV
               value: hello-world # We don't test the value, just the name
   scheduler:
+    metadata:
+      labels:
+        scheduler-sublabel: "label-value"
+      annotations:
+        scheduler-subannotation: "annotation-value"
     spec:
       containers:
         - name: scheduler

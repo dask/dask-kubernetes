@@ -1,8 +1,6 @@
 Testing
 =======
 
-.. warning:: Tests are not working on aarch64 (Apple M1) at the moment due to an architecture incompatibility between ``pytest-kind-control-plane`` and the docker image built from ``ci/Dockerfile``, similar to `this GitHub issue <https://github.com/kubernetes-sigs/kind/issues/2402>`_.
-
 Running the test suite for ``dask-kubernetes`` doesn't require an existing Kubernetes cluster but does require
 `Docker <https://docs.docker.com/get-docker/>`_, `kubectl <https://kubernetes.io/docs/tasks/tools/#kubectl>`_ and `helm <https://helm.sh/docs/intro/install/>`_.
 

@@ -23,6 +23,17 @@ spec:
                 type: string
               worker:
                 properties:
+                  metadata:
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
                   replicas:
                     default: 1
                     type: integer

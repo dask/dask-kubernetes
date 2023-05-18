@@ -13,7 +13,8 @@ serviceAccount:
   name: ""  # The name of the service account to use. If not set and create is true, a name is generated using the fullname template.
 
 rbac:
-  create: true # Create a cluster role needed by the operator and bind it to the service account
+  create: true # Create a Role/ClusterRole needed by the operator and bind it to the service account
+  cluster: true # Creates a ClusterRole if true, else create a namespaced Role
 
 podAnnotations: {}  # Extra annotations for the operator pod
 
@@ -48,3 +49,39 @@ affinity: {}  # Affinity
 
 kopfArgs: # Command line flags to pass to kopf on start up
   - --all-namespaces
+
+metrics:
+  scheduler:
+    enabled: false # Enable scheduler metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on scheduler.
+    serviceMonitor:
+      enabled: false # Enable scheduler servicemonitor.
+      namespace: "" # Deploy servicemonitor in different namespace, e.g. monitoring.
+      namespaceSelector: {} # Selector to select which namespaces the Endpoints objects are discovered from.
+      # Default: scrape .Release.Namespace only
+      # To scrape all, use the following:
+      # namespaceSelector:
+      #   any: true
+      additionalLabels: {} # Additional labels to add to the ServiceMonitor metadata.
+      interval: 15s # Interval at which metrics should be scraped.
+      jobLabel: "" # The label to use to retrieve the job name from.
+      targetLabels: # TargetLabels transfers labels on the Kubernetes Service onto the target.
+        - dask.org/cluster-name
+      metricRelabelings: [] # MetricRelabelConfigs to apply to samples before ingestion.
+  worker:
+    enabled: false # Enable workers metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on workers.
+    podMonitor:
+      enabled: false # Enable workers podmonitor
+      namespace: "" # Deploy podmonitor in different namespace, e.g. monitoring.
+      namespaceSelector: {} # Selector to select which namespaces the Endpoints objects are discovered from.
+      # Default: scrape .Release.Namespace only
+      # To scrape all, use the following:
+      # namespaceSelector:
+      #   any: true
+      # metrics will apply to the additional worker groups as well
+      additionalLabels: {} # Additional labels to add to the PodMonitor metadata.
+      interval: 15s # Interval at which metrics should be scraped.
+      jobLabel: "" # The label to use to retrieve the job name from.
+      podTargetLabels:  # PodTargetLabels transfers labels on the Kubernetes Pod onto the target.
+        - dask.org/cluster-name
+        - dask.org/workergroup-name
+      metricRelabelings: [] # MetricRelabelConfigs to apply to samples before ingestion.

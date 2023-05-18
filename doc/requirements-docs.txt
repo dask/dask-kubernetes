@@ -3,3 +3,4 @@ sphinx
 sphinx-reredirects
 sphinxcontrib-mermaid
 dask-sphinx-theme>=3.0.0
+frigate>=0.7.0
