@@ -727,7 +727,7 @@ class KubeCluster(Cluster):
         """Delete the dask cluster"""
         return self.sync(self._close, timeout=timeout)
 
-    async def _close(self, timeout=None):
+    async def _close(self, timeout=3600):
         await super()._close()
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
