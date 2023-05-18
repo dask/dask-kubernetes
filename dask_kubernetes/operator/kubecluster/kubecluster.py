@@ -237,6 +237,22 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
+        if self.n_workers is not None and not isinstance(self.n_workers, int):
+            raise TypeError(f"n_workers must be an integer, got {type(self.n_workers)}")
+
+        try:
+            # Validate `resources` param is a dictionary whose
+            # keys must either be 'limits' or 'requests'
+            assert isinstance(self.resources, dict)
+
+            for field in self.resources:
+                if field in ("limits", "requests"):
+                    assert isinstance(self.resources[field], dict)
+                else:
+                    raise ValueError(f"Unknown field '{field}' in resources")
+        except TypeError as e:
+            raise TypeError(f"invalid '{type(resources)}' for resources type") from e
+
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
@@ -266,7 +282,8 @@ class KubeCluster(Cluster):
             watch_component_status_task = asyncio.create_task(
                 self._watch_component_status()
             )
-            show_rich_output_task = asyncio.create_task(self._show_rich_output())
+            if not self.quiet:
+                show_rich_output_task = asyncio.create_task(self._show_rich_output())
             await ClusterAuth.load_first(self.auth)
             cluster_exists = (await self._get_cluster()) is not None
 
@@ -290,7 +307,8 @@ class KubeCluster(Cluster):
             self._log(f"Ready, dashboard available at {self.dashboard_link}")
         finally:
             watch_component_status_task.cancel()
-            show_rich_output_task.cancel()
+            if not self.quiet:
+                show_rich_output_task.cancel()
 
     def __await__(self):
         async def _():
@@ -928,7 +946,13 @@ def make_worker_spec(
     if isinstance(worker_command, str):
         worker_command = worker_command.split(" ")
 
-    args = worker_command + ["--name", "$(DASK_WORKER_NAME)"]
+    args = worker_command + [
+        "--name",
+        "$(DASK_WORKER_NAME)",
+        "--dashboard",
+        "--dashboard-address",
+        "8788",
+    ]
 
     return {
         "replicas": n_workers,
@@ -940,6 +964,13 @@ def make_worker_spec(
                     "args": args,
                     "env": env,
                     "resources": resources,
+                    "ports": [
+                        {
+                            "name": "http-dashboard",
+                            "containerPort": 8788,
+                            "protocol": "TCP",
+                        },
+                    ],
                 }
             ]
         },

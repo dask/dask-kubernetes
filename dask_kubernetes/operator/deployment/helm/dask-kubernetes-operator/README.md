@@ -30,6 +30,24 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity | `{}` |
 | `kopfArgs` | Command line flags to pass to kopf on start up | `["--all-namespaces"]` |
+| `metrics.scheduler.enabled` | Enable scheduler metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on scheduler. | `false` |
+| `metrics.scheduler.serviceMonitor.enabled` | Enable scheduler servicemonitor. | `false` |
+| `metrics.scheduler.serviceMonitor.namespace` | Deploy servicemonitor in different namespace, e.g. monitoring. | `""` |
+| `metrics.scheduler.serviceMonitor.namespaceSelector` | Selector to select which namespaces the Endpoints objects are discovered from. | `{}` |
+| `metrics.scheduler.serviceMonitor.additionalLabels` | Additional labels to add to the ServiceMonitor metadata. | `{}` |
+| `metrics.scheduler.serviceMonitor.interval` | Interval at which metrics should be scraped. | `"15s"` |
+| `metrics.scheduler.serviceMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
+| `metrics.scheduler.serviceMonitor.targetLabels` | TargetLabels transfers labels on the Kubernetes Service onto the target. | `["dask.org/cluster-name"]` |
+| `metrics.scheduler.serviceMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
+| `metrics.worker.enabled` | Enable workers metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on workers. | `false` |
+| `metrics.worker.podMonitor.enabled` | Enable workers podmonitor | `false` |
+| `metrics.worker.podMonitor.namespace` | Deploy podmonitor in different namespace, e.g. monitoring. | `""` |
+| `metrics.worker.podMonitor.namespaceSelector` | Selector to select which namespaces the Endpoints objects are discovered from. | `{}` |
+| `metrics.worker.podMonitor.additionalLabels` | Additional labels to add to the PodMonitor metadata. | `{}` |
+| `metrics.worker.podMonitor.interval` | Interval at which metrics should be scraped. | `"15s"` |
+| `metrics.worker.podMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
+| `metrics.worker.podMonitor.podTargetLabels` | PodTargetLabels transfers labels on the Kubernetes Pod onto the target. | `["dask.org/cluster-name", "dask.org/workergroup-name"]` |
+| `metrics.worker.podMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
 
 
 

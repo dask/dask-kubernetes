@@ -26,5 +26,7 @@ setup(
         kubecluster=dask_kubernetes.operator:discover
         [dask_operator_plugin]
         noop=dask_kubernetes.operator.controller.plugins.noop
+        [dask_cli]
+        kubernetes=dask_kubernetes.cli:main
       """,
 )

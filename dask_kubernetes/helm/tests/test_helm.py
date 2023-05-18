@@ -21,9 +21,21 @@ from dask_ctl.discovery import (
 @pytest.fixture(scope="session")
 def chart_repo():
     repo_name = "dask"
-    subprocess.run(
-        ["helm", "repo", "add", repo_name, "https://helm.dask.org/"], check=True
-    )
+    repo_url = "https://helm.dask.org/"
+    output = subprocess.run(["helm", "repo", "list"], capture_output=True)
+    repo_lines = output.stdout.decode().splitlines()[1:]  # First line is header
+    dask_repo_present = False
+    for repo_line in repo_lines:
+        repo, url = repo_line.replace(" ", "").split("\t")
+        if repo == repo_name:
+            if url.rstrip("/") != repo_url.rstrip("/"):
+                raise ValueError(f"Dask repo already present with different URL {url}")
+            dask_repo_present = True
+    if not dask_repo_present:
+        subprocess.run(
+            ["helm", "repo", "add", repo_name, repo_url],
+            check=True,
+        )
     subprocess.run(["helm", "repo", "update"], check=True)
     return repo_name
 

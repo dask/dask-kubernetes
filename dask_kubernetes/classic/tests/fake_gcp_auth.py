@@ -1,7 +1,7 @@
 import datetime
 import json
 
-expiry = datetime.datetime.now() + datetime.timedelta(seconds=5)
+expiry = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
 expiry.replace(tzinfo=datetime.timezone.utc)
 expiry_str = expiry.isoformat("T") + "Z"
 
