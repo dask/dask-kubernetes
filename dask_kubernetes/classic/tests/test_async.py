@@ -6,6 +6,7 @@ import os
 import random
 from time import time
 import yaml
+import sys
 
 import kubernetes_asyncio as kubernetes
 import pytest
@@ -853,7 +854,7 @@ async def test_auto_refresh(cluster):
                         "config": {
                             "access-token": "",
                             "cmd-args": "--fake-arg arg",
-                            "cmd-path": f"python {TEST_DIR}/fake_gcp_auth.py",
+                            "cmd-path": f"{sys.executable} {TEST_DIR}/fake_gcp_auth.py",
                             "expiry": "",
                             "expiry-key": "{.credential.token_expiry}",
                             "toekn-key": "{.credential.access_token}",
