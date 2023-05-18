@@ -127,7 +127,7 @@ def test_cluster_crashloopbackoff(kopf_runner, docker_image):
             spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
                 0
             ] = "dask-schmeduler"
-            KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
+            KubeCluster(custom_cluster_spec=spec, resource_timeout=1, idle_timeout=2)
 
 
 def test_adapt(kopf_runner, docker_image):
