@@ -244,7 +244,7 @@ class KubeCluster(Cluster):
                 else:
                     raise ValueError(f"resources has unknown field '{field}'")
         except AssertionError as e:
-            raise e
+            raise TypeError from e
 
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
