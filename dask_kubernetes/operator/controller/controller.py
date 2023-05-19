@@ -380,7 +380,8 @@ async def daskworkergroup_create(body, spec, name, namespace, logger, **kwargs):
     new_spec = dict(spec)
     kopf.adopt(new_spec, owner=cluster.raw)
 
-    await DaskWorkerGroup(body).patch(new_spec)
+    worker_group = await DaskWorkerGroup(body)
+    await worker_group.patch(new_spec)
     logger.info(f"Successfully adopted by {cluster.name}")
 
     del kwargs["new"]
@@ -528,7 +529,8 @@ async def daskworkergroup_replica_update(
                 )
                 kopf.adopt(data, owner=body)
                 kopf.label(data, labels=cluster.labels)
-                await Pod(data).create()
+                worker_pod = await Pod(data)
+                await worker_pod.create()
             logger.info(f"Scaled worker group {name} up to {desired_workers} workers.")
         if workers_needed < 0:
             worker_ids = await retire_workers(
@@ -584,7 +586,7 @@ async def daskjob_create_components(
         labels,
     )
     kopf.adopt(cluster_spec)
-    cluster = DaskCluster(cluster_spec)
+    cluster = await DaskCluster(cluster_spec)
     await cluster.create()
     logger.info(f"Cluster {cluster.name} for job {name} created in {namespace}.")
 
@@ -605,7 +607,7 @@ async def daskjob_create_components(
         labels=labels,
     )
     kopf.adopt(job_pod_spec)
-    job_pod = Pod(job_pod_spec)
+    job_pod = await Pod(job_pod_spec)
     await job_pod.create()
     patch.status["clusterName"] = cluster_name
     patch.status["jobStatus"] = "ClusterCreated"
@@ -620,7 +622,9 @@ async def daskjob_create_components(
 )
 async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
     logger.info("Job now in running")
-    job = DaskJob.get(meta["labels"]["dask.org/cluster-name"], namespace=namespace)
+    job = await DaskJob.get(
+        meta["labels"]["dask.org/cluster-name"], namespace=namespace
+    )
     await job.patch(
         {
             "status": {
@@ -640,8 +644,8 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job succeeded, deleting Dask cluster.")
     cluster_name = meta["labels"]["dask.org/cluster-name"]
-    cluster = DaskCluster.get(cluster_name, namespace=namespace)
-    job = DaskJob.get(cluster_name, namespace=namespace)
+    cluster = await DaskCluster.get(cluster_name, namespace=namespace)
+    job = await DaskJob.get(cluster_name, namespace=namespace)
     await cluster.delete()
     await job.patch(
         {
@@ -662,8 +666,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job failed, deleting Dask cluster.")
     cluster_name = meta["labels"]["dask.org/cluster-name"]
-    cluster = DaskCluster.get(cluster_name, namespace=namespace)
-    job = DaskJob.get(cluster_name, namespace=namespace)
+    cluster = await DaskCluster.get(cluster_name, namespace=namespace)
+    job = await DaskJob.get(cluster_name, namespace=namespace)
     await cluster.delete()
     await job.patch(
         {
@@ -678,8 +682,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 @kopf.on.create("daskautoscaler.kubernetes.dask.org")
 async def daskautoscaler_create(body, spec, name, namespace, logger, **kwargs):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
-    autoscaler = DaskAutoscaler(body)
-    cluster = DaskCluster.get(spec["cluster"], namespace=namespace)
+    autoscaler = await DaskAutoscaler(body)
+    cluster = await DaskCluster.get(spec["cluster"], namespace=namespace)
     new_spec = dict(spec)
     kopf.adopt(new_spec, owner=cluster.raw)
     await autoscaler.patch(new_spec)
@@ -688,12 +692,12 @@ async def daskautoscaler_create(body, spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskautoscaler.kubernetes.dask.org", interval=5.0)
 async def daskautoscaler_adapt(body, spec, name, namespace, logger, **kwargs):
-    scheduler_pod = Pod.get(f"{spec['cluster']}-scheduler", namespace=namespace)
+    scheduler_pod = await Pod.get(f"{spec['cluster']}-scheduler", namespace=namespace)
     if not scheduler_pod.ready():
         logger.info("Scheduler not ready, skipping autoscaling")
         return
 
-    autoscaler = DaskAutoscaler(body)
+    autoscaler = await DaskAutoscaler(body)
     worker_group = await DaskWorkerGroup.get(
         f"{spec['cluster']}-default", namespace=namespace
     )
