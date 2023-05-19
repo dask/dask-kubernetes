@@ -15,6 +15,16 @@ spec:
     - name: v1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: Status
+          type: string
+          jsonPath: .status.jobStatus
+        - name: Number Of Workers
+          type: integer
+          jsonPath: .spec.cluster.spec.worker.replicas
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           type: object
@@ -57,10 +67,3 @@ spec:
                   $ref: 'python://dask_kubernetes/operator/customresources/templates.yaml#/definitions/dask.k8s.api.v1.DaskCluster'
       subresources:
         status: {}
-      additionalPrinterColumns:
-        - jsonPath: .status.jobStatus
-          name: Status
-          type: string
-        - jsonPath: .spec.cluster.spec.worker.replicas
-          name: Number Of Workers
-          type: integer
