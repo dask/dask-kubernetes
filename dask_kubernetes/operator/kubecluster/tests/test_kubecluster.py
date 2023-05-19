@@ -1,4 +1,5 @@
 import pytest
+import kubernetes_asyncio as kubernetes
 
 from dask.distributed import Client
 from distributed.utils import TimeoutError
@@ -153,3 +154,22 @@ def test_custom_spec(kopf_runner, docker_image):
         with KubeCluster(custom_cluster_spec=spec, n_workers=1) as cluster:
             with Client(cluster) as client:
                 assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
+def test_typo_resource_limits(kopf_runner):
+    with kopf_runner:
+        with pytest.raises(ValueError):
+            KubeCluster(
+                name="foo",
+                resources={
+                    "limit": {  # <-- Typo, should be `limits`
+                        "CPU": "1",
+                    },
+                },
+            )
+
+
+def test_invalid_kwargs_exception(kopf_runner):
+    with kopf_runner:
+        with pytest.raises(kubernetes.client.ApiException):
+            KubeCluster(name="foo", n_workers="1")

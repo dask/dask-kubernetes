@@ -230,6 +230,22 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
+        try:
+            # Validate `resources` param is a dictionary whose
+            # keys must either be 'limits' or 'requests'
+            assert isinstance(
+                self.resources, dict
+            ), f"resources must be dict type, found {type(resources)}"
+            for field in self.resources:
+                if field in ("limits", "requests"):
+                    assert isinstance(
+                        self.resources[field], dict
+                    ), f"key of '{field}' must be dict type"
+                else:
+                    raise ValueError(f"resources has unknown field '{field}'")
+        except AssertionError as e:
+            raise TypeError from e
+
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
@@ -259,7 +275,8 @@ class KubeCluster(Cluster):
             watch_component_status_task = asyncio.create_task(
                 self._watch_component_status()
             )
-            show_rich_output_task = asyncio.create_task(self._show_rich_output())
+            if not self.quiet:
+                show_rich_output_task = asyncio.create_task(self._show_rich_output())
             await ClusterAuth.load_first(self.auth)
             cluster_exists = (await self._get_cluster()) is not None
 
@@ -283,7 +300,8 @@ class KubeCluster(Cluster):
             self._log(f"Ready, dashboard available at {self.dashboard_link}")
         finally:
             watch_component_status_task.cancel()
-            show_rich_output_task.cancel()
+            if not self.quiet:
+                show_rich_output_task.cancel()
 
     def __await__(self):
         async def _():
@@ -323,11 +341,14 @@ class KubeCluster(Cluster):
                     body=data,
                 )
             except kubernetes.client.ApiException as e:
-                raise RuntimeError(
-                    "Failed to create DaskCluster resource. "
-                    "Are the Dask Custom Resource Definitions installed? "
-                    "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
-                ) from e
+                if e.status == 404:
+                    raise RuntimeError(
+                        "Failed to create DaskCluster resource."
+                        "Are the Dask Custom Resource Definitions installed? "
+                        "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
+                    ) from e
+                else:
+                    raise e
 
             try:
                 self._log("Waiting for controller to action cluster")

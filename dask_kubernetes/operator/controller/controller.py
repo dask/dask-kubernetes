@@ -9,7 +9,7 @@ from uuid import uuid4
 import aiohttp
 import kopf
 from importlib_metadata import entry_points
-from kr8s.asyncio import api
+import kr8s
 from kr8s.asyncio.objects import APIObject, Pod, Service
 
 from dask_kubernetes.common.networking import get_scheduler_address
@@ -294,10 +294,9 @@ async def daskcluster_create_components(
 ):
     """When the DaskCluster status.phase goes into Created create the cluster components."""
     logger.info("Creating Dask cluster components.")
-
+    api = await kr8s.asyncio.api()
     annotations = _get_annotations(meta)
     labels = _get_labels(meta)
-    # TODO Check for existing scheduler pod
     scheduler_spec = spec.get("scheduler", {})
     if "metadata" in scheduler_spec:
         if "annotations" in scheduler_spec["metadata"]:
@@ -308,18 +307,31 @@ async def daskcluster_create_components(
         name, scheduler_spec.get("spec"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_pod = Pod(data)
-    await scheduler_pod.create()
-    logger.info(f"Scheduler pod {scheduler_pod.name} created in {namespace}.")
+    pods = await api.get(
+        "pods",
+        namespace=namespace,
+        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={name}",
+    )
+    if len(pods) == 0:
+        scheduler_pod = await Pod(data)
+        await scheduler_pod.create()
+        logger.info(f"Scheduler pod {data['metadata']['name']} created in {namespace}.")
 
-    # TODO Check for existing scheduler service
     data = build_scheduler_service_spec(
         name, scheduler_spec.get("service"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_service = Service(data)
-    await scheduler_service.create()
-    logger.info(f"Scheduler service {scheduler_service.name} created in {namespace}.")
+    services = await api.get(
+        "services",
+        namespace=namespace,
+        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={name}",
+    )
+    if len(services) == 0:
+        scheduler_service = await Service(data)
+        await scheduler_service.create()
+        logger.info(
+            f"Scheduler service {data['metadata']['name']} created in {namespace}."
+        )
 
     worker_spec = spec.get("worker", {})
     annotations = _get_annotations(meta)
@@ -330,10 +342,16 @@ async def daskcluster_create_components(
         if "labels" in worker_spec["metadata"]:
             labels.update(**worker_spec["metadata"]["labels"])
     data = build_default_worker_group_spec(name, worker_spec, annotations, labels)
-    dask_worker_group = DaskWorkerGroup(data)
-    await dask_worker_group.create()
-    logger.info(f"Worker group {dask_worker_group.name} created in {namespace}.")
 
+    worker_groups = await api.get(
+        "daskworkergroups",
+        namespace=namespace,
+        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={name}",
+    )
+    if len(worker_groups) == 0:
+        dask_worker_group = await DaskWorkerGroup(data)
+        await dask_worker_group.create()
+        logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
     patch.status["phase"] = "Pending"
 
 
@@ -380,6 +398,7 @@ async def daskworkergroup_create(body, spec, name, namespace, logger, **kwargs):
 async def retire_workers(
     n_workers, scheduler_service_name, worker_group_name, namespace, logger
 ):
+    api = await kr8s.asyncio.api()
     # Try gracefully retiring via the HTTP API
     dashboard_address = await get_scheduler_address(
         scheduler_service_name,
@@ -424,7 +443,7 @@ async def retire_workers(
     logger.info(
         f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
     )
-    workers = await api().get(
+    workers = await api.get(
         "pods",
         label_selector=f"dask.org/workergroup-name={worker_group_name}",
         namespace=namespace,
@@ -470,6 +489,7 @@ worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 async def daskworkergroup_replica_update(
     name, namespace, meta, spec, new, body, logger, **kwargs
 ):
+    api = await kr8s.asyncio.api()
     cluster_name = spec["cluster"]
 
     # Replica updates can come in quick succession and the changes must be applied atomically to ensure
@@ -477,7 +497,7 @@ async def daskworkergroup_replica_update(
     async with worker_group_scale_locks[f"{namespace}/{name}"]:
         cluster = await DaskCluster.get(cluster_name, namespace=namespace)
 
-        workers = await api().get(
+        workers = await api.get(
             "pods",
             namespace=namespace,
             label_selector=f"dask.org/workergroup-name={name}",
