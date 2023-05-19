@@ -4,6 +4,7 @@ import pathlib
 import os
 import subprocess
 import tempfile
+import sys
 
 from kopf.testing import KopfRunner
 from pytest_kind.cluster import KindCluster
@@ -25,7 +26,17 @@ def kopf_runner(k8s_cluster):
 @pytest.fixture(scope="session")
 def docker_image():
     image_name = "dask-kubernetes:dev"
-    subprocess.run(["docker", "build", "-t", image_name, "./ci/"], check=True)
+    subprocess.run(
+        [
+            "docker",
+            "build",
+            "-t",
+            image_name,
+            f"--build-arg='BASE_IMAGE=ghcr.io/dask/dask:latest-py{sys.version_info.major}.{sys.version_info.minor}'",
+            "./ci/",
+        ],
+        check=True,
+    )
     return image_name
 
 
