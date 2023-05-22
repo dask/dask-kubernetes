@@ -147,8 +147,8 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "-l",
                         "dask.org/component=worker",
                     )
-                    await client.wait_for_workers(0)  # initial deletion
-                    await client.wait_for_workers(3)  # recovery
+                    await client.wait_for_workers(0, timeout=60)  # initial deletion
+                    await client.wait_for_workers(3, timeout=120)  # recovery
 
 
 @pytest.mark.timeout(180)
