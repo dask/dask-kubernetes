@@ -146,8 +146,6 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "pod",
                         "-l",
                         "dask.org/component=worker",
-                        "--grace-period=0",
-                        "--force",
                     )
                     assert scheduler_pod_name not in k8s_cluster.kubectl("get", "pods")
                     await client.wait_for_workers(3, timeout=120)  # recovery

@@ -462,7 +462,7 @@ worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
-@kopf.on.delete("pod", labels={"dask.org/component": "worker"})
+@kopf.on.timer("daskworkergroup.kubernetes.dask.org", interval=30.0)
 async def daskworkergroup_replica_update(
     name, namespace, meta, spec, new, body, logger, **kwargs
 ):
