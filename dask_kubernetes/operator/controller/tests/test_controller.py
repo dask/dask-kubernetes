@@ -140,6 +140,9 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
                     await client.wait_for_workers(3)
 
 
@@ -182,6 +185,9 @@ async def test_scalesimplecluster_from_cluster_spec(
                         "daskcluster.kubernetes.dask.org",
                         cluster_name,
                     )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
                     await client.wait_for_workers(3)
 
 
