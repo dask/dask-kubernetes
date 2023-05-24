@@ -148,7 +148,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "dask.org/component=worker",
                     )
                     assert worker_pod_name not in k8s_cluster.kubectl("get", "pods")
-                    await client.wait_for_workers(3, timeout=120)  # recovery
+                    await client.wait_for_workers(3)  # recovery
 
 
 @pytest.mark.timeout(180)
