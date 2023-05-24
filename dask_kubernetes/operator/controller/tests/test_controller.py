@@ -140,6 +140,54 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                         "daskworkergroup.kubernetes.dask.org",
                         "simple-default",
                     )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
+                    await client.wait_for_workers(3)
+
+
+@pytest.mark.asyncio
+async def test_scalesimplecluster_from_cluster_spec(
+    k8s_cluster, kopf_runner, gen_cluster
+):
+    with kopf_runner as runner:
+        async with gen_cluster() as cluster_name:
+            scheduler_pod_name = "simple-scheduler"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple-scheduler"
+            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
+            while service_name not in k8s_cluster.kubectl("get", "svc"):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "wait",
+                "pods",
+                "--for=condition=Ready",
+                scheduler_pod_name,
+                "--timeout=120s",
+            )
+            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
+                async with Client(
+                    f"tcp://localhost:{port}", asynchronous=True
+                ) as client:
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "--replicas=5",
+                        "daskcluster.kubernetes.dask.org",
+                        cluster_name,
+                    )
+                    await client.wait_for_workers(5)
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "--replicas=3",
+                        "daskcluster.kubernetes.dask.org",
+                        cluster_name,
+                    )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
                     await client.wait_for_workers(3)
 
 
