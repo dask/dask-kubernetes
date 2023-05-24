@@ -147,22 +147,17 @@ async def test_scalesimplecluster_from_cluster_spec(
 ):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
-            scheduler_pod_name = "simple-scheduler"
+            scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
             service_name = "simple-scheduler"
-            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
+                "get", "deployments"
+            ):
                 await asyncio.sleep(0.1)
             while service_name not in k8s_cluster.kubectl("get", "svc"):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
                 await asyncio.sleep(0.1)
-            k8s_cluster.kubectl(
-                "wait",
-                "pods",
-                "--for=condition=Ready",
-                scheduler_pod_name,
-                "--timeout=120s",
-            )
             with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
