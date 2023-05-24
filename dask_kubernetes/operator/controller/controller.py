@@ -15,8 +15,6 @@ from kr8s.asyncio.objects import APIObject
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
-from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.dask import DaskCluster
 from distributed.core import rpc
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
@@ -390,9 +388,8 @@ async def handle_scheduler_service_status(
     else:
         phase = "Running"
 
-    api = HTTPClient(KubeConfig.from_env())
-    cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
-        labels["dask.org/cluster-name"]
+    cluster = await DaskCluster.get(
+        labels["dask.org/cluster-name"], namespace=namespace
     )
     await cluster.patch({"status": {"phase": phase}})
 
