@@ -462,11 +462,13 @@ worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 
 
 def resource_is_deleted(event, **_):
-    return event['type'] == 'DELETED'
+    return event["type"] == "DELETED"
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
-@kopf.on.event("", "v1", "pod", when=resource_is_deleted, labels={"dask.org/component": "worker"})
+@kopf.on.event(
+    "", "v1", "pod", when=resource_is_deleted, labels={"dask.org/component": "worker"}
+)
 async def daskworkergroup_replica_update(
     name, namespace, meta, spec, new, body, logger, **kwargs
 ):
