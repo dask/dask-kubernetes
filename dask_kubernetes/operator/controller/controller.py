@@ -620,19 +620,17 @@ async def daskjob_create_components(
     labels={"dask.org/component": "job-runner"},
     new="Running",
 )
-async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
+async def handle_runner_status_change_running(labels, namespace, logger, **kwargs):
     logger.info("Job now in running")
-    job = await DaskJob.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    job = await DaskJob.get(labels.get("dask.org/cluster-name"), namespace=namespace)
     await job.patch(
         {
-            "status": {
-                "jobStatus": "Running",
-                "startTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
-            }
-        }
+            "jobStatus": "Running",
+            "startTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+        },
+        subresource="status",
     )
+    await job.refresh()
 
 
 @kopf.on.field(
@@ -649,11 +647,10 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
     await cluster.delete()
     await job.patch(
         {
-            "status": {
-                "jobStatus": "Successful",
-                "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
-            }
-        }
+            "jobStatus": "Successful",
+            "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+        },
+        subresource="status",
     )
 
 
@@ -671,11 +668,10 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
     await cluster.delete()
     await job.patch(
         {
-            "status": {
-                "jobStatus": "Failed",
-                "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
-            }
-        }
+            "jobStatus": "Failed",
+            "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
+        },
+        subresource="status",
     )
 
 
