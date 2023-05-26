@@ -230,21 +230,21 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
-        if self.n_workers is not None and not isinstance(self.n_workers, int):
-            raise TypeError(f"n_workers must be an integer, got {type(self.n_workers)}")
-
         try:
             # Validate `resources` param is a dictionary whose
             # keys must either be 'limits' or 'requests'
-            assert isinstance(self.resources, dict)
-
+            assert isinstance(
+                self.resources, dict
+            ), f"resources must be dict type, found {type(resources)}"
             for field in self.resources:
                 if field in ("limits", "requests"):
-                    assert isinstance(self.resources[field], dict)
+                    assert isinstance(
+                        self.resources[field], dict
+                    ), f"key of '{field}' must be dict type"
                 else:
-                    raise ValueError(f"Unknown field '{field}' in resources")
-        except TypeError as e:
-            raise TypeError(f"invalid '{type(resources)}' for resources type") from e
+                    raise ValueError(f"resources has unknown field '{field}'")
+        except AssertionError as e:
+            raise TypeError from e
 
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
@@ -341,11 +341,14 @@ class KubeCluster(Cluster):
                     body=data,
                 )
             except kubernetes.client.ApiException as e:
-                raise RuntimeError(
-                    "Failed to create DaskCluster resource. "
-                    "Are the Dask Custom Resource Definitions installed? "
-                    "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
-                ) from e
+                if e.status == 404:
+                    raise RuntimeError(
+                        "Failed to create DaskCluster resource."
+                        "Are the Dask Custom Resource Definitions installed? "
+                        "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
+                    ) from e
+                else:
+                    raise e
 
             try:
                 self._log("Waiting for controller to action cluster")

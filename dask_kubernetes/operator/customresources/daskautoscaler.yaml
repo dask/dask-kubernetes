@@ -13,6 +13,20 @@ spec:
     - name: v1
       served: true
       storage: true
+      additionalPrinterColumns:
+        - name: Cluster
+          type: string
+          description: Cluster to autoscale
+          jsonPath: .spec.cluster
+        - name: Minimum
+          type: integer
+          jsonPath: .spec.minimum
+        - name: Maximum
+          type: integer
+          jsonPath: .spec.maximum
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           type: object
