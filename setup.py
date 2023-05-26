@@ -19,7 +19,7 @@ setup(
     long_description=(open("README.rst").read() if exists("README.rst") else ""),
     zip_safe=False,
     install_requires=list(open("requirements.txt").read().strip().split("\n")),
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     entry_points="""
         [dask_cluster_discovery]
         helmcluster=dask_kubernetes.helm:discover

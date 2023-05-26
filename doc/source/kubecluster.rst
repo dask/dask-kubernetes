@@ -124,7 +124,7 @@ Additionally, we can also use tools like `dask-cuda
     spec:
       restartPolicy: Never
       containers:
-      - image: rapidsai/rapidsai:cuda11.0-runtime-ubuntu18.04-py3.8
+      - image: nvcr.io/nvidia/rapidsai/rapidsai-core:23.04-cuda11.8-runtime-ubuntu22.04-py3.10
         imagePullPolicy: IfNotPresent
         args: [dask-cuda-worker, $(DASK_SCHEDULER_ADDRESS), --rmm-pool-size, 10GB]
         name: dask-cuda
