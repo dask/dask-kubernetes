@@ -679,7 +679,7 @@ class KubeCluster(Cluster):
             spec = make_worker_spec(
                 env=env or self.env,
                 resources=resources or self.resources,
-                extra_pod_config=extra_pod_config or self.make_worker_spec,
+                extra_pod_config=extra_pod_config or self.extra_pod_config,
                 worker_command=worker_command or self.worker_command,
                 n_workers=n_workers or self.n_workers,
                 image=image or self.image,
