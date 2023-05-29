@@ -77,6 +77,8 @@ class KubeCluster(Cluster):
         Number of workers on initial launch.
         Use ``scale`` to change this number in the future
     resources: Dict[str, str]
+    node_extras: Dict[str, Dict[str, str] | List[Dict[str, str]]]
+        Tolerations, Affinities, and nodeSelectors
     env: List[dict] | Dict[str, str]
         List of environment variables to pass to worker pod.
         Can be a list of dicts using the same structure as k8s envs
@@ -164,6 +166,7 @@ class KubeCluster(Cluster):
         image=None,
         n_workers=None,
         resources=None,
+        node_extras=None,
         env=None,
         worker_command=None,
         auth=ClusterAuth.DEFAULT,
@@ -176,7 +179,6 @@ class KubeCluster(Cluster):
         scheduler_forward_port=None,
         **kwargs,
     ):
-
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = (
             dask.config.get("kubernetes.namespace", override_with=namespace)
@@ -193,6 +195,9 @@ class KubeCluster(Cluster):
             )
         self.resources = dask.config.get(
             "kubernetes.resources", override_with=resources
+        )
+        self.node_extras = dask.config.get(
+            "kubernetes.node_extras", override_with=node_extras
         )
         self.env = dask.config.get("kubernetes.env", override_with=env)
         self.worker_command = dask.config.get(
@@ -324,6 +329,7 @@ class KubeCluster(Cluster):
                     name=self.name,
                     env=self.env,
                     resources=self.resources,
+                    node_extras=self.node_extras,
                     worker_command=self.worker_command,
                     n_workers=self.n_workers,
                     image=self.image,
@@ -523,7 +529,7 @@ class KubeCluster(Cluster):
         table.add_column("Component")
         table.add_column("Status", justify="right")
 
-        for (label, component) in [
+        for label, component in [
             ("DaskCluster", "cluster"),
             ("Scheduler Pod", "schedulerpod"),
             ("Scheduler Service", "schedulerservice"),
@@ -611,6 +617,7 @@ class KubeCluster(Cluster):
         n_workers=3,
         image=None,
         resources=None,
+        node_extras=None,
         worker_command=None,
         env=None,
         custom_spec=None,
@@ -630,6 +637,8 @@ class KubeCluster(Cluster):
         resources: Dict[str, str]
             Resources to be passed to the underlying pods.
             If ommitted will use the cluster default.
+        node_extras: Dict[str, Dict[str, str] | List[Dict[str, str]]]
+         Tolerations, Affinities, and nodeSelectors
         env: List[dict]
             List of environment variables to pass to worker pod.
             If ommitted will use the cluster default.
@@ -647,6 +656,7 @@ class KubeCluster(Cluster):
             n_workers=n_workers,
             image=image,
             resources=resources,
+            node_extras=node_extras,
             worker_command=worker_command,
             env=env,
             custom_spec=custom_spec,
@@ -658,6 +668,7 @@ class KubeCluster(Cluster):
         n_workers=3,
         image=None,
         resources=None,
+        node_extras=None,
         worker_command=None,
         env=None,
         custom_spec=None,
@@ -668,6 +679,7 @@ class KubeCluster(Cluster):
             spec = make_worker_spec(
                 env=env or self.env,
                 resources=resources or self.resources,
+                node_extras=node_extras,
                 worker_command=worker_command or self.worker_command,
                 n_workers=n_workers or self.n_workers,
                 image=image or self.image,
@@ -875,6 +887,7 @@ def make_cluster_spec(
     image="ghcr.io/dask/dask:latest",
     n_workers=None,
     resources=None,
+    node_extras=None,
     env=None,
     worker_command="dask-worker",
     scheduler_service_type="ClusterIP",
@@ -891,6 +904,8 @@ def make_cluster_spec(
         Container image to use for the scheduler and workers
     n_workers: int (optional)
         Number of workers in the default worker group
+    node_extras: dict (optional)
+        nodeSelector, tolerations, affinity
     resources: dict (optional)
         Resource limits to set on scheduler and workers
     env: dict (optional)
@@ -906,6 +921,7 @@ def make_cluster_spec(
             "worker": make_worker_spec(
                 env=env,
                 resources=resources,
+                node_extras=node_extras,
                 worker_command=worker_command,
                 n_workers=n_workers,
                 image=image,
@@ -914,6 +930,7 @@ def make_cluster_spec(
                 cluster_name=name,
                 env=env,
                 resources=resources,
+                node_extras=node_extras,
                 image=image,
                 scheduler_service_type=scheduler_service_type,
             ),
@@ -925,6 +942,7 @@ def make_worker_spec(
     image="ghcr.io/dask/dask:latest",
     n_workers=3,
     resources=None,
+    node_extras={},
     env=None,
     worker_command="dask-worker",
 ):
@@ -948,6 +966,7 @@ def make_worker_spec(
     return {
         "replicas": n_workers,
         "spec": {
+            **node_extras,
             "containers": [
                 {
                     "name": "worker",
@@ -963,7 +982,7 @@ def make_worker_spec(
                         },
                     ],
                 }
-            ]
+            ],
         },
     }
 
@@ -972,6 +991,7 @@ def make_scheduler_spec(
     cluster_name,
     env=None,
     resources=None,
+    node_extras={},
     image="ghcr.io/dask/dask:latest",
     scheduler_service_type="ClusterIP",
 ):
@@ -985,6 +1005,7 @@ def make_scheduler_spec(
 
     return {
         "spec": {
+            **node_extras,
             "containers": [
                 {
                     "name": "scheduler",
@@ -1016,7 +1037,7 @@ def make_scheduler_spec(
                         "periodSeconds": 20,
                     },
                 }
-            ]
+            ],
         },
         "service": {
             "type": scheduler_service_type,
