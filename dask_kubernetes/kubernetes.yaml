@@ -4,6 +4,7 @@ kubernetes:
 
   # Shared options
   name: "dask-{user}-{uuid}"
+  extra_pod_config: {}
   namespace: null
   env: {}
   count:
