@@ -887,7 +887,7 @@ def make_cluster_spec(
     image="ghcr.io/dask/dask:latest",
     n_workers=None,
     resources=None,
-    extra_pod_config=None,
+    extra_pod_config={},
     env=None,
     worker_command="dask-worker",
     scheduler_service_type="ClusterIP",
@@ -954,8 +954,7 @@ def make_worker_spec(
 
     if isinstance(worker_command, str):
         worker_command = worker_command.split(" ")
-    if extra_pod_config is None:
-        extra_pod_config = {}
+
     args = worker_command + [
         "--name",
         "$(DASK_WORKER_NAME)",
@@ -1003,9 +1002,6 @@ def make_scheduler_spec(
     else:
         # If they gave us a list, assume its a list of dicts and already ready to go
         env = env
-
-    if extra_pod_config is None:
-        extra_pod_config = {}
 
     return {
         "spec": {
