@@ -791,6 +791,8 @@ class KubeCluster(Cluster):
                 name=f"{self.name}-{worker_group}",
                 body={"spec": {"replicas": n}},
             )
+            for instance in self._instances:
+                instance.scheduler_info = self.scheduler_info
 
     def adapt(self, minimum=None, maximum=None):
         """Turn on adaptivity
