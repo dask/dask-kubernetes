@@ -867,7 +867,12 @@ class KubeCluster(Cluster):
         --------
         >>> cluster = KubeCluster.from_name(name="simple-cluster")
         """
-        return cls(name=name, create_mode=CreateMode.CONNECT_ONLY, **kwargs)
+        return cls(
+            name=name,
+            create_mode=CreateMode.CONNECT_ONLY,
+            shutdown_on_close=False,
+            **kwargs,
+        )
 
 
 def make_cluster_spec(
