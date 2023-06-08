@@ -105,6 +105,8 @@ def install_gateway(k8s_cluster):
             check=True,
             env={**os.environ},
         )
+    else:
+        yield
 
 
 @pytest.fixture(scope="session", autouse=True)
