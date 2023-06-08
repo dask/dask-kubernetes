@@ -104,6 +104,14 @@ def test_cluster_from_name(kopf_runner, docker_image, ns):
                 assert firstcluster == secondcluster
 
 
+def test_cluster_scheduler_info_updated(kopf_runner, docker_image, ns):
+    with kopf_runner:
+        with KubeCluster(name="abc", namespace=ns, image=docker_image) as firstcluster:
+            with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
+                firstcluster.scale(1)
+                assert firstcluster.scheduler_info == secondcluster.scheduler_info
+
+
 def test_additional_worker_groups(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
