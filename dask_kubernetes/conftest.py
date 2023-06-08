@@ -4,11 +4,12 @@ import pathlib
 import os
 import subprocess
 import tempfile
+import uuid
 
 from kopf.testing import KopfRunner
 from pytest_kind.cluster import KindCluster
 
-from dask_kubernetes.common.utils import check_dependency, get_current_namespace
+from dask_kubernetes.common.utils import check_dependency
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -60,17 +61,12 @@ def install_istio(k8s_cluster):
         )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(autouse=True)
 def ns(k8s_cluster):
-    return get_current_namespace()
-
-
-def run_generate(crd_path, patch_path, temp_path):
-    subprocess.run(
-        ["k8s-crd-resolver", "-r", "-j", patch_path, crd_path, temp_path],
-        check=True,
-        env={**os.environ},
-    )
+    ns = "dask-k8s-pytest-" + uuid.uuid4().hex[:10]
+    k8s_cluster.kubectl("create", "ns", ns)
+    yield ns
+    k8s_cluster.kubectl("delete", "ns", ns, "--wait=false", "--ignore-not-found=true")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -114,6 +110,13 @@ def customresources(k8s_cluster):
 
     temp_dir = tempfile.TemporaryDirectory()
     crd_path = os.path.join(DIR, "operator", "customresources")
+
+    def run_generate(crd_path, patch_path, temp_path):
+        subprocess.run(
+            ["k8s-crd-resolver", "-r", "-j", patch_path, crd_path, temp_path],
+            check=True,
+            env={**os.environ},
+        )
 
     for crd in ["daskcluster", "daskworkergroup", "daskjob", "daskautoscaler"]:
         run_generate(

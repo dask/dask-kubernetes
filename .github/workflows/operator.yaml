@@ -49,37 +49,8 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
-        run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
-      - name: Debug k8s resources
-        if: always()
-        run: kubectl get all -A
-
-
-  gateway:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10"]
-        kubernetes-version: ["1.27.0"]
-
-    env:
-      KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install deps
-        run: ./ci/install-deps.sh
-      - name: Run tests
-        env:
-          KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
-          TEST_ISTIO: "true"
           TEST_DASK_GATEWAY: "true"
-        run: pytest dask_kubernetes/operator/controller/tests/test_controller.py::test_simplecluster
+        run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
       - name: Debug k8s resources
         if: always()
         run: kubectl get all -A
