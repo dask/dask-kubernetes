@@ -807,8 +807,12 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
         pod_ready = False
         try:
+            pods = await coreapi.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={spec['cluster']}",
+            )
             scheduler_pod = await coreapi.read_namespaced_pod(
-                f"{spec['cluster']}-scheduler", namespace
+                pods.items[0].metadata.name, namespace
             )
             if scheduler_pod.status.phase == "Running":
                 pod_ready = True

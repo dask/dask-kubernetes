@@ -131,21 +131,21 @@ def test_cluster_crashloopbackoff(kopf_runner, docker_image):
             KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
 
 
-# def test_adapt(kopf_runner, docker_image):
-#     with kopf_runner:
-#         with KubeCluster(
-#             name="adaptive",
-#             image=docker_image,
-#             n_workers=0,
-#         ) as cluster:
-#             cluster.adapt(minimum=0, maximum=1)
-#             with Client(cluster) as client:
-#                 f = client.submit(lambda x: x + 1, 10)
-#                 assert f.result() == 11
+def test_adapt(kopf_runner, docker_image):
+    with kopf_runner:
+        with KubeCluster(
+            name="adaptive",
+            image=docker_image,
+            n_workers=0,
+        ) as cluster:
+            cluster.adapt(minimum=0, maximum=1)
+            with Client(cluster) as client:
+                f = client.submit(lambda x: x + 1, 10)
+                assert f.result() == 11
 
-#             # Need to clean up the DaskAutoscaler object
-#             # See https://github.com/dask/dask-kubernetes/issues/546
-#             cluster.scale(0)
+            # Need to clean up the DaskAutoscaler object
+            # See https://github.com/dask/dask-kubernetes/issues/546
+            cluster.scale(0)
 
 
 def test_custom_spec(kopf_runner, docker_image):
