@@ -35,7 +35,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +63,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
+          TEST_DASK_GATEWAY: "true"
         run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
       - name: Debug k8s resources
         if: always()
