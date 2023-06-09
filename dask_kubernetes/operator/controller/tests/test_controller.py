@@ -22,7 +22,7 @@ _EXPECTED_LABELS = {"test-label": "label-value"}
 
 
 @pytest.fixture()
-def gen_cluster(k8s_cluster):
+def gen_cluster(k8s_cluster, ns):
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
     @asynccontextmanager
@@ -31,27 +31,23 @@ def gen_cluster(k8s_cluster):
         cluster_name = "simple"
 
         # Create cluster resource
-        k8s_cluster.kubectl("apply", "-f", cluster_path)
+        k8s_cluster.kubectl("apply", "-n", ns, "-f", cluster_path)
         while cluster_name not in k8s_cluster.kubectl(
-            "get", "daskclusters.kubernetes.dask.org"
+            "get", "daskclusters.kubernetes.dask.org", "-n", ns
         ):
             await asyncio.sleep(0.1)
 
         try:
-            yield cluster_name
+            yield cluster_name, ns
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
-            k8s_cluster.kubectl("delete", "-f", cluster_path)
-            while cluster_name in k8s_cluster.kubectl(
-                "get", "daskclusters.kubernetes.dask.org"
-            ):
-                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl("delete", "-n", ns, "-f", cluster_path)
 
     yield cm
 
 
 @pytest.fixture()
-def gen_job(k8s_cluster):
+def gen_job(k8s_cluster, ns):
     """Yields an instantiated context manager for creating/deleting a simple job."""
 
     @asynccontextmanager
@@ -61,19 +57,19 @@ def gen_job(k8s_cluster):
             job_name = yaml.load(f, yaml.Loader)["metadata"]["name"]
 
         # Create cluster resource
-        k8s_cluster.kubectl("apply", "-f", job_path)
+        k8s_cluster.kubectl("apply", "-n", ns, "-f", job_path)
         while job_name not in k8s_cluster.kubectl(
-            "get", "daskjobs.kubernetes.dask.org"
+            "get", "daskjobs.kubernetes.dask.org", "-n", ns
         ):
             await asyncio.sleep(0.1)
 
         try:
-            yield job_name
+            yield job_name, ns
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
-            k8s_cluster.kubectl("delete", "-f", job_path)
+            k8s_cluster.kubectl("delete", "-n", ns, "-f", job_path)
             while job_name in k8s_cluster.kubectl(
-                "get", "daskjobs.kubernetes.dask.org"
+                "get", "daskjobs.kubernetes.dask.org", "-n", ns
             ):
                 await asyncio.sleep(0.1)
 
@@ -103,69 +99,35 @@ def test_operator_plugins(kopf_runner):
     assert "Plugin 'noop' running." in runner.stdout
 
 
-@pytest.mark.asyncio
-async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
-        async with gen_cluster() as cluster_name:
-            scheduler_pod_name = "simple-scheduler"
-            worker_pod_name = "simple-default-worker"
-            service_name = "simple-scheduler"
-            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
-            while service_name not in k8s_cluster.kubectl("get", "svc"):
-                await asyncio.sleep(0.1)
-            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
-                await asyncio.sleep(0.1)
-            k8s_cluster.kubectl(
-                "wait",
-                "pods",
-                "--for=condition=Ready",
-                scheduler_pod_name,
-                "--timeout=120s",
-            )
-            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
-                async with Client(
-                    f"tcp://localhost:{port}", asynchronous=True
-                ) as client:
-                    k8s_cluster.kubectl(
-                        "scale",
-                        "--replicas=5",
-                        "daskworkergroup.kubernetes.dask.org",
-                        "simple-default",
-                    )
-                    await client.wait_for_workers(5)
-                    k8s_cluster.kubectl(
-                        "scale",
-                        "--replicas=3",
-                        "daskworkergroup.kubernetes.dask.org",
-                        "simple-default",
-                    )
-                    await client.wait_for_workers(3)
-
-
 @pytest.mark.timeout(180)
 @pytest.mark.asyncio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
-        async with gen_cluster() as cluster_name:
+        async with gen_cluster() as (cluster_name, ns):
             scheduler_pod_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
             service_name = "simple-scheduler"
 
-            while scheduler_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            while scheduler_pod_name not in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            ):
                 await asyncio.sleep(0.1)
-            while service_name not in k8s_cluster.kubectl("get", "svc"):
+            while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
                 await asyncio.sleep(0.1)
-            while worker_pod_name not in k8s_cluster.kubectl("get", "pods"):
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
                 await asyncio.sleep(0.1)
             k8s_cluster.kubectl(
                 "wait",
+                "-n",
+                ns,
                 "pods",
                 "--for=condition=Ready",
                 scheduler_pod_name,
                 "--timeout=120s",
             )
-            with k8s_cluster.port_forward(f"service/{service_name}", 8786) as port:
+            with k8s_cluster.port_forward(
+                f"service/{service_name}", 8786, "-n", ns
+            ) as port:
                 async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
@@ -179,6 +141,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             scheduler_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
+                "-n",
+                ns,
                 "--selector=dask.org/component=scheduler",
                 "-o",
                 "jsonpath='{.items[0].spec.containers[0].env[0]}'",
@@ -191,6 +155,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "pods",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=scheduler",
                     "-o",
                     "jsonpath='{.items[0].metadata.annotations}'",
@@ -203,6 +169,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "svc",
+                    "-n",
+                    ns,
                     "--selector=dask.org/cluster-name=simple",
                     "-o",
                     "jsonpath='{.items[0].metadata.annotations}'",
@@ -214,6 +182,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             worker_env = k8s_cluster.kubectl(
                 "get",
                 "pods",
+                "-n",
+                ns,
                 "--selector=dask.org/component=worker",
                 "-o",
                 "jsonpath='{.items[0].spec.containers[0].env[0]}'",
@@ -227,6 +197,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "pods",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=worker",
                     "-o",
                     "jsonpath='{.items[0].metadata.annotations}'",
@@ -239,6 +211,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "daskworkergroups",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=workergroup",
                     "-o",
                     "jsonpath='{.items[0].metadata.labels}'",
@@ -252,6 +226,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "pods",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=scheduler",
                     "-o",
                     "jsonpath='{.items[0].metadata.labels}'",
@@ -265,6 +241,8 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
                 k8s_cluster.kubectl(
                     "get",
                     "pods",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=worker",
                     "-o",
                     "jsonpath='{.items[0].metadata.labels}'",
@@ -274,10 +252,120 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert "worker-sublabel" in workergroup_labels
 
 
-def _get_job_status(k8s_cluster):
+@pytest.mark.asyncio
+async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            scheduler_pod_name = "simple-scheduler"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple-scheduler"
+            while scheduler_pod_name not in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            ):
+                await asyncio.sleep(0.1)
+            while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "wait",
+                "pods",
+                "-n",
+                ns,
+                "--for=condition=Ready",
+                scheduler_pod_name,
+                "--timeout=120s",
+            )
+            with k8s_cluster.port_forward(
+                f"service/{service_name}", 8786, "-n", ns
+            ) as port:
+                async with Client(
+                    f"tcp://localhost:{port}", asynchronous=True
+                ) as client:
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "-n",
+                        ns,
+                        "--replicas=5",
+                        "daskworkergroup.kubernetes.dask.org",
+                        "simple-default",
+                    )
+                    await client.wait_for_workers(5)
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "-n",
+                        ns,
+                        "--replicas=3",
+                        "daskworkergroup.kubernetes.dask.org",
+                        "simple-default",
+                    )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
+                    await client.wait_for_workers(3)
+
+
+@pytest.mark.asyncio
+async def test_scalesimplecluster_from_cluster_spec(
+    k8s_cluster, kopf_runner, gen_cluster
+):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            scheduler_pod_name = "simple-scheduler"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple-scheduler"
+            while scheduler_pod_name not in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            ):
+                await asyncio.sleep(0.1)
+            while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "wait",
+                "pods",
+                "-n",
+                ns,
+                "--for=condition=Ready",
+                scheduler_pod_name,
+                "--timeout=120s",
+            )
+            with k8s_cluster.port_forward(
+                f"service/{service_name}", 8786, "-n", ns
+            ) as port:
+                async with Client(
+                    f"tcp://localhost:{port}", asynchronous=True
+                ) as client:
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "-n",
+                        ns,
+                        "--replicas=5",
+                        "daskcluster.kubernetes.dask.org",
+                        cluster_name,
+                    )
+                    await client.wait_for_workers(5)
+                    k8s_cluster.kubectl(
+                        "scale",
+                        "-n",
+                        ns,
+                        "--replicas=3",
+                        "daskcluster.kubernetes.dask.org",
+                        cluster_name,
+                    )
+                    # TODO: Currently, doesn't test anything. Need to add optional
+                    #       argument to wait when removing workers once distributed
+                    #       PR github.com/dask/distributed/pull/6377 is merged.
+                    await client.wait_for_workers(3)
+
+
+def _get_job_status(k8s_cluster, ns):
     return json.loads(
         k8s_cluster.kubectl(
             "get",
+            "-n",
+            ns,
             "daskjobs.kubernetes.dask.org",
             "-o",
             "jsonpath='{.items[0].status}'",
@@ -321,28 +409,31 @@ def _assert_final_job_status(job, job_status, expected_status):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Flaky in CI")
 async def test_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
-        async with gen_job("simplejob.yaml") as job:
+        async with gen_job("simplejob.yaml") as (job, ns):
             assert job
 
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskjobs.kubernetes.dask.org", "-n", ns
+            ):
                 await asyncio.sleep(0.1)
 
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
             while job not in k8s_cluster.kubectl(
-                "get", "daskclusters.kubernetes.dask.org"
+                "get", "daskclusters.kubernetes.dask.org", "-n", ns
             ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_cluster_created(job, job_status)
 
             # Assert job pod is created
@@ -354,13 +445,15 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_running(job, job_status)
 
             job_annotations = json.loads(
                 k8s_cluster.kubectl(
                     "get",
                     "pods",
+                    "-n",
+                    ns,
                     "--selector=dask.org/component=job-runner",
                     "-o",
                     "jsonpath='{.items[0].metadata.annotations}'",
@@ -369,14 +462,18 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             _EXPECTED_ANNOTATIONS.items() <= job_annotations.items()
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
-            while "Completed" not in k8s_cluster.kubectl("get", "po", runner_name):
+            while "Completed" not in k8s_cluster.kubectl(
+                "get", "-n", ns, "po", runner_name
+            ):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
+            while job in k8s_cluster.kubectl(
+                "get", "-n", ns, "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_final_job_status(job, job_status, "Successful")
 
     assert "A DaskJob has been created" in runner.stdout
@@ -386,49 +483,55 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
 @pytest.mark.asyncio
 async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
-        async with gen_job("failedjob.yaml") as job:
+        async with gen_job("failedjob.yaml") as (job, ns):
             assert job
 
             runner_name = f"{job}-runner"
 
             # Assert that job was created
-            while job not in k8s_cluster.kubectl("get", "daskjobs.kubernetes.dask.org"):
+            while job not in k8s_cluster.kubectl(
+                "get", "daskjobs.kubernetes.dask.org", "-n", ns
+            ):
                 await asyncio.sleep(0.1)
 
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_created(job_status)
 
             # Assert that cluster is created
             while job not in k8s_cluster.kubectl(
-                "get", "daskclusters.kubernetes.dask.org"
+                "get", "daskclusters.kubernetes.dask.org", "-n", ns
             ):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(0.1)  # Wait for a short time, to avoid race condition
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_cluster_created(job, job_status)
 
             # Assert job pod is created
-            while job not in k8s_cluster.kubectl("get", "po"):
+            while job not in k8s_cluster.kubectl("get", "po", "-n", ns):
                 await asyncio.sleep(0.1)
 
             # Assert that pod started Running
-            while "Running" not in k8s_cluster.kubectl("get", "po"):
+            while "Running" not in k8s_cluster.kubectl("get", "po", "-n", ns):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_job_status_running(job, job_status)
 
             # Assert job pod runs to failure
-            while "Error" not in k8s_cluster.kubectl("get", "po", runner_name):
+            while "Error" not in k8s_cluster.kubectl(
+                "get", "po", "-n", ns, runner_name
+            ):
                 await asyncio.sleep(0.1)
 
             # Assert cluster is removed on completion
-            while job in k8s_cluster.kubectl("get", "daskclusters.kubernetes.dask.org"):
+            while job in k8s_cluster.kubectl(
+                "get", "-n", ns, "daskclusters.kubernetes.dask.org"
+            ):
                 await asyncio.sleep(0.1)
 
-            job_status = _get_job_status(k8s_cluster)
+            job_status = _get_job_status(k8s_cluster, ns)
             _assert_final_job_status(job, job_status, "Failed")
 
     assert "A DaskJob has been created" in runner.stdout

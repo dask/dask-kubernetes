@@ -2,7 +2,6 @@ apiVersion: kubernetes.dask.org/v1
 kind: DaskJob
 metadata:
   name: failed-job
-  namespace: default
 spec:
   job:
     spec:

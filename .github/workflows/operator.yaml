@@ -35,19 +35,19 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        kubernetes-version: ["1.25.0"]
+        python-version: ["3.9", "3.10"]
+        kubernetes-version: ["1.27.0"]
         include:
         - python-version: "3.10"
-          kubernetes-version: "1.22.13"
+          kubernetes-version: "1.24.13"
         - python-version: "3.10"
-          kubernetes-version: "1.23.10"
+          kubernetes-version: "1.25.9"
         - python-version: "3.10"
-          kubernetes-version: "1.24.4"
+          kubernetes-version: "1.26.4"
 
     env:
       KUBECONFIG: .pytest-kind/pytest-kind/kubeconfig
@@ -63,6 +63,7 @@ jobs:
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
+          TEST_DASK_GATEWAY: "true"
         run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
       - name: Debug k8s resources
         if: always()
