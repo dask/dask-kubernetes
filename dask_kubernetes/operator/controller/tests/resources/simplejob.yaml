@@ -2,7 +2,6 @@ apiVersion: kubernetes.dask.org/v1
 kind: DaskJob
 metadata:
   name: simple-job
-  namespace: default
   annotations:
     test-annotation: "annotation-value"
     "kopf.zalando.org/foobar": "should-not-be-propagated"
