@@ -1,20 +1,18 @@
-name: "Operator"
+name: "HelmCluster"
 on:
   pull_request:
     paths:
-      - ".github/workflows/operator.yaml"
+      - ".github/workflows/helmcluster.yaml"
       - "ci/**"
-      - "dask_kubernetes/operator/**"
+      - "dask_kubernetes/helm/**"
       - "dask_kubernetes/common/**"
-      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
   push:
     paths:
-      - ".github/workflows/operator.yaml"
+      - ".github/workflows/helmcluster.yaml"
       - "ci/**"
-      - "dask_kubernetes/operator/**"
+      - "dask_kubernetes/helm/**"
       - "dask_kubernetes/common/**"
-      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
 
 concurrency:
@@ -22,20 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-chart:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Lint Helm Chart
-        run: helm lint dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
-      - name: Download Pluto
-        uses: FairwindsOps/pluto/github-action@v5.11.1
-      - name: Check for deprecated APIs
-        run: helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator | pluto detect -
-
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -62,9 +48,7 @@ jobs:
       - name: Run tests
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
-          TEST_ISTIO: "true"
-          TEST_DASK_GATEWAY: "true"
-        run: pytest dask_kubernetes/common dask_kubernetes/operator dask_kubernetes/aiopykube
+        run: pytest dask_kubernetes/common/tests dask_kubernetes/helm/tests
       - name: Debug k8s resources
-        if: always()
+        if: success() || failure()
         run: kubectl get all -A
