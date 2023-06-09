@@ -101,7 +101,6 @@ def test_operator_plugins(kopf_runner):
 
 @pytest.mark.timeout(180)
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Debugging hangs")
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
@@ -232,7 +231,6 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Debugging hangs")
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as cluster_name:
@@ -276,7 +274,6 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Debugging hangs")
 async def test_scalesimplecluster_from_cluster_spec(
     k8s_cluster, kopf_runner, gen_cluster
 ):
@@ -368,7 +365,6 @@ def _assert_final_job_status(job, job_status, expected_status):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Debugging hangs")
 async def test_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
         async with gen_job("simplejob.yaml") as job:
