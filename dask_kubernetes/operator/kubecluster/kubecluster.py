@@ -366,11 +366,15 @@ class KubeCluster(Cluster):
                 )
             except CrashLoopBackOffError as e:
                 logs = await self._get_logs()
+                pods = await core_api.list_namespaced_pod(
+                    namespace=self.namespace,
+                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                )
                 await self._close()
                 raise SchedulerStartupError(
                     "Scheduler failed to start.",
                     "Scheduler Pod logs:",
-                    logs[self.name + "-scheduler"],
+                    logs[pods.items[0].metadata.name],
                 ) from e
             self._log("Waiting for scheduler service")
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
@@ -485,9 +489,13 @@ class KubeCluster(Cluster):
 
             # Get Scheduler Pod status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
+                pods = await self.k8s_api.list_namespaced_pod(
+                    namespace=self.namespace,
+                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                )
                 pod = await Pod.objects(
                     self.k8s_api, namespace=self.namespace
-                ).get_by_name(self.name + "-scheduler")
+                ).get_by_name(pods.items[0].metadata.name)
                 phase = pod.obj["status"]["phase"]
                 if phase == "Running":
                     conditions = {
