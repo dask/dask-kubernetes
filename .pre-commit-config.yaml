@@ -29,3 +29,9 @@ repos:
         files: ^dask_kubernetes/operator/go_client/pkg/apis/.*\.go$
         exclude: ^dask_kubernetes/operator/go_client/pkg/apis/.*zz_generated.*\.go$
         pass_filenames: false
+      - id: lint-go-code
+        name: lint-go-code
+        entry: dask_kubernetes/operator/go_client/hack/lint.sh
+        language: script
+        files: ^dask_kubernetes/operator/go_client/.*\.go$
+        pass_filenames: false
