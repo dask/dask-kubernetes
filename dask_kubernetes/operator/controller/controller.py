@@ -46,11 +46,8 @@ class DaskCluster(APIObject):
     plural = "daskclusters"
     singular = "daskcluster"
     namespaced = True
-
-    # TODO make scalable
-    # scalable = True
-    # # Dot notation not yet supported in kr8s
-    # scalable_spec = "worker.replicas"
+    scalable = True
+    scalable_spec = "worker.replicas"
 
 
 class DaskWorkerGroup(APIObject):
