@@ -2,8 +2,9 @@
 
 CURRENT_DIR=$(dirname ${BASH_SOURCE})
 REPO_DIR=$(realpath "$CURRENT_DIR/../../../..")
+MAJOR_VERSION="v2023"
 
-PROJECT_MODULE="github.com/dask/dask-kubernetes"
+PROJECT_MODULE="github.com/dask/dask-kubernetes/${MAJOR_VERSION}"
 IMAGE_NAME="kubernetes-codegen:latest"
 
 CUSTOM_RESOURCE_NAME="kubernetes.dask.org"
