@@ -4,8 +4,7 @@ import kubernetes_asyncio as kubernetes
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
-from dask_kubernetes.aiopykube.dask import DaskCluster
-from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
+from dask_kubernetes.operator.objects import DaskCluster
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 from dask_kubernetes.exceptions import SchedulerStartupError
 
@@ -111,11 +110,8 @@ async def test_cluster_from_name(kopf_runner, docker_image, ns):
                 "abc", namespace=ns, asynchronous=True
             ) as secondcluster:
                 assert firstcluster == secondcluster
-            k8s_api = HTTPClient(KubeConfig.from_env())
-            cluster = await DaskCluster.objects(k8s_api, namespace=ns).get_by_name(
-                "abc"
-            )
-            assert cluster.obj["status"]["phase"] == "Running"
+            cluster = await DaskCluster.get("abc", namespace=ns)
+            assert cluster.status["phase"] == "Running"
 
 
 def test_cluster_scheduler_info_updated(kopf_runner, docker_image, ns):
