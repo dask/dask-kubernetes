@@ -2,7 +2,6 @@ apiVersion: kubernetes.dask.org/v1
 kind: DaskCluster
 metadata:
   name: simple
-  namespace: default
   labels:
     test-label: "label-value"
   annotations:
