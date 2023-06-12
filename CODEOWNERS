@@ -1,7 +1,7 @@
 *   @jacobtomlinson
-dask_kubernetes/operator/customresources/  @bstadlbauer
+dask_kubernetes/operator/customresources/  @jacobtomlinson @bstadlbauer
 
 # Go operator
-go.mod  @bstadlbauer
-go.sum  @bstadlbauer
-dask_kubernetes/operator/go_client/  @bstadlbauer
+go.mod  @jacobtomlinson @bstadlbauer
+go.sum  @jacobtomlinson @bstadlbauer
+dask_kubernetes/operator/go_client/  @jacobtomlinson @bstadlbauer
