@@ -336,6 +336,34 @@ async def test_scalesimplecluster_from_cluster_spec(
                     await client.wait_for_workers(3)
 
 
+@pytest.mark.asyncio
+async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            scheduler_deployment_name = "simple-scheduler"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple-scheduler"
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            ):
+                await asyncio.sleep(0.1)
+            while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "delete",
+                "pods",
+                "-l",
+                "dask.org/cluster-name=simple,dask.org/component=scheduler",
+                "-n",
+                ns,
+            )
+            assert scheduler_deployment_name in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            )
+
+
 def _get_job_status(k8s_cluster, ns):
     return json.loads(
         k8s_cluster.kubectl(
