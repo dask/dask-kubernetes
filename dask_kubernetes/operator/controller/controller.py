@@ -11,8 +11,8 @@ import kopf
 import kubernetes_asyncio as kubernetes
 from importlib_metadata import entry_points
 from kubernetes_asyncio.client import ApiException
-from kr8s.asyncio.objects import APIObject
 
+from dask_kubernetes.operator.objects import DaskCluster
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
@@ -37,45 +37,6 @@ for ep in entry_points(group="dask_operator_plugin"):
 
 class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
-
-
-class DaskCluster(APIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskclusters"
-    kind = "DaskCluster"
-    plural = "daskclusters"
-    singular = "daskcluster"
-    namespaced = True
-    scalable = True
-    scalable_spec = "worker.replicas"
-
-
-class DaskWorkerGroup(APIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskworkergroups"
-    kind = "DaskWorkerGroup"
-    plural = "daskworkergroups"
-    singular = "daskworkergroup"
-    namespaced = True
-    scalable = True
-
-
-class DaskAutoscaler(APIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskautoscalers"
-    kind = "DaskAutoscaler"
-    plural = "daskautoscalers"
-    singular = "daskautoscaler"
-    namespaced = True
-
-
-class DaskJob(APIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskjobs"
-    kind = "DaskJob"
-    plural = "daskjobs"
-    singular = "daskjob"
-    namespaced = True
 
 
 def _get_annotations(meta):
