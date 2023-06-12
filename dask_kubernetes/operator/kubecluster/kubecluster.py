@@ -102,6 +102,9 @@ class KubeCluster(Cluster):
     shutdown_on_close: bool (optional)
         Whether or not to delete the cluster resource when this object is closed.
         Defaults to ``True`` when creating a cluster and ``False`` when connecting to an existing one.
+    idle_timeout: int (optional)
+        If set Kubernetes will delete the cluster automatically if the scheduler is idle for longer than
+        this timeout in seconds.
     resource_timeout: int (optional)
         Time in seconds to wait for Kubernetes resources to enter their expected state.
         Example: If the ``DaskCluster`` resource that gets created isn't moved into a known ``status.phase``
@@ -170,6 +173,7 @@ class KubeCluster(Cluster):
         port_forward_cluster_ip=None,
         create_mode=None,
         shutdown_on_close=None,
+        idle_timeout=None,
         resource_timeout=None,
         scheduler_service_type=None,
         custom_cluster_spec=None,
@@ -219,6 +223,9 @@ class KubeCluster(Cluster):
         )
         self.scheduler_forward_port = dask.config.get(
             "kubernetes.scheduler-forward-port", override_with=scheduler_forward_port
+        )
+        self.idle_timeout = dask.config.get(
+            "kubernetes.idle-timeout", override_with=idle_timeout
         )
 
         if self._custom_cluster_spec:
@@ -328,6 +335,7 @@ class KubeCluster(Cluster):
                     n_workers=self.n_workers,
                     image=self.image,
                     scheduler_service_type=self.scheduler_service_type,
+                    idle_timeout=self.idle_timeout,
                 )
             else:
                 data = self._custom_cluster_spec
@@ -722,7 +730,7 @@ class KubeCluster(Cluster):
         """Delete the dask cluster"""
         return self.sync(self._close, timeout=timeout)
 
-    async def _close(self, timeout=None):
+    async def _close(self, timeout=3600):
         await super()._close()
         if self.shutdown_on_close:
             async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -791,6 +799,9 @@ class KubeCluster(Cluster):
                 name=f"{self.name}-{worker_group}",
                 body={"spec": {"replicas": n}},
             )
+            for instance in self._instances:
+                if instance.name == self.name:
+                    instance.scheduler_info = self.scheduler_info
 
     def adapt(self, minimum=None, maximum=None):
         """Turn on adaptivity
@@ -878,6 +889,7 @@ def make_cluster_spec(
     env=None,
     worker_command="dask-worker",
     scheduler_service_type="ClusterIP",
+    idle_timeout=0,
 ):
     """Generate a ``DaskCluster`` kubernetes resource.
 
@@ -897,12 +909,15 @@ def make_cluster_spec(
         Environment variables to set on scheduler and workers
     worker_command: str (optional)
         Worker command to use when starting the workers
+    idle_timeout: int (optional)
+        Timeout to cleanup idle cluster
     """
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
         "metadata": {"name": name},
         "spec": {
+            "idleTimeout": idle_timeout,
             "worker": make_worker_spec(
                 env=env,
                 resources=resources,

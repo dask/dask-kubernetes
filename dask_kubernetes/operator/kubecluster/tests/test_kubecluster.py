@@ -104,6 +104,14 @@ def test_cluster_from_name(kopf_runner, docker_image, ns):
                 assert firstcluster == secondcluster
 
 
+def test_cluster_scheduler_info_updated(kopf_runner, docker_image, ns):
+    with kopf_runner:
+        with KubeCluster(name="abc", namespace=ns, image=docker_image) as firstcluster:
+            with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
+                firstcluster.scale(1)
+                assert firstcluster.scheduler_info == secondcluster.scheduler_info
+
+
 def test_additional_worker_groups(kopf_runner, docker_image):
     with kopf_runner:
         with KubeCluster(
@@ -124,11 +132,11 @@ def test_cluster_without_operator(docker_image):
 def test_cluster_crashloopbackoff(kopf_runner, docker_image):
     with kopf_runner:
         with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
-            spec = make_cluster_spec(name="foo", n_workers=1)
+            spec = make_cluster_spec(name="crashloopbackoff", n_workers=1)
             spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
                 0
             ] = "dask-schmeduler"
-            KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
+            KubeCluster(custom_cluster_spec=spec, resource_timeout=1, idle_timeout=2)
 
 
 def test_adapt(kopf_runner, docker_image):
