@@ -13,4 +13,5 @@ docker run \
     run -v \
     --enable goimports \
     --enable gofmt \
+    --timeout 3m0s \
     ./...
