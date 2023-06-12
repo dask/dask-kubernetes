@@ -3,9 +3,9 @@ module github.com/dask/dask-kubernetes
 go 1.18
 
 require (
-	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
-	k8s.io/client-go v0.27.2
+	k8s.io/api v0.24.1
+	k8s.io/apimachinery v0.24.1
+	k8s.io/client-go v0.24.1
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 )
 
