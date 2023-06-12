@@ -100,14 +100,14 @@ def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
 @pytest.mark.asyncio
 async def test_cluster_from_name(kopf_runner, docker_image, ns):
     with kopf_runner:
-        with KubeCluster(
+        async with KubeCluster(
             name="abc",
             namespace=ns,
             image=docker_image,
             n_workers=1,
             asynchronous=True,
         ) as firstcluster:
-            with KubeCluster.from_name(
+            async with KubeCluster.from_name(
                 "abc", namespace=ns, asynchronous=True
             ) as secondcluster:
                 assert firstcluster == secondcluster
