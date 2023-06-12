@@ -5,6 +5,7 @@ from dask.distributed import Client
 from distributed.utils import TimeoutError
 
 from dask_kubernetes.aiopykube.dask import DaskCluster
+from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 from dask_kubernetes.exceptions import SchedulerStartupError
 
@@ -99,16 +100,22 @@ def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
 @pytest.mark.asyncio
 async def test_cluster_from_name(kopf_runner, docker_image, ns):
     with kopf_runner:
-        async with KubeCluster(
-            name="abc", namespace=ns, image=docker_image, n_workers=1
+        with KubeCluster(
+            name="abc",
+            namespace=ns,
+            image=docker_image,
+            n_workers=1,
+            asynchronous=True,
         ) as firstcluster:
-            async with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
+            with KubeCluster.from_name(
+                "abc", namespace=ns, asynchronous=True
+            ) as secondcluster:
                 assert firstcluster == secondcluster
-            async with kubernetes.client.api_client.ApiClient() as api_client:
-                cluster = await DaskCluster.objects(
-                    kubernetes.client.CoreV1Api(api_client), namespace=ns
-                ).get_by_name("abc")
-                assert cluster.obj["status"]["phase"] == "Running"
+            k8s_api = HTTPClient(KubeConfig.from_env())
+            cluster = await DaskCluster.objects(k8s_api, namespace=ns).get_by_name(
+                "abc"
+            )
+            assert cluster.obj["status"]["phase"] == "Running"
 
 
 def test_cluster_scheduler_info_updated(kopf_runner, docker_image, ns):
