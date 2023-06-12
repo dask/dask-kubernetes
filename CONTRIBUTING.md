@@ -28,4 +28,6 @@ In case you have changed the custom resource definitions, please port your chang
 ./dask_kubernetes/operator/go_client/hack/regenerate-code.sh
 ```
 to regenerate all the files. Code-generation will also happen automatically upon commit and on CI, using `pre-commit`.
- 
+
+#### Versioning
+`go` is very opinionated when it comes to versioning, especially regarding breaking changes. It's versioning system is designed around [Semantic Versioning](https://semver.org/) which is different from [Calendar Versioning](https://calver.org/) used throughout `dask`. In `go`, each major version is it's own package ([docs](https://go.dev/doc/modules/release-workflow#breaking)), which is why need to increase the version (i.e. the year from CalVer) in `./go.mod` as well as in `./dask_kubernetes/operator/go_client/hack/regenerate-code.sh` yearly for this work.
