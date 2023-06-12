@@ -417,7 +417,7 @@ async def retire_workers(
             )
 
     # Otherwise try gracefully retiring via the RPC
-    logger.info(
+    logger.debug(
         f"Scaling {worker_group_name} failed via the HTTP API, falling back to the Dask RPC"
     )
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
@@ -436,7 +436,7 @@ async def retire_workers(
             return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
-    logger.info(
+    logger.debug(
         f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
     )
     async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -471,7 +471,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
             )
 
     # Otherwise try gracefully checking via the RPC
-    logger.info(
+    logger.debug(
         f"Checking {scheduler_service_name} idleness failed via the HTTP API, falling back to the Dask RPC"
     )
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
@@ -488,7 +488,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
             return idle_since
 
     # Finally fall back to code injection via the Dask RPC for distributed<=2023.3.1
-    logger.info(
+    logger.debug(
         f"Checking {scheduler_service_name} idleness failed via the Dask RPC, falling back to run_on_scheduler"
     )
 
@@ -976,11 +976,15 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
     if spec["idleTimeout"]:
-        idle_since = await check_scheduler_idle(
-            scheduler_service_name=f"{name}-scheduler",
-            namespace=namespace,
-            logger=logger,
-        )
+        try:
+            idle_since = await check_scheduler_idle(
+                scheduler_service_name=f"{name}-scheduler",
+                namespace=namespace,
+                logger=logger,
+            )
+        except Exception as e:
+            logger.warn("Unable to connect to scheduler, skipping autoshutdown check.")
+            return
         if idle_since and time.time() > idle_since + spec["idleTimeout"]:
             api = HTTPClient(KubeConfig.from_env())
             cluster = await DaskCluster.objects(api, namespace=namespace).get_by_name(
