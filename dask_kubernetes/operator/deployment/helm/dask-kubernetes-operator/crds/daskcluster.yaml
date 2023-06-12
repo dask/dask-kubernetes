@@ -30,6 +30,9 @@ spec:
         properties:
           spec:
             properties:
+              idleTimeout:
+                default: 0
+                type: integer
               scheduler:
                 properties:
                   metadata:
