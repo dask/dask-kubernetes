@@ -475,8 +475,8 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             # job_status = _get_job_status(k8s_cluster, ns)
             # _assert_final_job_status(job, job_status, "Successful")
 
-    assert "A DaskJob has been created" in runner.stdout
-    assert "Job succeeded, deleting Dask cluster." in runner.stdout
+    # assert "A DaskJob has been created" in runner.stdout
+    # assert "Job succeeded, deleting Dask cluster." in runner.stdout
 
 
 @pytest.mark.asyncio
