@@ -363,6 +363,7 @@ async def daskworkergroup_create(body, spec, name, namespace, logger, **kwargs):
 
     del kwargs["new"]
     await daskworkergroup_replica_update(
+        body=body,
         spec=spec,
         name=name,
         namespace=namespace,
