@@ -374,11 +374,15 @@ class KubeCluster(Cluster):
                 )
             except CrashLoopBackOffError as e:
                 logs = await self._get_logs()
+                pods = await core_api.list_namespaced_pod(
+                    namespace=self.namespace,
+                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                )
                 await self._close()
                 raise SchedulerStartupError(
                     "Scheduler failed to start.",
                     "Scheduler Pod logs:",
-                    logs[self.name + "-scheduler"],
+                    logs[pods.items[0].metadata.name],
                 ) from e
             self._log("Waiting for scheduler service")
             await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
@@ -493,22 +497,30 @@ class KubeCluster(Cluster):
 
             # Get Scheduler Pod status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
-                pod = await Pod.objects(
-                    self.k8s_api, namespace=self.namespace
-                ).get_by_name(self.name + "-scheduler")
-                phase = pod.obj["status"]["phase"]
-                if phase == "Running":
-                    conditions = {
-                        c["type"]: c["status"] for c in pod.obj["status"]["conditions"]
-                    }
-                    if "Ready" not in conditions or conditions["Ready"] != "True":
-                        phase = "Health Checking"
-                    if "containerStatuses" in pod.obj["status"]:
-                        for container in pod.obj["status"]["containerStatuses"]:
-                            if "waiting" in container["state"]:
-                                phase = container["state"]["waiting"]["reason"]
+                async with kubernetes.client.api_client.ApiClient() as api_client:
+                    core_api = kubernetes.client.CoreV1Api(api_client)
+                    pods = await core_api.list_namespaced_pod(
+                        namespace=self.namespace,
+                        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                    )
+                if pods.items:
+                    pod = await Pod.objects(
+                        self.k8s_api, namespace=self.namespace
+                    ).get_by_name(pods.items[0].metadata.name)
+                    phase = pod.obj["status"]["phase"]
+                    if phase == "Running":
+                        conditions = {
+                            c["type"]: c["status"]
+                            for c in pod.obj["status"]["conditions"]
+                        }
+                        if "Ready" not in conditions or conditions["Ready"] != "True":
+                            phase = "Health Checking"
+                        if "containerStatuses" in pod.obj["status"]:
+                            for container in pod.obj["status"]["containerStatuses"]:
+                                if "waiting" in container["state"]:
+                                    phase = container["state"]["waiting"]["reason"]
 
-                self._startup_component_status["schedulerpod"] = phase
+                    self._startup_component_status["schedulerpod"] = phase
 
             # Get Scheduler Service status
             with suppress(pykube.exceptions.ObjectDoesNotExist):

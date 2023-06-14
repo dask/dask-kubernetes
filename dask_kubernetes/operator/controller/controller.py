@@ -60,7 +60,9 @@ def _get_labels(meta):
     }
 
 
-def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
+def build_scheduler_deployment_spec(
+    cluster_name, namespace, pod_spec, annotations, labels
+):
     labels.update(
         **{
             "dask.org/cluster-name": cluster_name,
@@ -68,14 +70,24 @@ def build_scheduler_pod_spec(cluster_name, spec, annotations, labels):
             "sidecar.istio.io/inject": "false",
         }
     )
+    metadata = {
+        "name": f"{cluster_name}-scheduler",
+        "labels": labels,
+        "annotations": annotations,
+    }
+    spec = {}
+    spec["replicas"] = 1
+    spec["selector"] = {
+        "matchLabels": labels,
+    }
+    spec["template"] = {
+        "metadata": metadata,
+        "spec": pod_spec,
+    }
     return {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": f"{cluster_name}-scheduler",
-            "labels": labels,
-            "annotations": annotations,
-        },
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": metadata,
         "spec": spec,
     }
 
@@ -270,8 +282,8 @@ async def daskcluster_create_components(
                 annotations.update(**scheduler_spec["metadata"]["annotations"])
             if "labels" in scheduler_spec["metadata"]:
                 labels.update(**scheduler_spec["metadata"]["labels"])
-        data = build_scheduler_pod_spec(
-            name, scheduler_spec.get("spec"), annotations, labels
+        data = build_scheduler_deployment_spec(
+            name, namespace, scheduler_spec.get("spec"), annotations, labels
         )
         kopf.adopt(data)
         pod = await api.list_namespaced_pod(
@@ -279,12 +291,12 @@ async def daskcluster_create_components(
             label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={name}",
         )
         if not pod.items:
-            await api.create_namespaced_pod(
+            await kubernetes.client.AppsV1Api(api_client).create_namespaced_deployment(
                 namespace=namespace,
                 body=data,
             )
             logger.info(
-                f"Scheduler pod {data['metadata']['name']} created in {namespace}."
+                f"Scheduler deployment {data['metadata']['name']} created in {namespace}."
             )
 
         data = build_scheduler_service_spec(
@@ -295,7 +307,7 @@ async def daskcluster_create_components(
             namespace=namespace,
             label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={name}",
         )
-        if not pod.items:
+        if not service.items:
             await api.create_namespaced_service(
                 namespace=namespace,
                 body=data,
@@ -862,8 +874,12 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
         pod_ready = False
         try:
+            pods = await coreapi.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={spec['cluster']}",
+            )
             scheduler_pod = await coreapi.read_namespaced_pod(
-                f"{spec['cluster']}-scheduler", namespace
+                pods.items[0].metadata.name, namespace
             )
             if scheduler_pod.status.phase == "Running":
                 pod_ready = True
