@@ -497,10 +497,12 @@ class KubeCluster(Cluster):
 
             # Get Scheduler Pod status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
-                pods = await self.k8s_api.list_namespaced_pod(
-                    namespace=self.namespace,
-                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
-                )
+                async with kubernetes.client.api_client.ApiClient() as api_client:
+                    core_api = kubernetes.client.CoreV1Api(api_client)
+                    pods = await core_api.list_namespaced_pod(
+                        namespace=self.namespace,
+                        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                    )
                 pod = await Pod.objects(
                     self.k8s_api, namespace=self.namespace
                 ).get_by_name(pods.items[0].metadata.name)

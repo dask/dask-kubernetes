@@ -359,6 +359,16 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
                 "-n",
                 ns,
             )
+            k8s_cluster.kubectl(
+                "wait",
+                "--for=condition=Ready",
+                "-l",
+                "dask.org/cluster-name=simple,dask.org/component=scheduler",
+                "pod",
+                "-n",
+                ns,
+                "--timeout=60s",
+            )
             assert scheduler_deployment_name in k8s_cluster.kubectl(
                 "get", "pods", "-n", ns
             )
