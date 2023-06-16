@@ -1,0 +1,29 @@
+# As we're using CalVer, we need to update the major version of the go package every year
+# More info in this discussion: https://github.com/dask/dask-kubernetes/pull/731#discussion_r1226569925
+name: "Update go package version"
+
+on:
+  schedule:
+    - cron: "0 0 1 1 *" # At 00:00 on January 1st
+
+jobs:
+  update-major-go-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Update go package version
+        run: |
+          PAST_YEAR=2023
+          CURRENT_YEAR=2024
+          sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" go.mod
+          sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/hack/regenerate-code.sh
+          sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1/register.go
+          ./dask_kubernetes/operator/go_client/hack/regenerate-code.sh
+      - uses: peter-evans/create-pull-request@v4
+        with:
+          commit-message: "Update major go package version"
+          title: "Update major go package version"
+          body: "Update major go package version"
+          branch: "update-go-package-version"
+          branch-suffix: "timestamp"
+          delete-branch: true
