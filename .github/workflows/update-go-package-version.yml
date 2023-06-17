@@ -4,7 +4,7 @@ name: "Update go package version"
 
 on:
   schedule:
-    - cron: "0 0 1 1 *" # At 00:00 on January 1st
+    - cron: "0 0 2 1 *"  # 00:00 UTC on the 2nd of January every year
 
 jobs:
   update-major-go-version:
@@ -13,8 +13,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Update go package version
         run: |
-          PAST_YEAR=2023
-          CURRENT_YEAR=2024
+          PAST_YEAR=$(date -d "last year" '+%Y')
+          CURRENT_YEAR=$(date '+%Y')
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" go.mod
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/hack/regenerate-code.sh
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1/register.go
