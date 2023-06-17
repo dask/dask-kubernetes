@@ -196,8 +196,14 @@ async def get_scheduler_address(
 async def wait_for_scheduler(api, cluster_name, namespace, timeout=None):
     pod_start_time = None
     while True:
+        async with kubernetes.client.api_client.ApiClient() as api_client:
+            k8s_api = kubernetes.client.CoreV1Api(api_client)
+            pods = await k8s_api.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={cluster_name}",
+            )
         pod = await Pod.objects(api, namespace=namespace).get_by_name(
-            cluster_name + "-scheduler"
+            pods.items[0].metadata.name
         )
         phase = pod.obj["status"]["phase"]
         if phase == "Running":

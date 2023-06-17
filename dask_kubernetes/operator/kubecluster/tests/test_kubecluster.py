@@ -4,6 +4,7 @@ import kubernetes_asyncio as kubernetes
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
+from dask_kubernetes.operator.objects import DaskCluster
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 from dask_kubernetes.exceptions import SchedulerStartupError
 
@@ -95,13 +96,30 @@ def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
-def test_cluster_from_name(kopf_runner, docker_image, ns):
+@pytest.mark.asyncio
+async def test_cluster_from_name(kopf_runner, docker_image, ns):
     with kopf_runner:
-        with KubeCluster(
-            name="abc", namespace=ns, image=docker_image, n_workers=1
+        async with KubeCluster(
+            name="abc",
+            namespace=ns,
+            image=docker_image,
+            n_workers=1,
+            asynchronous=True,
         ) as firstcluster:
-            with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
+            async with KubeCluster.from_name(
+                "abc", namespace=ns, asynchronous=True
+            ) as secondcluster:
                 assert firstcluster == secondcluster
+            cluster = await DaskCluster.get("abc", namespace=ns)
+            assert cluster.status["phase"] == "Running"
+
+
+def test_cluster_scheduler_info_updated(kopf_runner, docker_image, ns):
+    with kopf_runner:
+        with KubeCluster(name="abc", namespace=ns, image=docker_image) as firstcluster:
+            with KubeCluster.from_name("abc", namespace=ns) as secondcluster:
+                firstcluster.scale(1)
+                assert firstcluster.scheduler_info == secondcluster.scheduler_info
 
 
 def test_additional_worker_groups(kopf_runner, docker_image):
@@ -124,11 +142,11 @@ def test_cluster_without_operator(docker_image):
 def test_cluster_crashloopbackoff(kopf_runner, docker_image):
     with kopf_runner:
         with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
-            spec = make_cluster_spec(name="foo", n_workers=1)
+            spec = make_cluster_spec(name="crashloopbackoff", n_workers=1)
             spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
                 0
             ] = "dask-schmeduler"
-            KubeCluster(custom_cluster_spec=spec, resource_timeout=1)
+            KubeCluster(custom_cluster_spec=spec, resource_timeout=1, idle_timeout=2)
 
 
 def test_adapt(kopf_runner, docker_image):
