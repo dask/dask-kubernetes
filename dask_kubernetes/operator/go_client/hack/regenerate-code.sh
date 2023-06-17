@@ -15,13 +15,14 @@ docker build -f "${CURRENT_DIR}/Dockerfile" \
              -t "${IMAGE_NAME}" \
              .
 
-cmd="./generate-groups.sh all \
-    "$PROJECT_MODULE/dask_kubernetes/operator/go_client/pkg/client" \
-    "$PROJECT_MODULE/dask_kubernetes/operator/go_client/pkg/apis" \
-    $CUSTOM_RESOURCE_NAME:$CUSTOM_RESOURCE_VERSION"
-
-
 echo "Generating client codes..."
 docker run --rm \
            -v "${REPO_DIR}:/go/src/${PROJECT_MODULE}" \
-           "${IMAGE_NAME}" $cmd
+           -w "/go/src/${PROJECT_MODULE}" \
+           "${IMAGE_NAME}" \
+           /go/src/k8s.io/code-generator/generate-groups.sh \
+            all \
+            $PROJECT_MODULE/dask_kubernetes/operator/go_client/pkg/client \
+            $PROJECT_MODULE/dask_kubernetes/operator/go_client/pkg/apis \
+            $CUSTOM_RESOURCE_NAME:$CUSTOM_RESOURCE_VERSION \
+            -h /root/boilerplate.txt
