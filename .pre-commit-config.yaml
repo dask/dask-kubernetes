@@ -22,11 +22,16 @@ repos:
         language: script
         types: [yaml]
         pass_filenames: true
-      - id: check-go-generation
-        name: check-go-generation
+      - id: regenerate-go-code
+        name: regenerate-go-code
         entry: dask_kubernetes/operator/go_client/hack/regenerate-code.sh
         language: script
-        files: ^dask_kubernetes/operator/go_client/pkg/apis/.*\.go$
+        files: |
+          (?x)^(
+            go\.mod
+            |go\.sum
+            |dask_kubernetes/operator/go_client/pkg/apis/.*\.go
+          )$
         exclude: ^dask_kubernetes/operator/go_client/pkg/apis/.*zz_generated.*\.go$
         pass_filenames: false
       - id: lint-go-code
