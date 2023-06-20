@@ -104,27 +104,19 @@ def test_operator_plugins(kopf_runner):
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
-            scheduler_pod_name = "simple-scheduler"
+            scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
             service_name = "simple-scheduler"
 
-            while scheduler_pod_name not in k8s_cluster.kubectl(
-                "get", "pods", "-n", ns
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
+                "get", "deployments", "-n", ns
             ):
                 await asyncio.sleep(0.1)
             while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
                 await asyncio.sleep(0.1)
-            k8s_cluster.kubectl(
-                "wait",
-                "-n",
-                ns,
-                "pods",
-                "--for=condition=Ready",
-                scheduler_pod_name,
-                "--timeout=120s",
-            )
+
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
@@ -256,26 +248,18 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
-            scheduler_pod_name = "simple-scheduler"
+            scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
             service_name = "simple-scheduler"
-            while scheduler_pod_name not in k8s_cluster.kubectl(
-                "get", "pods", "-n", ns
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
+                "get", "deployments", "-n", ns
             ):
                 await asyncio.sleep(0.1)
             while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
                 await asyncio.sleep(0.1)
-            k8s_cluster.kubectl(
-                "wait",
-                "pods",
-                "-n",
-                ns,
-                "--for=condition=Ready",
-                scheduler_pod_name,
-                "--timeout=120s",
-            )
+
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
@@ -311,10 +295,10 @@ async def test_scalesimplecluster_from_cluster_spec(
 ):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
-            scheduler_pod_name = "simple-scheduler"
+            scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
             service_name = "simple-scheduler"
-            while scheduler_pod_name not in k8s_cluster.kubectl(
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
                 "get", "pods", "-n", ns
             ):
                 await asyncio.sleep(0.1)
@@ -322,15 +306,7 @@ async def test_scalesimplecluster_from_cluster_spec(
                 await asyncio.sleep(0.1)
             while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
                 await asyncio.sleep(0.1)
-            k8s_cluster.kubectl(
-                "wait",
-                "pods",
-                "-n",
-                ns,
-                "--for=condition=Ready",
-                scheduler_pod_name,
-                "--timeout=120s",
-            )
+
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
@@ -358,6 +334,44 @@ async def test_scalesimplecluster_from_cluster_spec(
                     #       argument to wait when removing workers once distributed
                     #       PR github.com/dask/distributed/pull/6377 is merged.
                     await client.wait_for_workers(3)
+
+
+@pytest.mark.asyncio
+async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            scheduler_deployment_name = "simple-scheduler"
+            worker_pod_name = "simple-default-worker"
+            service_name = "simple-scheduler"
+            while scheduler_deployment_name not in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            ):
+                await asyncio.sleep(0.1)
+            while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
+                await asyncio.sleep(0.1)
+            while worker_pod_name not in k8s_cluster.kubectl("get", "pods", "-n", ns):
+                await asyncio.sleep(0.1)
+            k8s_cluster.kubectl(
+                "delete",
+                "pods",
+                "-l",
+                "dask.org/cluster-name=simple,dask.org/component=scheduler",
+                "-n",
+                ns,
+            )
+            k8s_cluster.kubectl(
+                "wait",
+                "--for=condition=Ready",
+                "-l",
+                "dask.org/cluster-name=simple,dask.org/component=scheduler",
+                "pod",
+                "-n",
+                ns,
+                "--timeout=60s",
+            )
+            assert scheduler_deployment_name in k8s_cluster.kubectl(
+                "get", "pods", "-n", ns
+            )
 
 
 def _get_job_status(k8s_cluster, ns):
