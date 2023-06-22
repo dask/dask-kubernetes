@@ -263,6 +263,9 @@ class KubeCluster(Cluster):
         self._startup_component_status = {}
 
         super().__init__(name=name, loop=loop, asynchronous=asynchronous, **kwargs)
+
+        # If https://github.com/dask/distributed/pull/7941 is merged we can
+        # simplify the next 8 lines to ``if not self.called_from_running_loop:``
         try:
             called_from_running_loop = (
                 getattr(loop, "asyncio_loop", None) is asyncio.get_running_loop()
