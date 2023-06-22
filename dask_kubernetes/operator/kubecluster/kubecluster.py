@@ -178,9 +178,10 @@ class KubeCluster(Cluster):
         scheduler_service_type=None,
         custom_cluster_spec=None,
         scheduler_forward_port=None,
+        loop=None,
+        asynchronous=False,
         **kwargs,
     ):
-
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = (
             dask.config.get("kubernetes.namespace", override_with=namespace)
@@ -261,12 +262,15 @@ class KubeCluster(Cluster):
         self._rich_spinner = Spinner("dots", speed=0.5)
         self._startup_component_status = {}
 
-        super().__init__(name=name, **kwargs)
+        super().__init__(name=name, loop=loop, asynchronous=asynchronous, **kwargs)
         try:
-            asynchronous = self.asynchronous
+            called_from_running_loop = (
+                getattr(loop, "asyncio_loop", None) is asyncio.get_running_loop()
+            )
         except RuntimeError:
-            asynchronous = False
-        if not asynchronous:
+            called_from_running_loop = asynchronous
+
+        if not called_from_running_loop:
             self._loop_runner.start()
             self.sync(self._start)
 
@@ -547,7 +551,7 @@ class KubeCluster(Cluster):
         table.add_column("Component")
         table.add_column("Status", justify="right")
 
-        for (label, component) in [
+        for label, component in [
             ("DaskCluster", "cluster"),
             ("Scheduler Pod", "schedulerpod"),
             ("Scheduler Service", "schedulerservice"),
