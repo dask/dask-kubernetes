@@ -423,7 +423,6 @@ def _assert_final_job_status(job, job_status, expected_status):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Flaky in CI")
 async def test_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
         async with gen_job("simplejob.yaml") as (job, ns):
@@ -451,11 +450,11 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
             _assert_job_status_cluster_created(job, job_status)
 
             # Assert job pod is created
-            while job not in k8s_cluster.kubectl("get", "po"):
+            while job not in k8s_cluster.kubectl("get", "po", "-n", ns):
                 await asyncio.sleep(0.1)
 
             # Assert that pod started Running
-            while "Running" not in k8s_cluster.kubectl("get", "po"):
+            while "Running" not in k8s_cluster.kubectl("get", "po", "-n", ns):
                 await asyncio.sleep(0.1)
 
             await asyncio.sleep(5)  # Wait for a short time, to avoid race condition
@@ -473,7 +472,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
                     "jsonpath='{.items[0].metadata.annotations}'",
                 )[1:-1]
             )
-            _EXPECTED_ANNOTATIONS.items() <= job_annotations.items()
+            assert _EXPECTED_ANNOTATIONS.items() <= job_annotations.items()
 
             # Assert job pod runs to completion (will fail if doesn't connect to cluster)
             while "Completed" not in k8s_cluster.kubectl(
