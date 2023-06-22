@@ -262,7 +262,11 @@ class KubeCluster(Cluster):
         self._startup_component_status = {}
 
         super().__init__(name=name, **kwargs)
-        if not self.asynchronous:
+        try:
+            asynchronous = self.asynchronous
+        except RuntimeError:
+            asynchronous = False
+        if not asynchronous:
             self._loop_runner.start()
             self.sync(self._start)
 
