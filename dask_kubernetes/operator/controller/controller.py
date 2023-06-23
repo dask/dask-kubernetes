@@ -1,5 +1,4 @@
 import asyncio
-import copy
 from collections import defaultdict
 import time
 from contextlib import suppress
@@ -111,10 +110,9 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
     }
 
 
-def build_worker_pod_spec(
-    worker_group_name, namespace, cluster_name, uuid, spec, annotations, labels
+def build_worker_deployment_spec(
+    worker_group_name, namespace, cluster_name, uuid, pod_spec, annotations, labels
 ):
-    spec = copy.deepcopy(spec)
     labels.update(
         **{
             "dask.org/cluster-name": cluster_name,
@@ -124,14 +122,24 @@ def build_worker_pod_spec(
         }
     )
     worker_name = f"{worker_group_name}-worker-{uuid}"
-    pod_spec = {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": worker_name,
-            "labels": labels,
-            "annotations": annotations,
-        },
+    metadata = {
+        "name": worker_name,
+        "labels": labels,
+        "annotations": annotations,
+    }
+    spec = {}
+    spec["replicas"] = 1  # make_worker_spec returns dict with a replicas key?
+    spec["selector"] = {
+        "matchLabels": labels,
+    }
+    spec["template"] = {
+        "metadata": metadata,
+        "spec": pod_spec,
+    }
+    deployment_spec = {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": metadata,
         "spec": spec,
     }
     env = [
@@ -144,12 +152,14 @@ def build_worker_pod_spec(
             "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
-    for i in range(len(pod_spec["spec"]["containers"])):
-        if "env" in pod_spec["spec"]["containers"][i]:
-            pod_spec["spec"]["containers"][i]["env"].extend(env)
+    for i in range(len(deployment_spec["spec"]["template"]["spec"]["containers"])):
+        if "env" in deployment_spec["spec"]["template"]["spec"]["containers"][i]:
+            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"].extend(
+                env
+            )
         else:
-            pod_spec["spec"]["containers"][i]["env"] = env
-    return pod_spec
+            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"] = env
+    return deployment_spec
 
 
 def get_job_runner_pod_name(job_name):
@@ -632,18 +642,20 @@ async def daskworkergroup_replica_update(
                     labels.update(**worker_spec["metadata"]["labels"])
             if workers_needed > 0:
                 for _ in range(workers_needed):
-                    data = build_worker_pod_spec(
+                    data = build_worker_deployment_spec(
                         worker_group_name=name,
                         namespace=namespace,
                         cluster_name=cluster_name,
                         uuid=uuid4().hex[:10],
-                        spec=worker_spec["spec"],
+                        pod_spec=worker_spec["spec"],
                         annotations=annotations,
                         labels=labels,
                     )
                     kopf.adopt(data, owner=body)
                     kopf.label(data, labels=cluster_labels)
-                    await corev1api.create_namespaced_pod(
+                    await kubernetes.client.AppsV1Api(
+                        api_client
+                    ).create_namespaced_deployment(
                         namespace=namespace,
                         body=data,
                     )
@@ -660,7 +672,9 @@ async def daskworkergroup_replica_update(
                 )
                 logger.info(f"Workers to close: {worker_ids}")
                 for wid in worker_ids:
-                    await corev1api.delete_namespaced_pod(
+                    await kubernetes.client.AppsV1Api(
+                        api_client
+                    ).delete_namespaced_deployment(
                         name=wid,
                         namespace=namespace,
                     )
