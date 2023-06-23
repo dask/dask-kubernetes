@@ -396,6 +396,9 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
             )
             # Delete a worker Pod
             await pods[0].delete()
+            # Wait for deleted Pod to go away
+            while pods[0].exists():
+                await asyncio.sleep(0.1)
             # Wait for Pods to be recreated
             while len((pods := await wg.pods())) < n_pods:
                 await asyncio.sleep(0.1)
