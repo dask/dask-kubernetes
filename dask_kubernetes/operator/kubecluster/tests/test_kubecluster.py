@@ -4,7 +4,7 @@ import kubernetes_asyncio as kubernetes
 from dask.distributed import Client
 from distributed.utils import TimeoutError
 
-from dask_kubernetes.operator.objects import DaskCluster
+from dask_kubernetes.operator._objects import DaskCluster
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 from dask_kubernetes.exceptions import SchedulerStartupError
 

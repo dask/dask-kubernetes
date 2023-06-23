@@ -14,7 +14,7 @@ from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
 )
-from dask_kubernetes.operator.objects import DaskCluster, DaskWorkerGroup, DaskJob
+from dask_kubernetes.operator._objects import DaskCluster, DaskWorkerGroup, DaskJob
 
 DIR = pathlib.Path(__file__).parent.absolute()
 

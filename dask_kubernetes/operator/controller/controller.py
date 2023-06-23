@@ -11,7 +11,7 @@ import kubernetes_asyncio as kubernetes
 from importlib_metadata import entry_points
 from kubernetes_asyncio.client import ApiException
 
-from dask_kubernetes.operator.objects import DaskCluster
+from dask_kubernetes.operator._objects import DaskCluster
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
