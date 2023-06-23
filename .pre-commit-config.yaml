@@ -22,3 +22,32 @@ repos:
         language: script
         types: [yaml]
         pass_filenames: true
+      - id: regenerate-go-code
+        name: regenerate-go-code
+        entry: dask_kubernetes/operator/go_client/hack/regenerate-code.sh
+        language: script
+        files: |
+          (?x)^(
+            go\.mod
+            |go\.sum
+            |dask_kubernetes/operator/go_client/pkg/apis/.*\.go
+          )$
+        exclude: ^dask_kubernetes/operator/go_client/pkg/apis/.*zz_generated.*\.go$
+        pass_filenames: false
+      - id: lint-go-code
+        name: lint-go-code
+        entry: dask_kubernetes/operator/go_client/hack/lint.sh
+        language: script
+        files: ^dask_kubernetes/operator/go_client/.*\.go$
+        pass_filenames: false
+      - id: build-go-code
+        name: build-go-code
+        entry: golang:1.19.10-bookworm bash -c 'GOCACHE=/src/.cache go build ./...'
+        language: docker_image
+        files: |
+          (?x)^(
+            go\.mod
+            |go\.sum
+            |dask_kubernetes/operator/go_client/.*\.go
+          )$
+        pass_filenames: false

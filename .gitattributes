@@ -1,2 +1,5 @@
 dask_kubernetes/_version.py export-subst
 * text=auto
+
+dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1/zz_generated.deepcopy.go linguist-generated=true
+dask_kubernetes/operator/go_client/pkg/client/** linguist-generated=true
