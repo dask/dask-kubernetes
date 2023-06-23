@@ -382,9 +382,7 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
             # Get the default worker group
-            wgs = []
-            while not wgs:
-                wgs = await cluster.worker_groups()
+            while not (wgs := await cluster.worker_groups()):
                 await asyncio.sleep(0.1)
             [wg] = wgs
             # Wait for worker Pods to be created
