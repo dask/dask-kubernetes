@@ -9,10 +9,12 @@ import pytest
 import yaml
 from dask.distributed import Client
 
+from kr8s.asyncio.objects import Pod, Deployment, Service
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
 )
+from dask_kubernetes.operator.objects import DaskCluster, DaskWorkerGroup, DaskJob
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -590,3 +592,70 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 
     assert "A DaskJob has been created" in runner.stdout
     assert "Job failed, deleting Dask cluster." in runner.stdout
+
+
+@pytest.mark.asyncio
+async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            cluster = await DaskCluster.get(cluster_name, namespace=ns)
+
+            worker_groups = []
+            while not worker_groups:
+                worker_groups = await cluster.worker_groups()
+                await asyncio.sleep(0.1)
+            assert len(worker_groups) == 1  # Just the default worker group
+            wg = worker_groups[0]
+            assert isinstance(wg, DaskWorkerGroup)
+
+            scheduler_pod = await cluster.scheduler_pod()
+            assert isinstance(scheduler_pod, Pod)
+
+            scheduler_deployment = await cluster.scheduler_deployment()
+            assert isinstance(scheduler_deployment, Deployment)
+
+            scheduler_service = await cluster.scheduler_service()
+            assert isinstance(scheduler_service, Service)
+
+
+@pytest.mark.asyncio
+async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster):
+    with kopf_runner as runner:
+        async with gen_cluster() as (cluster_name, ns):
+            cluster = await DaskCluster.get(cluster_name, namespace=ns)
+
+            worker_groups = []
+            while not worker_groups:
+                worker_groups = await cluster.worker_groups()
+                await asyncio.sleep(0.1)
+            assert len(worker_groups) == 1  # Just the default worker group
+            wg = worker_groups[0]
+            assert isinstance(wg, DaskWorkerGroup)
+
+            pods = []
+            while not pods:
+                pods = await wg.pods()
+                await asyncio.sleep(0.1)
+            assert all([isinstance(p, Pod) for p in pods])
+
+            deployments = []
+            while not deployments:
+                deployments = await wg.deployments()
+                await asyncio.sleep(0.1)
+            assert all([isinstance(d, Deployment) for d in deployments])
+
+            assert (await wg.cluster()).name == cluster.name
+
+
+@pytest.mark.asyncio
+@pytest.mark.skip(reason="Flaky in CI")
+async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
+    with kopf_runner as runner:
+        async with gen_job("simplejob.yaml") as (job_name, ns):
+            job = await DaskJob.get(job_name, namespace=ns)
+
+            job_pod = await job.pod()
+            assert isinstance(job_pod, Pod)
+
+            cluster = await job.cluster()
+            assert isinstance(cluster, DaskCluster)
