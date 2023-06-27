@@ -162,11 +162,11 @@ def build_worker_deployment_spec(
     return deployment_spec
 
 
-def get_job_runner_pod_name(job_name):
+def get_job_runner_job_name(job_name):
     return f"{job_name}-runner"
 
 
-def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, labels):
+def build_job_spec(job_name, cluster_name, namespace, spec, annotations, labels):
     labels.update(
         **{
             "dask.org/cluster-name": cluster_name,
@@ -174,15 +174,21 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
             "sidecar.istio.io/inject": "false",
         }
     )
-    pod_spec = {
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": get_job_runner_pod_name(job_name),
-            "labels": labels,
-            "annotations": annotations,
+    metadata = {
+        "name": get_job_runner_job_name(job_name),
+        "labels": labels,
+        "annotations": annotations,
+    }
+    job_spec = {
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": metadata,
+        "spec": {
+            "template": {
+                "metadata": metadata,
+                "spec": spec,
+            },
         },
-        "spec": spec,
     }
     env = [
         {
@@ -190,12 +196,12 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
             "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
-    for i in range(len(pod_spec["spec"]["containers"])):
-        if "env" in pod_spec["spec"]["containers"][i]:
-            pod_spec["spec"]["containers"][i]["env"].extend(env)
+    for i in range(len(job_spec["spec"]["template"]["spec"]["containers"])):
+        if "env" in job_spec["spec"]["template"]["spec"]["containers"][i]:
+            job_spec["spec"]["template"]["spec"]["containers"][i]["env"].extend(env)
         else:
-            pod_spec["spec"]["containers"][i]["env"] = env
-    return pod_spec
+            job_spec["spec"]["template"]["spec"]["containers"][i]["env"] = env
+    return job_spec
 
 
 def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
@@ -737,28 +743,28 @@ async def daskjob_create_components(
 
         labels = _get_labels(meta)
         annotations = _get_annotations(meta)
-        job_spec = spec["job"]
-        if "metadata" in job_spec:
-            if "annotations" in job_spec["metadata"]:
-                annotations.update(**job_spec["metadata"]["annotations"])
-            if "labels" in job_spec["metadata"]:
-                labels.update(**job_spec["metadata"]["labels"])
-        job_pod_spec = build_job_pod_spec(
+        dask_job_spec = spec["job"]
+        if "metadata" in dask_job_spec:
+            if "annotations" in dask_job_spec["metadata"]:
+                annotations.update(**dask_job_spec["metadata"]["annotations"])
+            if "labels" in dask_job_spec["metadata"]:
+                labels.update(**dask_job_spec["metadata"]["labels"])
+        job_spec = build_job_spec(
             job_name=name,
             cluster_name=cluster_name,
             namespace=namespace,
-            spec=job_spec["spec"],
+            spec=dask_job_spec["spec"],
             annotations=annotations,
             labels=labels,
         )
-        kopf.adopt(job_pod_spec)
-        await corev1api.create_namespaced_pod(
+        kopf.adopt(job_spec)
+        await kubernetes.client.BatchV1Api(api_client).create_namespaced_job(
             namespace=namespace,
-            body=job_pod_spec,
+            body=job_spec,
         )
         patch.status["clusterName"] = cluster_name
         patch.status["jobStatus"] = "ClusterCreated"
-        patch.status["jobRunnerPodName"] = get_job_runner_pod_name(name)
+        patch.status["jobRunnerPodName"] = get_job_runner_job_name(name)
 
 
 @kopf.on.field(

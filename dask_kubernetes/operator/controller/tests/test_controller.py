@@ -12,7 +12,7 @@ from dask.distributed import Client
 from kr8s.asyncio.objects import Pod, Deployment, Service
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
-    get_job_runner_pod_name,
+    get_job_runner_job_name,
 )
 from dask_kubernetes.operator._objects import DaskCluster, DaskWorkerGroup, DaskJob
 
@@ -425,13 +425,13 @@ def _assert_job_status_created(job_status):
 def _assert_job_status_cluster_created(job, job_status):
     assert "jobStatus" in job_status
     assert job_status["clusterName"] == job
-    assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
+    assert job_status["jobRunnerPodName"] == get_job_runner_job_name(job)
 
 
 def _assert_job_status_running(job, job_status):
     assert "jobStatus" in job_status
     assert job_status["clusterName"] == job
-    assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
+    assert job_status["jobRunnerPodName"] == get_job_runner_job_name(job)
     start_time = datetime.strptime(job_status["startTime"], KUBERNETES_DATETIME_FORMAT)
     assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(seconds=10))
 
@@ -439,7 +439,7 @@ def _assert_job_status_running(job, job_status):
 def _assert_final_job_status(job, job_status, expected_status):
     assert job_status["jobStatus"] == expected_status
     assert job_status["clusterName"] == job
-    assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
+    assert job_status["jobRunnerPodName"] == get_job_runner_job_name(job)
     start_time = datetime.strptime(job_status["startTime"], KUBERNETES_DATETIME_FORMAT)
     assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(minutes=1))
     end_time = datetime.strptime(job_status["endTime"], KUBERNETES_DATETIME_FORMAT)
