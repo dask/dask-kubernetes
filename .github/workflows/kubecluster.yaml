@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/kubecluster.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/classic/**"
       - "dask_kubernetes/common/**"
@@ -10,6 +11,7 @@ on:
   push:
     paths:
       - ".github/workflows/kubecluster.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/classic/**"
       - "dask_kubernetes/common/**"
