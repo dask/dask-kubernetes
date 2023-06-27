@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/operator.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
@@ -11,6 +12,7 @@ on:
   push:
     paths:
       - ".github/workflows/operator.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"

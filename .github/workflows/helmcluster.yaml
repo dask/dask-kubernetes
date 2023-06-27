@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/helmcluster.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/helm/**"
       - "dask_kubernetes/common/**"
@@ -10,6 +11,7 @@ on:
   push:
     paths:
       - ".github/workflows/helmcluster.yaml"
+      - "requirements*"
       - "ci/**"
       - "dask_kubernetes/helm/**"
       - "dask_kubernetes/common/**"
