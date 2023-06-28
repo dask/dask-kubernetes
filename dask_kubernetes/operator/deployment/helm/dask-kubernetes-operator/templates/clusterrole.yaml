@@ -38,6 +38,10 @@ rules:
     resources: [services, services/status]
     verbs: ["*"]
 
+  - apiGroups: ["apps"]
+    resources: [deployments, deployments/status]
+    verbs: ["*"]
+
   - apiGroups: ["", events.k8s.io]
     resources: [events]
     verbs: ["*"]
