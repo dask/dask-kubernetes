@@ -34,9 +34,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: WORKER_BATCH_SIZE
-              value: {{- toYaml .Values.workerAllocationSettings.size | nindent 14}}
+              value:
+                {{- toYaml .Values.workerAllocationSettings.size | nindent 16 }}
             - name: WORKER_DELAY
-              value: {{- toYaml .Values.workerAllocationSettings.delay | nindent 14}}
+              value:
+                {{- toYaml .Values.workerAllocationSettings.delay | nindent 16 }}
           args:
             - --liveness=http://0.0.0.0:8080/healthz
           {{- with .Values.kopfArgs }}

@@ -48,7 +48,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `metrics.worker.podMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
 | `metrics.worker.podMonitor.podTargetLabels` | PodTargetLabels transfers labels on the Kubernetes Pod onto the target. | `["dask.org/cluster-name", "dask.org/workergroup-name"]` |
 | `metrics.worker.podMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
-| `workerAllocationSettings.size` |  | `5` |
+| `workerAllocationSettings.size` |  | `"5"` |
 | `workerAllocationSettings.delay` |  | `"1s"` |
 
 

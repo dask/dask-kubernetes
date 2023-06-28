@@ -3,6 +3,7 @@ from collections import defaultdict
 import time
 from contextlib import suppress
 from datetime import datetime
+import os
 from uuid import uuid4
 
 import aiohttp
@@ -255,6 +256,9 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
     # The default timeout is 300s which is usually to long
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
     settings.networking.request_timeout = 10
+    global SIZE, DELAY
+    SIZE = int(os.getenv("WORKER_BATCH_SIZE"))
+    DELAY = int(os.getenv("WORKER_DELAY")[:-1])
 
 
 # There may be useful things for us to expose via the liveness probe
@@ -632,6 +636,8 @@ async def daskworkergroup_replica_update(
             )
             desired_workers = new
             workers_needed = desired_workers - current_workers
+            deployment_groups = workers_needed // SIZE
+            excess_workers = workers_needed % SIZE
             labels = _get_labels(meta)
             annotations = _get_annotations(meta)
             worker_spec = spec["worker"]
@@ -641,24 +647,65 @@ async def daskworkergroup_replica_update(
                 if "labels" in worker_spec["metadata"]:
                     labels.update(**worker_spec["metadata"]["labels"])
             if workers_needed > 0:
-                for _ in range(workers_needed):
-                    data = build_worker_deployment_spec(
-                        worker_group_name=name,
-                        namespace=namespace,
-                        cluster_name=cluster_name,
-                        uuid=uuid4().hex[:10],
-                        pod_spec=worker_spec["spec"],
-                        annotations=annotations,
-                        labels=labels,
-                    )
-                    kopf.adopt(data, owner=body)
-                    kopf.label(data, labels=cluster_labels)
-                    await kubernetes.client.AppsV1Api(
-                        api_client
-                    ).create_namespaced_deployment(
-                        namespace=namespace,
-                        body=data,
-                    )
+                if deployment_groups:
+                    for __ in range(deployment_groups):
+                        for _ in range(SIZE):
+                            data = build_worker_deployment_spec(
+                                worker_group_name=name,
+                                namespace=namespace,
+                                cluster_name=cluster_name,
+                                uuid=uuid4().hex[:10],
+                                pod_spec=worker_spec["spec"],
+                                annotations=annotations,
+                                labels=labels,
+                            )
+                            kopf.adopt(data, owner=body)
+                            kopf.label(data, labels=cluster_labels)
+                            await kubernetes.client.AppsV1Api(
+                                api_client
+                            ).create_namespaced_deployment(
+                                namespace=namespace,
+                                body=data,
+                            )
+                        await asyncio.sleep(DELAY)
+                    if excess_workers:
+                        for _ in range(excess_workers):
+                            data = build_worker_deployment_spec(
+                                worker_group_name=name,
+                                namespace=namespace,
+                                cluster_name=cluster_name,
+                                uuid=uuid4().hex[:10],
+                                pod_spec=worker_spec["spec"],
+                                annotations=annotations,
+                                labels=labels,
+                            )
+                            kopf.adopt(data, owner=body)
+                            kopf.label(data, labels=cluster_labels)
+                            await kubernetes.client.AppsV1Api(
+                                api_client
+                            ).create_namespaced_deployment(
+                                namespace=namespace,
+                                body=data,
+                            )
+                else:
+                    for _ in range(workers_needed):
+                        data = build_worker_deployment_spec(
+                            worker_group_name=name,
+                            namespace=namespace,
+                            cluster_name=cluster_name,
+                            uuid=uuid4().hex[:10],
+                            pod_spec=worker_spec["spec"],
+                            annotations=annotations,
+                            labels=labels,
+                        )
+                        kopf.adopt(data, owner=body)
+                        kopf.label(data, labels=cluster_labels)
+                        await kubernetes.client.AppsV1Api(
+                            api_client
+                        ).create_namespaced_deployment(
+                            namespace=namespace,
+                            body=data,
+                        )
                 logger.info(
                     f"Scaled worker group {name} up to {desired_workers} workers."
                 )
