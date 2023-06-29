@@ -26,7 +26,9 @@ def kopf_runner(k8s_cluster):
 @pytest.fixture(scope="session")
 def docker_image():
     image_name = "dask-kubernetes:dev"
-    subprocess.run(["docker", "build", "-t", image_name, "./ci/"], check=True)
+    project_root = pathlib.Path(__file__).parent.parent
+    ci_dir = project_root / "ci"
+    subprocess.run(["docker", "build", "-t", image_name, str(ci_dir)], check=True)
     return image_name
 
 
