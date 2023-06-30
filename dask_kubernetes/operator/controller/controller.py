@@ -769,9 +769,8 @@ async def daskjob_create_components(
 )
 async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
     logger.info("Job now in running")
-    job = await DaskJob.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    name = meta["labels"]["dask.org/cluster-name"]
+    job = await DaskJob.get(name, namespace=namespace)
     await job.patch(
         {
             "status": {
@@ -790,13 +789,10 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
 )
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job succeeded, deleting Dask cluster.")
-    cluster = await DaskCluster.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    name = meta["labels"]["dask.org/cluster-name"]
+    cluster = await DaskCluster.get(name, namespace=namespace)
     await cluster.delete()
-    job = await DaskJob.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    job = await DaskJob.get(name, namespace=namespace)
     await job.patch(
         {
             "status": {
@@ -815,13 +811,10 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 )
 async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
     logger.info("Job failed, deleting Dask cluster.")
-    cluster = await DaskCluster.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    name = meta["labels"]["dask.org/cluster-name"]
+    cluster = await DaskCluster.get(name, namespace=namespace)
     await cluster.delete()
-    job = await DaskJob.get(
-        meta["labels"]["dask.org/cluster-name"], namespace=namespace
-    )
+    job = await DaskJob.get(name, namespace=namespace)
     await job.patch(
         {
             "status": {
