@@ -574,11 +574,9 @@ worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 async def daskcluster_default_worker_group_replica_update(
     name, namespace, old, new, **kwargs
 ):
-    if old is None:
-        return
-
-    wg = await DaskWorkerGroup.get(f"{name}-default", namespace=namespace)
-    await wg.scale(new)
+    if old is not None:
+        wg = await DaskWorkerGroup.get(f"{name}-default", namespace=namespace)
+        await wg.scale(new)
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
