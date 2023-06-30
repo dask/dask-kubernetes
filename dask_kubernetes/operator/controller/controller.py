@@ -11,7 +11,7 @@ import kubernetes_asyncio as kubernetes
 from importlib_metadata import entry_points
 from kubernetes_asyncio.client import ApiException
 
-from dask_kubernetes.operator._objects import DaskCluster
+from dask_kubernetes.operator._objects import DaskCluster, DaskWorkerGroup
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
@@ -572,25 +572,13 @@ worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
 
 @kopf.on.field("daskcluster.kubernetes.dask.org", field="spec.worker.replicas")
 async def daskcluster_default_worker_group_replica_update(
-    name, namespace, meta, spec, old, new, body, logger, **kwargs
+    name, namespace, old, new, **kwargs
 ):
     if old is None:
         return
-    worker_group_name = f"{name}-default"
 
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-        custom_objects_api.api_client.set_default_header(
-            "content-type", "application/merge-patch+json"
-        )
-        await custom_objects_api.patch_namespaced_custom_object_scale(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskworkergroups",
-            namespace=namespace,
-            name=worker_group_name,
-            body={"spec": {"replicas": new}},
-        )
+    wg = await DaskWorkerGroup.get(f"{name}-default", namespace=namespace)
+    await wg.patch({"spec": {"replicas": new}})
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
