@@ -578,7 +578,7 @@ async def daskcluster_default_worker_group_replica_update(
         return
 
     wg = await DaskWorkerGroup.get(f"{name}-default", namespace=namespace)
-    await wg.patch({"spec": {"replicas": new}})
+    await wg.scale(new)
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
