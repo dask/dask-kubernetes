@@ -78,6 +78,7 @@ class DaskWorkerGroup(APIObject):
     singular = "daskworkergroup"
     namespaced = True
     scalable = True
+    scalable_spec = "worker.replicas"
 
     async def pods(self) -> List[Pod]:
         return await self.api.get(
