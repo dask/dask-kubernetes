@@ -31,6 +31,12 @@ kubernetes:
   protocol: "tcp://"
   dashboard_address: ":8787"
 
+  # Dask Operator Controller options
+  controller:
+    worker-allocation:
+      batch-size: null
+      delay: null
+
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
   scheduler-service-wait-timeout: 30

@@ -3,7 +3,6 @@ from collections import defaultdict
 import time
 from contextlib import suppress
 from datetime import datetime
-import os
 from uuid import uuid4
 
 import aiohttp
@@ -22,6 +21,7 @@ from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
 from distributed.protocol.pickle import dumps
+import dask.config
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -261,9 +261,6 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
     # The default timeout is 300s which is usually to long
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
     settings.networking.request_timeout = 10
-    global SIZE, DELAY
-    SIZE = int(os.getenv("WORKER_BATCH_SIZE"))
-    DELAY = int(os.getenv("WORKER_DELAY")[:-1])
 
 
 # There may be useful things for us to expose via the liveness probe
@@ -627,8 +624,6 @@ async def daskworkergroup_replica_update(
             )
             desired_workers = new
             workers_needed = desired_workers - current_workers
-            deployment_groups = workers_needed // SIZE
-            excess_workers = workers_needed % SIZE
             labels = _get_labels(meta)
             annotations = _get_annotations(meta)
             worker_spec = spec["worker"]
@@ -637,69 +632,37 @@ async def daskworkergroup_replica_update(
                     annotations.update(**worker_spec["metadata"]["annotations"])
                 if "labels" in worker_spec["metadata"]:
                     labels.update(**worker_spec["metadata"]["labels"])
+
+            SIZE = dask.config.get("kubernetes.controller.worker-allocation.batch-size")
+            DELAY = dask.config.get("kubernetes.controller.worker-allocation.delay")
+            batch_size = min(workers_needed, SIZE)
             if workers_needed > 0:
-                if deployment_groups:
-                    for __ in range(deployment_groups):
-                        for _ in range(SIZE):
-                            data = build_worker_deployment_spec(
-                                worker_group_name=name,
-                                namespace=namespace,
-                                cluster_name=cluster_name,
-                                uuid=uuid4().hex[:10],
-                                pod_spec=worker_spec["spec"],
-                                annotations=annotations,
-                                labels=labels,
-                            )
-                            kopf.adopt(data, owner=body)
-                            kopf.label(data, labels=cluster_labels)
-                            await kubernetes.client.AppsV1Api(
-                                api_client
-                            ).create_namespaced_deployment(
-                                namespace=namespace,
-                                body=data,
-                            )
-                        await asyncio.sleep(DELAY)
-                    if excess_workers:
-                        for _ in range(excess_workers):
-                            data = build_worker_deployment_spec(
-                                worker_group_name=name,
-                                namespace=namespace,
-                                cluster_name=cluster_name,
-                                uuid=uuid4().hex[:10],
-                                pod_spec=worker_spec["spec"],
-                                annotations=annotations,
-                                labels=labels,
-                            )
-                            kopf.adopt(data, owner=body)
-                            kopf.label(data, labels=cluster_labels)
-                            await kubernetes.client.AppsV1Api(
-                                api_client
-                            ).create_namespaced_deployment(
-                                namespace=namespace,
-                                body=data,
-                            )
-                else:
-                    for _ in range(workers_needed):
-                        data = build_worker_deployment_spec(
-                            worker_group_name=name,
-                            namespace=namespace,
-                            cluster_name=cluster_name,
-                            uuid=uuid4().hex[:10],
-                            pod_spec=worker_spec["spec"],
-                            annotations=annotations,
-                            labels=labels,
-                        )
-                        kopf.adopt(data, owner=body)
-                        kopf.label(data, labels=cluster_labels)
-                        await kubernetes.client.AppsV1Api(
-                            api_client
-                        ).create_namespaced_deployment(
-                            namespace=namespace,
-                            body=data,
-                        )
-                logger.info(
-                    f"Scaled worker group {name} up to {desired_workers} workers."
-                )
+                for _ in range(batch_size):
+                    data = build_worker_deployment_spec(
+                        worker_group_name=name,
+                        namespace=namespace,
+                        cluster_name=cluster_name,
+                        uuid=uuid4().hex[:10],
+                        pod_spec=worker_spec["spec"],
+                        annotations=annotations,
+                        labels=labels,
+                    )
+                    kopf.adopt(data, owner=body)
+                    kopf.label(data, labels=cluster_labels)
+                    await kubernetes.client.AppsV1Api(
+                        api_client
+                    ).create_namespaced_deployment(
+                        namespace=namespace,
+                        body=data,
+                    )
+            if SIZE:
+                if workers_needed > SIZE:
+                    raise kopf.TemporaryError(
+                        "Added maximum number of workers for this batch but still need to create more workers, "
+                        f"waiting for {DELAY} seconds before continuing.",
+                        delay=DELAY,
+                    )
+            logger.info(f"Scaled worker group {name} up to {desired_workers} workers.")
             if workers_needed < 0:
                 worker_ids = await retire_workers(
                     n_workers=-workers_needed,

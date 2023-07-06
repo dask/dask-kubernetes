@@ -33,10 +33,10 @@ spec:
           image: "{{ .Values.image.name }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: WORKER_BATCH_SIZE
+            - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__BATCH_SIZE
               value:
                 {{- toYaml .Values.workerAllocationSettings.size | nindent 16 }}
-            - name: WORKER_DELAY
+            - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__DELAY
               value:
                 {{- toYaml .Values.workerAllocationSettings.delay | nindent 16 }}
           args:
