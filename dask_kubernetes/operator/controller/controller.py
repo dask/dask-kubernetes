@@ -382,7 +382,7 @@ async def handle_scheduler_service_status(
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_create(spec, name, namespace, logger, patch, **kwargs):
     cluster = await DaskCluster.get(spec["cluster"], namespace=namespace)
-    kopf.adopt(patch, cluster.raw)
+    kopf.adopt(patch, owner=cluster.raw)
     logger.info(f"Successfully adopted by {spec['cluster']}")
 
     del kwargs["new"]
