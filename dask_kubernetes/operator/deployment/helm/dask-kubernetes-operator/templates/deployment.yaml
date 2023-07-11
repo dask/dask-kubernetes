@@ -35,10 +35,10 @@ spec:
           env:
             - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__BATCH_SIZE
               value:
-                {{- toYaml .Values.workerAllocationSettings.size | nindent 16 }}
+                {{- toYaml .Values.workerAllocation.size | nindent 16 }}
             - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__DELAY
               value:
-                {{- toYaml .Values.workerAllocationSettings.delay | nindent 16 }}
+                {{- toYaml .Values.workerAllocation.delay | nindent 16 }}
           args:
             - --liveness=http://0.0.0.0:8080/healthz
           {{- with .Values.kopfArgs }}
