@@ -22,12 +22,6 @@ kubernetes:
   custom-cluster-spec: null
   scheduler-forward-port: null
 
-  # Dask Operator Controller options
-  controller:
-    worker-allocation:
-      batch-size: null
-      delay: null
-
   # Classic KubeCluster options
   host: "0.0.0.0"
   port: 0
