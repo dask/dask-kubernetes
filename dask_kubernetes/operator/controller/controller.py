@@ -769,7 +769,8 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
                 "jobStatus": "Running",
                 "startTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
             }
-        }
+        },
+        subresource="status",
     )
 
 
@@ -791,7 +792,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
                 "jobStatus": "Successful",
                 "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
             }
-        }
+        },
+        subresource="status",
     )
 
 
@@ -813,7 +815,8 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
                 "jobStatus": "Failed",
                 "endTime": datetime.utcnow().strftime(KUBERNETES_DATETIME_FORMAT),
             }
-        }
+        },
+        subresource="status",
     )
 
 
