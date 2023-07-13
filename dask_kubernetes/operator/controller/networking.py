@@ -9,7 +9,6 @@ from distributed.core import rpc
 
 from dask_kubernetes.aiopykube.objects import Pod
 from dask_kubernetes.exceptions import CrashLoopBackOffError
-from kr8s.portforward import PortForward
 from kr8s.asyncio.objects import Service
 
 
@@ -90,9 +89,10 @@ async def _is_service_available(host, port, retries=20):
 
 
 async def port_forward_service(service, remote_port, local_port=None):
-    async with PortForward(service, remote_port, local_port) as port:
-        print(f"Forwarding to port {port}")
-        return port
+    pf = service.portforward(remote_port, local_port)
+    port = await pf.start()
+    print(f"Forwarding to port {port}")
+    return port
 
 
 async def port_forward_dashboard(service_name, namespace):
