@@ -22,6 +22,7 @@ from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
 from distributed.protocol.pickle import dumps
+import dask.config
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -632,8 +633,12 @@ async def daskworkergroup_replica_update(
                     annotations.update(**worker_spec["metadata"]["annotations"])
                 if "labels" in worker_spec["metadata"]:
                     labels.update(**worker_spec["metadata"]["labels"])
+
+            SIZE = dask.config.get("kubernetes.controller.worker-allocation.batch-size")
+            DELAY = dask.config.get("kubernetes.controller.worker-allocation.delay")
+            batch_size = min(workers_needed, SIZE) if SIZE else workers_needed
             if workers_needed > 0:
-                for _ in range(workers_needed):
+                for _ in range(batch_size):
                     data = build_worker_deployment_spec(
                         worker_group_name=name,
                         namespace=namespace,
@@ -651,9 +656,14 @@ async def daskworkergroup_replica_update(
                         namespace=namespace,
                         body=data,
                     )
-                logger.info(
-                    f"Scaled worker group {name} up to {desired_workers} workers."
-                )
+            if SIZE:
+                if workers_needed > SIZE:
+                    raise kopf.TemporaryError(
+                        "Added maximum number of workers for this batch but still need to create more workers, "
+                        f"waiting for {DELAY} seconds before continuing.",
+                        delay=DELAY,
+                    )
+            logger.info(f"Scaled worker group {name} up to {desired_workers} workers.")
             if workers_needed < 0:
                 worker_ids = await retire_workers(
                     n_workers=-workers_needed,
