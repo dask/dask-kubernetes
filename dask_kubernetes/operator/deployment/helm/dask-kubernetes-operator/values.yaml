@@ -91,5 +91,5 @@ metrics:
       metricRelabelings: [] # MetricRelabelConfigs to apply to samples before ingestion.
 
 workerAllocation:
-  size: nil
-  delay: nil
+  size: null
+  delay: null
