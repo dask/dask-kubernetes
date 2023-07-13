@@ -383,7 +383,7 @@ async def handle_scheduler_service_status(
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
 async def daskworkergroup_create(body, logger, **kwargs):
-    wg = await DaskWorkerGroup(body)
+    wg = await DaskWorkerGroup(dict(body))
     cluster = await wg.cluster()
     await cluster.adopt(wg)
     logger.info(f"Successfully adopted by {cluster.name}")
@@ -812,7 +812,7 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 @kopf.on.create("daskautoscaler.kubernetes.dask.org")
 async def daskautoscaler_create(body, logger, **_):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
-    autoscaler = await DaskAutoscaler(body)
+    autoscaler = await DaskAutoscaler(dict(body))
     cluster = await autoscaler.cluster()
     await cluster.adopt(autoscaler)
     logger.info(f"Autoscaler {autoscaler.name} adopted by cluster {cluster.name}")
