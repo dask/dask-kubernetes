@@ -831,10 +831,10 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 
 
 @kopf.on.create("daskautoscaler.kubernetes.dask.org")
-async def daskautoscaler_create(body, namespace, logger, **kwargs):
+async def daskautoscaler_create(body, logger, **_):
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
     autoscaler = await DaskAutoscaler(body)
-    cluster = await DaskCluster.get(autoscaler.spec.cluster, namespace=namespace)
+    cluster = await autoscaler.cluster()
     await cluster.adopt(autoscaler)
     logger.info(f"Autoscaler {autoscaler.name} adopted by cluster {cluster.name}")
 
