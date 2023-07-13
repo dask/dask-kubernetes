@@ -26,6 +26,8 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `podSecurityContext` | Security context for the operator pod | `{}` |
 | `securityContext` | Security context for the operator container | `{}` |
 | `resources` | Resources for the operator pod | `{}` |
+| `volumes` | Volumes for the operator pod | `[]` |
+| `volumeMounts` | Volume mounts for the operator container | `[]` |
 | `nodeSelector` | Node selector | `{}` |
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity | `{}` |
@@ -48,6 +50,8 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `metrics.worker.podMonitor.jobLabel` | The label to use to retrieve the job name from. | `""` |
 | `metrics.worker.podMonitor.podTargetLabels` | PodTargetLabels transfers labels on the Kubernetes Pod onto the target. | `["dask.org/cluster-name", "dask.org/workergroup-name"]` |
 | `metrics.worker.podMonitor.metricRelabelings` | MetricRelabelConfigs to apply to samples before ingestion. | `[]` |
+| `workerAllocation.size` |  | `null` |
+| `workerAllocation.delay` |  | `null` |
 
 
 

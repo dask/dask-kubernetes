@@ -32,6 +32,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.name }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__BATCH_SIZE
+              value:
+                {{- toYaml .Values.workerAllocation.size | nindent 16 }}
+            - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__DELAY
+              value:
+                {{- toYaml .Values.workerAllocation.delay | nindent 16 }}
           args:
             - --liveness=http://0.0.0.0:8080/healthz
           {{- with .Values.kopfArgs }}
@@ -43,6 +50,10 @@ spec:
             httpGet:
               path: /healthz
               port: 8080
+          volumeMounts:
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

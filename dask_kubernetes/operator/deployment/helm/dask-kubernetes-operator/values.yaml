@@ -41,6 +41,10 @@ resources: {}  # Resources for the operator pod
   #   cpu: 100m
   #   memory: 128Mi
 
+volumes: []  # Volumes for the operator pod
+
+volumeMounts: []  # Volume mounts for the operator container
+
 nodeSelector: {}  # Node selector
 
 tolerations: []  # Tolerations
@@ -85,3 +89,7 @@ metrics:
         - dask.org/cluster-name
         - dask.org/workergroup-name
       metricRelabelings: [] # MetricRelabelConfigs to apply to samples before ingestion.
+
+workerAllocation:
+  size: null
+  delay: null

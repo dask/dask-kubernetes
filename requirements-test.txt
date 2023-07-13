@@ -7,4 +7,5 @@ git+https://codeberg.org/hjacobs/pytest-kind.git
 pytest-timeout
 pytest-rerunfailures
 git+https://github.com/elemental-lf/k8s-crd-resolver@v0.14.0
+jsonschema==4.17.3
 dask[complete]

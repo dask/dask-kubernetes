@@ -85,7 +85,7 @@ class DaskWorkerGroup(APIObject):
             Pod.endpoint,
             label_selector=",".join(
                 [
-                    f"dask.org/cluster-name={self.spec['cluster']}",
+                    f"dask.org/cluster-name={self.spec.cluster}",
                     "dask.org/component=worker",
                     f"dask.org/workergroup-name={self.name}",
                 ]
@@ -98,7 +98,7 @@ class DaskWorkerGroup(APIObject):
             Deployment.endpoint,
             label_selector=",".join(
                 [
-                    f"dask.org/cluster-name={self.spec['cluster']}",
+                    f"dask.org/cluster-name={self.spec.cluster}",
                     "dask.org/component=worker",
                     f"dask.org/workergroup-name={self.name}",
                 ]
@@ -107,7 +107,7 @@ class DaskWorkerGroup(APIObject):
         )
 
     async def cluster(self) -> DaskCluster:
-        return await DaskCluster.get(self.spec["cluster"], namespace=self.namespace)
+        return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
 class DaskAutoscaler(APIObject):
@@ -119,7 +119,7 @@ class DaskAutoscaler(APIObject):
     namespaced = True
 
     async def cluster(self) -> DaskCluster:
-        return await DaskCluster.get(self.spec["cluster"], namespace=self.namespace)
+        return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
 class DaskJob(APIObject):

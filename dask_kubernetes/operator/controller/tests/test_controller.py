@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pytest
 import yaml
 from dask.distributed import Client
+import dask.config
 
 from kr8s.asyncio.objects import Pod, Deployment, Service
 from dask_kubernetes.operator.controller import (
@@ -403,6 +404,44 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
             await asyncio.gather(
                 *[pod.wait(conditions="condition=Ready", timeout=60) for pod in pods]
             )
+
+
+@pytest.mark.asyncio
+async def test_simplecluster_batched_worker_deployments(
+    k8s_cluster, kopf_runner, gen_cluster
+):
+    with kopf_runner as runner:
+        with dask.config.set(
+            {
+                "kubernetes.controller.worker-allocation.batch-size": 1,
+                "kubernetes.controller.worker-allocation.delay": 5,
+            }
+        ):
+            async with gen_cluster() as (cluster_name, ns):
+                scheduler_deployment_name = "simple-scheduler"
+                worker_pod_name = "simple-default-worker"
+                service_name = "simple-scheduler"
+                while scheduler_deployment_name not in k8s_cluster.kubectl(
+                    "get", "deployments", "-n", ns
+                ):
+                    await asyncio.sleep(0.1)
+                while service_name not in k8s_cluster.kubectl("get", "svc", "-n", ns):
+                    await asyncio.sleep(0.1)
+                while worker_pod_name not in k8s_cluster.kubectl(
+                    "get", "pods", "-n", ns
+                ):
+                    await asyncio.sleep(0.1)
+
+                with k8s_cluster.port_forward(
+                    f"service/{service_name}", 8786, "-n", ns
+                ) as port:
+                    async with Client(
+                        f"tcp://localhost:{port}", asynchronous=True
+                    ) as client:
+                        await client.wait_for_workers(2)
+                        futures = client.map(lambda x: x + 1, range(10))
+                        total = client.submit(sum, futures)
+                        assert (await total) == sum(map(lambda x: x + 1, range(10)))
 
 
 def _get_job_status(k8s_cluster, ns):
