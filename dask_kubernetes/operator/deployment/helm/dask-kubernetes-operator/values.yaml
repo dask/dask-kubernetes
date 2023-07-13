@@ -89,3 +89,7 @@ metrics:
         - dask.org/cluster-name
         - dask.org/workergroup-name
       metricRelabelings: [] # MetricRelabelConfigs to apply to samples before ingestion.
+
+workerAllocation:
+  size: nil
+  delay: nil
