@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import aiohttp
 import kopf
+import kr8s
 from kr8s.asyncio.objects import Pod
 import kubernetes_asyncio as kubernetes
 from importlib_metadata import entry_points
@@ -465,13 +466,12 @@ async def retire_workers(
     logger.debug(
         f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
     )
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        workers = await api.list_namespaced_pod(
-            namespace=namespace,
-            label_selector=f"dask.org/workergroup-name={worker_group_name}",
-        )
-        return [w["metadata"]["name"] for w in workers.items[:-n_workers]]
+    workers = await kr8s.asyncio.get(
+        "pods",
+        namespace=namespace,
+        label_selector={"dask.org/workergroup-name": worker_group_name},
+    )
+    return [w.name for w in workers[:-n_workers]]
 
 
 async def check_scheduler_idle(scheduler_service_name, namespace, logger):
