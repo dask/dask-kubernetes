@@ -3,7 +3,7 @@ name: dask-kubernetes-operator
 description: A helm chart for managing the deployment of the dask kubernetes operator and CRDs
 type: application
 version: 0.0.1-set.by.chartpress
-appVersion: "2022.4.1"
+appVersion: "2022.7.0"
 home: https://kubernetes.dask.org/
 sources:
   - https://github.com/dask/dask-kubernetes/
