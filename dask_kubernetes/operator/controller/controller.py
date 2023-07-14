@@ -383,38 +383,17 @@ async def handle_scheduler_service_status(
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
-async def daskworkergroup_create(spec, name, namespace, logger, **kwargs):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CustomObjectsApi(api_client)
-        cluster = await api.get_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskclusters",
-            namespace=namespace,
-            name=spec["cluster"],
-        )
-        new_spec = dict(spec)
-        kopf.adopt(new_spec, owner=cluster)
-        api.api_client.set_default_header(
-            "content-type", "application/merge-patch+json"
-        )
-        await api.patch_namespaced_custom_object(
-            group="kubernetes.dask.org",
-            version="v1",
-            plural="daskworkergroups",
-            namespace=namespace,
-            name=name,
-            body=new_spec,
-        )
-        logger.info(f"Successfully adopted by {spec['cluster']}")
+async def daskworkergroup_create(body, logger, **kwargs):
+    wg = await DaskWorkerGroup(body)
+    cluster = await wg.cluster()
+    await cluster.adopt(wg)
+    logger.info(f"Successfully adopted by {cluster.name}")
 
     del kwargs["new"]
     await daskworkergroup_replica_update(
-        spec=spec,
-        name=name,
-        namespace=namespace,
+        body=body,
         logger=logger,
-        new=spec["worker"]["replicas"],
+        new=wg.replicas,
         **kwargs,
     )
 
