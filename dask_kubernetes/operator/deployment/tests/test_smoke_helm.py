@@ -48,6 +48,7 @@ def install_cluster_role_helm_chart(k8s_cluster, operator_image, ns):
     )
 
 
+@pytest.mark.timeout(180)
 def test_smoke_helm_deployment_role(install_cluster_role_helm_chart, ns):
     with KubeCluster(
         name="pytest-smoke-cluster",
