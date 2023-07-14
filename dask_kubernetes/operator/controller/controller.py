@@ -634,8 +634,12 @@ async def daskworkergroup_replica_update(
                 if "labels" in worker_spec["metadata"]:
                     labels.update(**worker_spec["metadata"]["labels"])
 
-            SIZE = dask.config.get("kubernetes.controller.worker-allocation.batch-size")
-            DELAY = dask.config.get("kubernetes.controller.worker-allocation.delay")
+            SIZE = int(
+                dask.config.get("kubernetes.controller.worker-allocation.batch-size", 0)
+            )
+            DELAY = int(
+                dask.config.get("kubernetes.controller.worker-allocation.delay", 0)
+            )
             batch_size = min(workers_needed, SIZE) if SIZE else workers_needed
             if workers_needed > 0:
                 for _ in range(batch_size):
