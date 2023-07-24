@@ -107,7 +107,6 @@ def install_gateway(k8s_cluster):
 
 @pytest.fixture(scope="session", autouse=True)
 def customresources(k8s_cluster):
-
     temp_dir = tempfile.TemporaryDirectory()
     crd_path = os.path.join(DIR, "operator", "customresources")
 
@@ -127,5 +126,5 @@ def customresources(k8s_cluster):
 
     k8s_cluster.kubectl("apply", "-f", temp_dir.name)
     yield
-    k8s_cluster.kubectl("delete", "-f", temp_dir.name)
+    k8s_cluster.kubectl("delete", "--wait=false", "-f", temp_dir.name)
     temp_dir.cleanup()
