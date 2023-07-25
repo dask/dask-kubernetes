@@ -24,7 +24,10 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `rbac.cluster` | Creates a ClusterRole if true, else create a namespaced Role | `true` |
 | `podAnnotations` | Extra annotations for the operator pod | `{}` |
 | `podSecurityContext` | Security context for the operator pod | `{}` |
-| `securityContext` | Security context for the operator container | `{}` |
+| `securityContext.capabilities.drop` |  | `["ALL"]` |
+| `securityContext.runAsNonRoot` |  | `true` |
+| `securityContext.runAsUser` |  | `1000` |
+| `securityContext.allowPrivilegeEscalation` |  | `false` |
 | `resources` | Resources for the operator pod | `{}` |
 | `volumes` | Volumes for the operator pod | `[]` |
 | `volumeMounts` | Volume mounts for the operator container | `[]` |
