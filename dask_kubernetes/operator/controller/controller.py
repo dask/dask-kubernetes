@@ -9,7 +9,6 @@ import aiohttp
 import kopf
 import kr8s
 from kr8s.asyncio.objects import Pod, Deployment, Service
-import kubernetes_asyncio as kubernetes
 from importlib_metadata import entry_points
 
 from dask_kubernetes.operator._objects import (
