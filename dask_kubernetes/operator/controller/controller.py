@@ -366,6 +366,7 @@ async def daskworkergroup_create(body, namespace, logger, **kwargs):
         body=body,
         logger=logger,
         new=wg.replicas,
+        namespace=namespace,
         **kwargs,
     )
 
