@@ -301,7 +301,7 @@ async def daskcluster_create_components(
         name, namespace, scheduler_spec.get("spec"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_deployment = await Deployment(data)
+    scheduler_deployment = await Deployment(data, namespace=namespace)
     if not await scheduler_deployment.exists():
         await scheduler_deployment.create()
     logger.info(
@@ -313,7 +313,7 @@ async def daskcluster_create_components(
         name, scheduler_spec.get("service"), annotations, labels
     )
     kopf.adopt(data)
-    scheduler_service = await Service(data)
+    scheduler_service = await Service(data, namespace=namespace)
     if not await scheduler_service.exists():
         await scheduler_service.create()
     logger.info(f"Scheduler service {data['metadata']['name']} created in {namespace}.")
@@ -328,7 +328,7 @@ async def daskcluster_create_components(
         if "labels" in worker_spec["metadata"]:
             labels.update(**worker_spec["metadata"]["labels"])
     data = build_default_worker_group_spec(name, worker_spec, annotations, labels)
-    worker_group = await DaskWorkerGroup(data)
+    worker_group = await DaskWorkerGroup(data, namespace=namespace)
     if not await worker_group.exists():
         await worker_group.create()
     logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
@@ -355,8 +355,8 @@ async def handle_scheduler_service_status(
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
-async def daskworkergroup_create(body, logger, **kwargs):
-    wg = await DaskWorkerGroup(body)
+async def daskworkergroup_create(body, namespace, logger, **kwargs):
+    wg = await DaskWorkerGroup(body, namespace=namespace)
     cluster = await wg.cluster()
     await cluster.adopt(wg)
     logger.info(f"Successfully adopted by {cluster.name}")
