@@ -1,4 +1,3 @@
-import pytest_asyncio
 import asyncio
 import base64
 import getpass
@@ -68,19 +67,19 @@ def user_env():
 cluster_kwargs = {"asynchronous": True}
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def remote_cluster(k8s_cluster, pod_spec):
     async with KubeCluster(pod_spec, deploy_mode="remote", **cluster_kwargs) as cluster:
         yield cluster
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def client(cluster):
     async with Client(cluster, asynchronous=True) as client:
         yield client
