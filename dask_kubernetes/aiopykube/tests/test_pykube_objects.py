@@ -7,7 +7,7 @@ from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.objects import Pod
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_pod_create_and_delete(docker_image, k8s_cluster):
     api = HTTPClient(KubeConfig.from_env())
     name = "test-" + uuid.uuid4().hex[:10]

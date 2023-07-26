@@ -5,7 +5,7 @@ from dask_kubernetes.operator import KubeCluster
 from dask_kubernetes.operator import discover
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_discovery(async_cluster):
     clusters = [name async for name, _ in discover()]
     assert async_cluster.name in clusters

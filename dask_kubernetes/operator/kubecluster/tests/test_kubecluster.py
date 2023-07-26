@@ -25,7 +25,7 @@ def test_kubecluster(cluster):
         assert client.submit(lambda x: x + 1, 10).result() == 11
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_kubecluster_async(kopf_runner, docker_image):
     with kopf_runner:
         async with KubeCluster(
@@ -96,7 +96,7 @@ def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image):
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_cluster_from_name(kopf_runner, docker_image, ns):
     with kopf_runner:
         async with KubeCluster(
