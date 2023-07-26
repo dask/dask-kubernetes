@@ -128,3 +128,8 @@ def customresources(k8s_cluster):
     yield
     k8s_cluster.kubectl("delete", "--wait=false", "-f", temp_dir.name)
     temp_dir.cleanup()
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"

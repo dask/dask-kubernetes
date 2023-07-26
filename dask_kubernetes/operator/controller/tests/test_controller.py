@@ -103,7 +103,7 @@ def test_operator_plugins(kopf_runner):
 
 
 @pytest.mark.timeout(180)
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -247,7 +247,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
             assert "worker-sublabel" in workergroup_labels
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -292,7 +292,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
                     await client.wait_for_workers(3)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_scalesimplecluster_from_cluster_spec(
     k8s_cluster, kopf_runner, gen_cluster
 ):
@@ -339,7 +339,7 @@ async def test_scalesimplecluster_from_cluster_spec(
                     await client.wait_for_workers(3)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -377,7 +377,7 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
             )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -406,7 +406,7 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
             )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_simplecluster_batched_worker_deployments(
     k8s_cluster, kopf_runner, gen_cluster
 ):
@@ -492,7 +492,7 @@ def _assert_final_job_status(job, job_status, expected_status):
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
         async with gen_job("simplejob.yaml") as (job, ns):
@@ -563,7 +563,7 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
     assert "Job succeeded, deleting Dask cluster." in runner.stdout
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
         async with gen_job("failedjob.yaml") as (job, ns):
@@ -621,7 +621,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
     assert "Job failed, deleting Dask cluster." in runner.stdout
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -645,7 +645,7 @@ async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
             assert isinstance(scheduler_service, Service)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
@@ -674,7 +674,7 @@ async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster):
             assert (await wg.cluster()).name == cluster.name
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.skip(reason="Flaky in CI")
 async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
     with kopf_runner as runner:
