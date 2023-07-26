@@ -10,6 +10,12 @@ WORKDIR /src/dask_kubernetes
 # Install dependencies
 RUN pip install .
 
+# Add non-root user
+RUN useradd -s /bin/bash dask
+
+# Run container as non-root
+USER 1000
+
 # Start operator
 ENTRYPOINT ["/usr/local/bin/kopf", "run", "-m", "dask_kubernetes.operator.controller"]
 CMD ["--liveness=http://0.0.0.0:8080/healthz", "--verbose", "--all-namespaces"]
