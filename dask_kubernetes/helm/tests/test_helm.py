@@ -1,5 +1,4 @@
 import pytest
-import pytest_asyncio
 
 import subprocess
 import os.path
@@ -95,7 +94,7 @@ def release(k8s_cluster, chart_name, test_namespace, release_name, config_path):
     subprocess.run(["helm", "delete", "-n", test_namespace, release_name], check=True)
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def cluster(k8s_cluster, release, test_namespace):
     from dask_kubernetes import HelmCluster
 
@@ -154,7 +153,7 @@ def test_raises_on_non_existant_release(k8s_cluster):
         HelmCluster(release_name="nosuchrelease", namespace="default")
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_create_helm_cluster(cluster, release_name):
     assert cluster.status == Status.running
     assert cluster.release_name == release_name
@@ -168,7 +167,7 @@ def test_create_sync_helm_cluster(sync_cluster, release_name):
     assert "id" in cluster.scheduler_info
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_scale_cluster(cluster):
     # Scale up
     await cluster.scale(4)
@@ -197,7 +196,7 @@ async def test_scale_cluster(cluster):
         await cluster.scale(2, worker_group="bar")
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_logs(cluster):
     from distributed.utils import Logs
 
@@ -211,13 +210,13 @@ async def test_logs(cluster):
     assert "Scheduler at:" in scheduler_logs
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_adaptivity_warning(cluster):
     with pytest.raises(NotImplementedError):
         await cluster.adapt(minimum=3, maximum=3)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.xfail(reason="Has asyncio issues on CI")
 async def test_discovery(release, release_name):
     discovery = "helmcluster"

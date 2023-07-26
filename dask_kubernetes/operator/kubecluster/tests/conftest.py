@@ -1,5 +1,4 @@
 import pytest
-import pytest_asyncio
 
 import dask.config
 
@@ -14,7 +13,7 @@ def cluster(kopf_runner, docker_image):
                 yield cluster
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def async_cluster(kopf_runner, docker_image):
     with dask.config.set({"kubernetes.name": "foo-{uuid}"}):
         with kopf_runner:
