@@ -21,13 +21,14 @@ podAnnotations: {}  # Extra annotations for the operator pod
 podSecurityContext: {}  # Security context for the operator pod
   # fsGroup: 2000
 
-securityContext: {}  # Security context for the operator container
-  # capabilities:
-  #   drop:
-  #   - ALL
+securityContext:  # Security context for the operator container
+  capabilities:
+    drop:
+    - ALL
+  runAsNonRoot: true
+  runAsUser: 1000
+  allowPrivilegeEscalation: false
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 resources: {}  # Resources for the operator pod
   # We usually recommend not to specify default resources and to leave this as a conscious
