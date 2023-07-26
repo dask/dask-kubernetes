@@ -11,7 +11,7 @@ def test_config_detection(k8s_cluster):
     assert b"pytest-kind" in check_output(["kubectl", "config", "current-context"])
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.xfail(reason="Has asyncio issues on CI")
 async def test_auth(k8s_cluster):
     await ClusterAuth.load_first(ClusterAuth.DEFAULT)
