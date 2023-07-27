@@ -237,7 +237,7 @@ More information about these images is available at the
 Note that these images can be further customized with extra packages using
 ``EXTRA_PIP_PACKAGES``, ``EXTRA_APT_PACKAGES``, and ``EXTRA_CONDA_PACKAGES``
 as described in the
-`Extensibility section <https://docs.dask.org/en/latest/setup/docker.html#extensibility>`_.
+`Extensibility section <https://docs.dask.org/en/latest/deploying-docker.html#extensibility>`_.
 
 Deployment Details
 ------------------
