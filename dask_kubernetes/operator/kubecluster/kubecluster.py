@@ -776,9 +776,7 @@ class KubeCluster(Cluster):
         )
         try:
             await autoscaler.patch({"spec": {"minimum": minimum, "maximum": maximum}})
-        except (
-            Exception  # Should be kr8s.NotFoundError once kr8s-org/kr8s#127 is merged
-        ):
+        except kr8s.NotFoundError:
             await autoscaler.create()
 
     def __enter__(self):
