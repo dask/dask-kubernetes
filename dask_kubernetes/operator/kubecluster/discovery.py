@@ -3,6 +3,7 @@ from typing import Callable, AsyncIterator, Tuple
 import kr8s
 
 from dask_kubernetes.operator.kubecluster import KubeCluster
+from dask_kubernetes.operator._objects import DaskCluster  # noqa
 
 
 async def discover() -> AsyncIterator[Tuple[str, Callable]]:
