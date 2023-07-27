@@ -297,7 +297,8 @@ class KubeCluster(Cluster):
             if not self.quiet:
                 show_rich_output_task = asyncio.create_task(self._show_rich_output())
             await ClusterAuth.load_first(self.auth)
-            cluster_exists = (await self._get_cluster()) is not None
+            cluster = await DaskCluster(self.name, namespace=self.namespace)
+            cluster_exists = await cluster.exists()
 
             if cluster_exists and self.create_mode == CreateMode.CREATE_ONLY:
                 raise ValueError(
@@ -396,7 +397,7 @@ class KubeCluster(Cluster):
                     logs[pods.items[0].metadata.name],
                 ) from e
             self._log("Waiting for scheduler service")
-            await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
+            await wait_for_service(f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             self._log("Connecting to scheduler")
             await wait_for_scheduler_comm(scheduler_address)
@@ -417,43 +418,41 @@ class KubeCluster(Cluster):
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
             self.shutdown_on_close = False
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            core_api = kubernetes.client.CoreV1Api(api_client)
-            cluster_spec = await self._get_cluster()
-            container_spec = cluster_spec["spec"]["worker"]["spec"]["containers"][0]
-            self.image = container_spec["image"]
-            self.n_workers = cluster_spec["spec"]["worker"]["replicas"]
-            if "resources" in container_spec:
-                self.resources = container_spec["resources"]
-            else:
-                self.resources = None
-            if "env" in container_spec:
-                self.env = container_spec["env"]
-            else:
-                self.env = {}
-            service_name = f"{cluster_spec['metadata']['name']}-scheduler"
-            self._log("Waiting for scheduler pod")
-            await wait_for_scheduler(
-                self.name, self.namespace, timeout=self._resource_timeout
-            )
-            self._log("Waiting for scheduler service")
-            await wait_for_service(core_api, service_name, self.namespace)
-            scheduler_address = await self._get_scheduler_address()
-            self._log("Connecting to scheduler")
-            await wait_for_scheduler_comm(scheduler_address)
-            self.scheduler_comm = rpc(scheduler_address)
-            local_port = self.scheduler_forward_port
-            if local_port:
-                local_port = int(local_port)
-            self._log("Getting dashboard URL")
-            dashboard_address = await get_scheduler_address(
-                service_name,
-                self.namespace,
-                port_name="http-dashboard",
-                port_forward_cluster_ip=self.port_forward_cluster_ip,
-                local_port=local_port,
-            )
-            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
+        cluster = await DaskCluster.get(self.name, namespace=self.namespace)
+        container_spec = cluster.spec.worker.spec.containers[0]
+        self.image = container_spec.image
+        self.n_workers = cluster.replicas
+        if "resources" in container_spec:
+            self.resources = container_spec.resources
+        else:
+            self.resources = None
+        if "env" in container_spec:
+            self.env = container_spec.env
+        else:
+            self.env = {}
+        service_name = f"{cluster.name}-scheduler"
+        self._log("Waiting for scheduler pod")
+        await wait_for_scheduler(
+            self.name, self.namespace, timeout=self._resource_timeout
+        )
+        self._log("Waiting for scheduler service")
+        await wait_for_service(service_name, self.namespace)
+        scheduler_address = await self._get_scheduler_address()
+        self._log("Connecting to scheduler")
+        await wait_for_scheduler_comm(scheduler_address)
+        self.scheduler_comm = rpc(scheduler_address)
+        local_port = self.scheduler_forward_port
+        if local_port:
+            local_port = int(local_port)
+        self._log("Getting dashboard URL")
+        dashboard_address = await get_scheduler_address(
+            service_name,
+            self.namespace,
+            port_name="http-dashboard",
+            port_forward_cluster_ip=self.port_forward_cluster_ip,
+            local_port=local_port,
+        )
+        self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _get_cluster(self):
         async with kubernetes.client.api_client.ApiClient() as api_client:
@@ -1010,24 +1009,26 @@ def make_scheduler_spec(
     }
 
 
-async def wait_for_service(api, service_name, namespace):
+async def wait_for_service(service_name, namespace):
     """Block until service is available."""
-    while True:
-        try:
-            service = await api.read_namespaced_service(service_name, namespace)
+    async with kubernetes.client.api_client.ApiClient() as api_client:
+        api = kubernetes.client.CoreV1Api(api_client)
+        while True:
+            try:
+                service = await api.read_namespaced_service(service_name, namespace)
 
-            # If the service is of type LoadBalancer, also wait until it's ready.
-            if (
-                service.spec.type == "LoadBalancer"
-                and len(service.status.load_balancer.ingress or []) == 0
-            ):
+                # If the service is of type LoadBalancer, also wait until it's ready.
+                if (
+                    service.spec.type == "LoadBalancer"
+                    and len(service.status.load_balancer.ingress or []) == 0
+                ):
+                    pass
+                else:
+                    break
+            except Exception:
                 pass
-            else:
-                break
-        except Exception:
-            pass
-        finally:
-            await asyncio.sleep(0.1)
+            finally:
+                await asyncio.sleep(0.1)
 
 
 @atexit.register
