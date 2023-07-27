@@ -22,7 +22,6 @@ from rich.spinner import Spinner
 import httpx
 import kr8s
 from kr8s.asyncio.objects import Pod, Service
-import kubernetes_asyncio as kubernetes
 import yaml
 
 import dask.config
@@ -445,20 +444,6 @@ class KubeCluster(Cluster):
             local_port=local_port,
         )
         self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
-
-    async def _get_cluster(self):
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            try:
-                return await custom_objects_api.get_namespaced_custom_object(
-                    group="kubernetes.dask.org",
-                    version="v1",
-                    plural="daskclusters",
-                    namespace=self.namespace,
-                    name=self.name,
-                )
-            except kubernetes.client.exceptions.ApiException as e:
-                return None
 
     async def _get_scheduler_address(self):
         address = await get_scheduler_address(
@@ -1003,24 +988,22 @@ def make_scheduler_spec(
 
 async def wait_for_service(service_name, namespace):
     """Block until service is available."""
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        while True:
-            try:
-                service = await api.read_namespaced_service(service_name, namespace)
+    while True:
+        try:
+            service = await Service.get(service_name, namespace)
 
-                # If the service is of type LoadBalancer, also wait until it's ready.
-                if (
-                    service.spec.type == "LoadBalancer"
-                    and len(service.status.load_balancer.ingress or []) == 0
-                ):
-                    pass
-                else:
-                    break
-            except Exception:
+            # If the service is of type LoadBalancer, also wait until it's ready.
+            if (
+                service.spec.type == "LoadBalancer"
+                and len(service.status.load_balancer.ingress or []) == 0
+            ):
                 pass
-            finally:
-                await asyncio.sleep(0.1)
+            else:
+                break
+        except Exception:
+            pass
+        finally:
+            await asyncio.sleep(0.1)
 
 
 @atexit.register
