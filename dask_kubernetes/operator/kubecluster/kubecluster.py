@@ -44,7 +44,10 @@ from dask_kubernetes.common.networking import (
 )
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.dask import DaskCluster, AIODaskWorkerGroup
+from dask_kubernetes.aiopykube.dask import (
+    DaskCluster,
+    DaskWorkerGroup as AIODaskWorkerGroup,
+)
 from dask_kubernetes.aiopykube.objects import Pod, Service
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 from dask_kubernetes.operator._objects import DaskWorkerGroup, DaskAutoscaler
