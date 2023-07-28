@@ -36,7 +36,7 @@ from kubernetes_asyncio.client.exceptions import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
 
-from dask_kubernetes.common.networking import (
+from dask_kubernetes.operator.controller.networking import (
     get_scheduler_address,
     wait_for_scheduler,
     wait_for_scheduler_comm,
