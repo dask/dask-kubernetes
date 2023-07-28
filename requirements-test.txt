@@ -2,7 +2,7 @@ flake8>=3.7
 black>=18.9b0
 dask-ctl>=2021.3.0
 pytest>=7.1
-git+https://codeberg.org/hjacobs/pytest-kind.git
+pytest-kind
 pytest-timeout
 pytest-rerunfailures
 git+https://github.com/elemental-lf/k8s-crd-resolver@v0.14.0
