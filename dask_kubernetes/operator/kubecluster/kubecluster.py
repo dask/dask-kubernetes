@@ -44,10 +44,10 @@ from dask_kubernetes.common.networking import (
 )
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.dask import DaskCluster, DaskWorkerGroup
+from dask_kubernetes.aiopykube.dask import DaskCluster, AIODaskWorkerGroup
 from dask_kubernetes.aiopykube.objects import Pod, Service
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
-from dask_kubernetes.operator._objects import DaskAutoscaler
+from dask_kubernetes.operator._objects import DaskWorkerGroup, DaskAutoscaler
 
 logger = logging.getLogger(__name__)
 
@@ -543,7 +543,7 @@ class KubeCluster(Cluster):
 
             # Get DaskWorkerGroup status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
-                await DaskWorkerGroup.objects(
+                await AIODaskWorkerGroup.objects(
                     self.k8s_api, namespace=self.namespace
                 ).get_by_name(self.name + "-default")
                 self._startup_component_status["workergroup"] = "Created"
