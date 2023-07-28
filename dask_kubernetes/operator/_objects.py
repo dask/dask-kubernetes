@@ -69,6 +69,14 @@ class DaskCluster(APIObject):
         assert len(services) == 1
         return services[0]
 
+    async def ready(self) -> bool:
+        await self._refresh()
+        return (
+            "status" in self.raw
+            and "phase" in self.status
+            and self.status.phase == "Running"
+        )
+
 
 class DaskWorkerGroup(APIObject):
     version = "kubernetes.dask.org/v1"

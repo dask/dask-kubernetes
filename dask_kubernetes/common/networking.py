@@ -12,6 +12,7 @@ from distributed.core import rpc
 
 from dask_kubernetes.common.utils import check_dependency
 from dask_kubernetes.aiopykube.objects import Pod
+from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.exceptions import CrashLoopBackOffError
 
 
@@ -193,8 +194,9 @@ async def get_scheduler_address(
         return address
 
 
-async def wait_for_scheduler(api, cluster_name, namespace, timeout=None):
+async def wait_for_scheduler(cluster_name, namespace, timeout=None):
     pod_start_time = None
+    api = HTTPClient(KubeConfig.from_env())
     while True:
         async with kubernetes.client.api_client.ApiClient() as api_client:
             k8s_api = kubernetes.client.CoreV1Api(api_client)

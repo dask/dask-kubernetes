@@ -378,7 +378,6 @@ class KubeCluster(Cluster):
             try:
                 self._log("Waiting for scheduler pod")
                 await wait_for_scheduler(
-                    self.k8s_api,
                     self.name,
                     self.namespace,
                     timeout=self._resource_timeout,
@@ -434,7 +433,7 @@ class KubeCluster(Cluster):
             service_name = f"{cluster_spec['metadata']['name']}-scheduler"
             self._log("Waiting for scheduler pod")
             await wait_for_scheduler(
-                self.k8s_api, self.name, self.namespace, timeout=self._resource_timeout
+                self.name, self.namespace, timeout=self._resource_timeout
             )
             self._log("Waiting for scheduler service")
             await wait_for_service(core_api, service_name, self.namespace)
