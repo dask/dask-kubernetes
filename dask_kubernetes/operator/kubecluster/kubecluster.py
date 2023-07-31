@@ -613,30 +613,25 @@ class KubeCluster(Cluster):
         return self.sync(self._get_logs)
 
     async def _get_logs(self):
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            core_api = kubernetes.client.CoreV1Api(api_client)
-            logs = Logs()
+        logs = Logs()
 
-            pods = await core_api.list_namespaced_pod(
-                namespace=self.namespace,
-                label_selector=f"dask.org/cluster-name={self.name}",
-            )
+        pods = await kr8s.asyncio.get(
+            "pods",
+            namespace=self.namespace,
+            label_selector=f"dask.org/cluster-name={self.name}",
+        )
 
-            for pod in pods.items:
-                if "scheduler" in pod.metadata.name or "worker" in pod.metadata.name:
-                    try:
-                        if pod.status.phase != "Running":
-                            raise ValueError(
-                                f"Cannot get logs for pod with status {pod.status.phase}.",
-                            )
-                        log = Log(
-                            await core_api.read_namespaced_pod_log(
-                                pod.metadata.name, pod.metadata.namespace
-                            )
+        for pod in pods:
+            if "scheduler" in pod.name or "worker" in pod.name:
+                try:
+                    if pod.status.phase != "Running":
+                        raise ValueError(
+                            f"Cannot get logs for pod with status {pod.status.phase}.",
                         )
-                    except (ValueError, kubernetes.client.exceptions.ApiException):
-                        log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
-                logs[pod.metadata.name] = log
+                    log = Log(await pod.logs())
+                except ValueError:
+                    log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
+            logs[pod.name] = log
 
         return logs
 
