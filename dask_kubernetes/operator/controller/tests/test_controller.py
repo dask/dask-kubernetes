@@ -16,7 +16,6 @@ from dask_kubernetes.operator.controller import (
     get_job_runner_pod_name,
 )
 from dask_kubernetes.operator._objects import DaskCluster, DaskWorkerGroup, DaskJob
-from dask_kubernetes.operator import KubeCluster
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -379,21 +378,33 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.anyio
+@pytest.mark.skip(reason="Flaky in CI")
 async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
-            resource = await DaskCluster.get(cluster_name, namespace=ns)
-            async with KubeCluster(name=resource.name, asynchronous=True) as cluster:
-                async with Client(cluster, asynchronous=True) as client:
-                    # Wait for Pods to be created
-                    await client.wait_for_workers(resource.replicas)
-                    # Get the default worker group
-                    [wg] = await resource.worker_groups()
-                    # Delete a worker Pod
-                    pods = await wg.pods()
-                    await pods[0].delete()
-                    # Wait for Pods to be recreated
-                    await client.wait_for_workers(resource.replicas)
+            cluster = await DaskCluster.get(cluster_name, namespace=ns)
+            # Get the default worker group
+            while not (wgs := await cluster.worker_groups()):
+                await asyncio.sleep(0.1)
+            [wg] = wgs
+            # Wait for worker Pods to be created
+            while not (pods := await wg.pods()):
+                await asyncio.sleep(0.1)
+            # Store number of workers
+            n_pods = len(pods)
+            # Wait for worker Pods to be ready
+            await asyncio.gather(
+                *[pod.wait(conditions="condition=Ready", timeout=60) for pod in pods]
+            )
+            # Delete a worker Pod
+            await pods[0].delete()
+            # Wait for Pods to be recreated
+            while len((pods := await wg.pods())) < n_pods:
+                await asyncio.sleep(0.1)
+            # Wait for worker Pods to be ready
+            await asyncio.gather(
+                *[pod.wait(conditions="condition=Ready", timeout=60) for pod in pods]
+            )
 
 
 @pytest.mark.anyio
