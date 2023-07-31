@@ -43,12 +43,16 @@ from dask_kubernetes.common.networking import (
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import (
-    DaskCluster,
+    DaskCluster as AIODaskCluster,
     DaskWorkerGroup as AIODaskWorkerGroup,
 )
 from dask_kubernetes.aiopykube.objects import Pod, Service
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
-from dask_kubernetes.operator._objects import DaskWorkerGroup, DaskAutoscaler
+from dask_kubernetes.operator._objects import (
+    DaskCluster,
+    DaskWorkerGroup,
+    DaskAutoscaler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -483,7 +487,7 @@ class KubeCluster(Cluster):
         """Wait for the operator to set the status.phase."""
         start = time.time()
         while start + self._resource_timeout > time.time():
-            cluster = await DaskCluster.objects(
+            cluster = await AIODaskCluster.objects(
                 self.k8s_api, namespace=self.namespace
             ).get_by_name(self.name)
             if (
@@ -501,7 +505,7 @@ class KubeCluster(Cluster):
         while True:
             # Get DaskCluster status
             with suppress(pykube.exceptions.ObjectDoesNotExist):
-                cluster = await DaskCluster.objects(
+                cluster = await AIODaskCluster.objects(
                     self.k8s_api, namespace=self.namespace
                 ).get_by_name(self.name)
                 self._startup_component_status["cluster"] = cluster.obj["status"][
