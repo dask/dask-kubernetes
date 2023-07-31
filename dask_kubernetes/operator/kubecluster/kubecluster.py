@@ -707,26 +707,21 @@ class KubeCluster(Cluster):
                 n_workers=n_workers or self.n_workers,
                 image=image or self.image,
             )
-            spec["cluster"] = self.name
-        data = {
-            "apiVersion": "kubernetes.dask.org/v1",
-            "kind": "DaskWorkerGroup",
-            "metadata": {"name": f"{self.name}-{name}"},
-            "spec": {
-                "cluster": f"{self.name}",
-                "worker": spec,
-            },
-        }
-
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            await custom_objects_api.create_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskworkergroups",
-                namespace=self.namespace,
-                body=data,
-            )
+        wg = await DaskWorkerGroup(
+            {
+                "apiVersion": "kubernetes.dask.org/v1",
+                "kind": "DaskWorkerGroup",
+                "metadata": {
+                    "name": f"{self.name}-{name}",
+                    "namespace": self.namespace,
+                },
+                "spec": {
+                    "cluster": f"{self.name}",
+                    "worker": spec,
+                },
+            }
+        )
+        await wg.create()
 
     def delete_worker_group(self, name):
         """Delete a dask worker group by name
@@ -743,15 +738,8 @@ class KubeCluster(Cluster):
         return self.sync(self._delete_worker_group, name)
 
     async def _delete_worker_group(self, name):
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
-            await custom_objects_api.delete_namespaced_custom_object(
-                group="kubernetes.dask.org",
-                version="v1",
-                plural="daskworkergroups",
-                namespace=self.namespace,
-                name=f"{self.name}-{name}",
-            )
+        wg = await DaskWorkerGroup(f"{self.name}-{name}", namespace=self.namespace)
+        await wg.delete()
 
     def close(self, timeout=3600):
         """Delete the dask cluster"""
