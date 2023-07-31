@@ -655,17 +655,20 @@ class KubeCluster(Cluster):
                 n_workers=n_workers or self.n_workers,
                 image=image or self.image,
             )
-            spec["cluster"] = self.name
-        data = {
-            "apiVersion": "kubernetes.dask.org/v1",
-            "kind": "DaskWorkerGroup",
-            "metadata": {"name": f"{self.name}-{name}"},
-            "spec": {
-                "cluster": f"{self.name}",
-                "worker": spec,
-            },
-        }
-        wg = await DaskWorkerGroup(data, namespace=self.namespace)
+        wg = await DaskWorkerGroup(
+            {
+                "apiVersion": "kubernetes.dask.org/v1",
+                "kind": "DaskWorkerGroup",
+                "metadata": {
+                    "name": f"{self.name}-{name}",
+                    "namespace": self.namespace,
+                },
+                "spec": {
+                    "cluster": f"{self.name}",
+                    "worker": spec,
+                },
+            }
+        )
         await wg.create()
 
     def delete_worker_group(self, name):
