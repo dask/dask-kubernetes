@@ -19,7 +19,6 @@ from rich.table import Table
 from rich.console import Group
 from rich.panel import Panel
 from rich.spinner import Spinner
-import pykube.exceptions
 import kubernetes_asyncio as kubernetes
 import yaml
 import kr8s
@@ -33,6 +32,7 @@ from distributed.utils import (
     TimeoutError,
     format_dashboard_link,
 )
+from kr8s.asyncio.objects import Pod, Service
 from kubernetes_asyncio.client.exceptions import ApiException
 
 from dask_kubernetes.common.auth import ClusterAuth
@@ -45,12 +45,14 @@ from dask_kubernetes.common.networking import (
 from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.aiopykube.dask import (
-    DaskCluster,
-    DaskWorkerGroup as AIODaskWorkerGroup,
+    DaskCluster as AIODaskCluster,
 )
-from dask_kubernetes.aiopykube.objects import Pod, Service
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
-from dask_kubernetes.operator._objects import DaskWorkerGroup, DaskAutoscaler
+from dask_kubernetes.operator._objects import (
+    DaskCluster,
+    DaskWorkerGroup,
+    DaskAutoscaler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -485,7 +487,7 @@ class KubeCluster(Cluster):
         """Wait for the operator to set the status.phase."""
         start = time.time()
         while start + self._resource_timeout > time.time():
-            cluster = await DaskCluster.objects(
+            cluster = await AIODaskCluster.objects(
                 self.k8s_api, namespace=self.namespace
             ).get_by_name(self.name)
             if (
@@ -502,53 +504,39 @@ class KubeCluster(Cluster):
     async def _watch_component_status(self):
         while True:
             # Get DaskCluster status
-            with suppress(pykube.exceptions.ObjectDoesNotExist):
-                cluster = await DaskCluster.objects(
-                    self.k8s_api, namespace=self.namespace
-                ).get_by_name(self.name)
-                self._startup_component_status["cluster"] = cluster.obj["status"][
-                    "phase"
-                ]
+            with suppress(kr8s.NotFoundError):
+                cluster = await DaskCluster.get(self.name, namespace=self.namespace)
+                if "status" in cluster.raw and "phase" in cluster.status:
+                    self._startup_component_status["cluster"] = cluster.status.phase
 
             # Get Scheduler Pod status
-            with suppress(pykube.exceptions.ObjectDoesNotExist):
-                async with kubernetes.client.api_client.ApiClient() as api_client:
-                    core_api = kubernetes.client.CoreV1Api(api_client)
-                    pods = await core_api.list_namespaced_pod(
-                        namespace=self.namespace,
-                        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
-                    )
-                if pods.items:
-                    pod = await Pod.objects(
-                        self.k8s_api, namespace=self.namespace
-                    ).get_by_name(pods.items[0].metadata.name)
-                    phase = pod.obj["status"]["phase"]
-                    if phase == "Running":
-                        conditions = {
-                            c["type"]: c["status"]
-                            for c in pod.obj["status"]["conditions"]
-                        }
-                        if "Ready" not in conditions or conditions["Ready"] != "True":
-                            phase = "Health Checking"
-                        if "containerStatuses" in pod.obj["status"]:
-                            for container in pod.obj["status"]["containerStatuses"]:
-                                if "waiting" in container["state"]:
-                                    phase = container["state"]["waiting"]["reason"]
+            with suppress(kr8s.NotFoundError):
+                scheduler_pod = await Pod.get(
+                    namespace=self.namespace,
+                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                )
 
-                    self._startup_component_status["schedulerpod"] = phase
+                phase = scheduler_pod.status.phase
+                if scheduler_pod.status.phase == "Running":
+                    if not await scheduler_pod.ready():
+                        phase = "Health Checking"
+                    if "container_statuses" in scheduler_pod.status:
+                        for container in scheduler_pod.status.container_statuses:
+                            if "waiting" in container.state:
+                                phase = container.state.waiting.reason
+
+                self._startup_component_status["schedulerpod"] = phase
 
             # Get Scheduler Service status
-            with suppress(pykube.exceptions.ObjectDoesNotExist):
-                await Service.objects(self.k8s_api).get_by_name(
-                    self.name + "-scheduler"
-                )
+            with suppress(kr8s.NotFoundError):
+                await Service.get(self.name + "-scheduler", namespace=self.namespace)
                 self._startup_component_status["schedulerservice"] = "Created"
 
             # Get DaskWorkerGroup status
-            with suppress(pykube.exceptions.ObjectDoesNotExist):
-                await AIODaskWorkerGroup.objects(
-                    self.k8s_api, namespace=self.namespace
-                ).get_by_name(self.name + "-default")
+            with suppress(kr8s.NotFoundError):
+                await DaskWorkerGroup.get(
+                    self.name + "-default", namespace=self.namespace
+                )
                 self._startup_component_status["workergroup"] = "Created"
 
             await asyncio.sleep(1)
