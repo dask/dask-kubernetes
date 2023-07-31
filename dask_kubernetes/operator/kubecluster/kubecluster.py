@@ -23,6 +23,7 @@ import httpx
 import kr8s
 from kr8s.asyncio.objects import Pod, Service
 import yaml
+import kr8s
 
 import dask.config
 from distributed.core import Status, rpc
