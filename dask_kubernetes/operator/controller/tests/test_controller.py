@@ -384,7 +384,7 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
         async with gen_cluster() as (cluster_name, ns):
             resource = await DaskCluster.get(cluster_name, namespace=ns)
             async with KubeCluster(
-                resource.name, namespace=ns, asynchronous=True
+                name=resource.name, namespace=ns, asynchronous=True
             ) as cluster:
                 async with Client(cluster, asynchronous=True) as client:
                     # Wait for Pods to be created
