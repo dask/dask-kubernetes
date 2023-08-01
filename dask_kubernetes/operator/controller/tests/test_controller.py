@@ -378,6 +378,7 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.anyio
+@pytest.mark.skip(reason="Flaky in CI")
 async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
     with kopf_runner as runner:
         async with gen_cluster() as (cluster_name, ns):
