@@ -376,15 +376,19 @@ class KubeCluster(Cluster):
                 timeout=self._resource_timeout,
             )
         except CrashLoopBackOffError as e:
-            scheduler_pod = await Pod.get(
-                namespace=self.namespace,
-                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
-            )
+            try:
+                scheduler_pod = await Pod.get(
+                    namespace=self.namespace,
+                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+                )
+                logs = await scheduler_pod.logs()
+            except Exception:
+                logs = "Failed to get logs."
             await self._close()
             raise SchedulerStartupError(
                 "Scheduler failed to start.",
                 "Scheduler Pod logs:",
-                scheduler_pod.logs(),
+                logs,
             ) from e
         self._log("Waiting for scheduler service")
         await wait_for_service(f"{self.name}-scheduler", self.namespace)
