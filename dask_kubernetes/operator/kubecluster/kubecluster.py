@@ -1008,7 +1008,7 @@ def make_scheduler_spec(
 
 async def wait_for_service(service_name, namespace):
     """Block until service is available."""
-    service = await Service.get(service_name, namespace)
+    service = await Service.get(service_name, namespace=namespace)
     while not await service.ready():
         await asyncio.sleep(0.1)
 
