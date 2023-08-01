@@ -12,6 +12,7 @@ from typing import ClassVar
 import warnings
 import weakref
 import uuid
+import httpx
 
 from rich import box
 from rich.live import Live
@@ -332,86 +333,77 @@ class KubeCluster(Cluster):
     async def _create_cluster(self):
         if self.shutdown_on_close is None:
             self.shutdown_on_close = True
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            core_api = kubernetes.client.CoreV1Api(api_client)
-            custom_objects_api = kubernetes.client.CustomObjectsApi(api_client)
 
-            if not self._custom_cluster_spec:
-                self._log("Generating cluster spec")
-                data = make_cluster_spec(
-                    name=self.name,
-                    env=self.env,
-                    resources=self.resources,
-                    worker_command=self.worker_command,
-                    n_workers=self.n_workers,
-                    image=self.image,
-                    scheduler_service_type=self.scheduler_service_type,
-                    idle_timeout=self.idle_timeout,
-                )
-            else:
-                data = self._custom_cluster_spec
-            try:
-                self._log("Creating DaskCluster object")
-                await custom_objects_api.create_namespaced_custom_object(
-                    group="kubernetes.dask.org",
-                    version="v1",
-                    plural="daskclusters",
-                    namespace=self.namespace,
-                    body=data,
-                )
-            except kubernetes.client.ApiException as e:
-                if e.status == 404:
-                    raise RuntimeError(
-                        "Failed to create DaskCluster resource."
-                        "Are the Dask Custom Resource Definitions installed? "
-                        "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
-                    ) from e
-                else:
-                    raise e
-
-            try:
-                self._log("Waiting for controller to action cluster")
-                await self._wait_for_controller()
-            except TimeoutError as e:
-                await self._close()
-                raise e
-            try:
-                self._log("Waiting for scheduler pod")
-                await wait_for_scheduler(
-                    self.name,
-                    self.namespace,
-                    timeout=self._resource_timeout,
-                )
-            except CrashLoopBackOffError as e:
-                logs = await self._get_logs()
-                pods = await core_api.list_namespaced_pod(
-                    namespace=self.namespace,
-                    label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
-                )
-                await self._close()
-                raise SchedulerStartupError(
-                    "Scheduler failed to start.",
-                    "Scheduler Pod logs:",
-                    logs[pods.items[0].metadata.name],
-                ) from e
-            self._log("Waiting for scheduler service")
-            await wait_for_service(f"{self.name}-scheduler", self.namespace)
-            scheduler_address = await self._get_scheduler_address()
-            self._log("Connecting to scheduler")
-            await wait_for_scheduler_comm(scheduler_address)
-            self.scheduler_comm = rpc(scheduler_address)
-            local_port = self.scheduler_forward_port
-            if local_port:
-                local_port = int(local_port)
-            self._log("Getting dashboard URL")
-            dashboard_address = await get_scheduler_address(
-                f"{self.name}-scheduler",
-                self.namespace,
-                port_name="http-dashboard",
-                port_forward_cluster_ip=self.port_forward_cluster_ip,
-                local_port=local_port,
+        if not self._custom_cluster_spec:
+            self._log("Generating cluster spec")
+            data = make_cluster_spec(
+                name=self.name,
+                env=self.env,
+                resources=self.resources,
+                worker_command=self.worker_command,
+                n_workers=self.n_workers,
+                image=self.image,
+                scheduler_service_type=self.scheduler_service_type,
+                idle_timeout=self.idle_timeout,
             )
-            self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
+        else:
+            data = self._custom_cluster_spec
+        try:
+            self._log("Creating DaskCluster object")
+            cluster = await DaskCluster(data, namespace=self.namespace)
+            await cluster.create()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise RuntimeError(
+                    "Failed to create DaskCluster resource."
+                    "Are the Dask Custom Resource Definitions installed? "
+                    "https://kubernetes.dask.org/en/latest/operator.html#installing-the-operator"
+                ) from e
+            else:
+                raise e
+
+        try:
+            self._log("Waiting for controller to action cluster")
+            await self._wait_for_controller()
+        except TimeoutError as e:
+            await self._close()
+            raise e
+        try:
+            self._log("Waiting for scheduler pod")
+            await wait_for_scheduler(
+                self.name,
+                self.namespace,
+                timeout=self._resource_timeout,
+            )
+        except CrashLoopBackOffError as e:
+            scheduler_pod = await Pod.get(
+                namespace=self.namespace,
+                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={self.name}",
+            )
+            await self._close()
+            raise SchedulerStartupError(
+                "Scheduler failed to start.",
+                "Scheduler Pod logs:",
+                scheduler_pod.logs(),
+            ) from e
+        self._log("Waiting for scheduler service")
+        await wait_for_service(f"{self.name}-scheduler", self.namespace)
+        scheduler_address = await self._get_scheduler_address()
+        self._log("Connecting to scheduler")
+        await wait_for_scheduler_comm(scheduler_address)
+        self.scheduler_comm = rpc(scheduler_address)
+        local_port = self.scheduler_forward_port
+        if local_port:
+            local_port = int(local_port)
+        self._log("Getting dashboard URL")
+        dashboard_address = await get_scheduler_address(
+            f"{self.name}-scheduler",
+            self.namespace,
+            port_name="http-dashboard",
+            port_forward_cluster_ip=self.port_forward_cluster_ip,
+            local_port=local_port,
+        )
+        self.forwarded_dashboard_port = dashboard_address.split(":")[-1]
 
     async def _connect_cluster(self):
         if self.shutdown_on_close is None:
