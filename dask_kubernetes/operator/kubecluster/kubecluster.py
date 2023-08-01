@@ -988,22 +988,9 @@ def make_scheduler_spec(
 
 async def wait_for_service(service_name, namespace):
     """Block until service is available."""
-    while True:
-        try:
-            service = await Service.get(service_name, namespace)
-
-            # If the service is of type LoadBalancer, also wait until it's ready.
-            if (
-                service.spec.type == "LoadBalancer"
-                and len(service.status.load_balancer.ingress or []) == 0
-            ):
-                pass
-            else:
-                break
-        except Exception:
-            pass
-        finally:
-            await asyncio.sleep(0.1)
+    service = await Service.get(service_name, namespace)
+    while not await service.ready():
+        await asyncio.sleep(0.1)
 
 
 @atexit.register
