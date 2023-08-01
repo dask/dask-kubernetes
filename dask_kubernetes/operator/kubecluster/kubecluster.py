@@ -41,10 +41,6 @@ from dask_kubernetes.common.networking import (
     wait_for_scheduler_comm,
 )
 from dask_kubernetes.common.utils import get_current_namespace
-from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
-from dask_kubernetes.aiopykube.dask import (
-    DaskCluster as AIODaskCluster,
-)
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 from dask_kubernetes.operator._objects import (
     DaskCluster,
@@ -262,7 +258,6 @@ class KubeCluster(Cluster):
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
-        self.k8s_api = HTTPClient(KubeConfig.from_env())
         self._instances.add(self)
         self._rich_spinner = Spinner("dots", speed=0.5)
         self._startup_component_status = {}
@@ -484,15 +479,9 @@ class KubeCluster(Cluster):
     async def _wait_for_controller(self):
         """Wait for the operator to set the status.phase."""
         start = time.time()
+        cluster = await DaskCluster.get(self.name, namespace=self.namespace)
         while start + self._resource_timeout > time.time():
-            cluster = await AIODaskCluster.objects(
-                self.k8s_api, namespace=self.namespace
-            ).get_by_name(self.name)
-            if (
-                "status" in cluster.obj
-                and "phase" in cluster.obj["status"]
-                and cluster.obj["status"]["phase"] == "Running"
-            ):
+            if await cluster.ready():
                 return
             await asyncio.sleep(0.25)
         raise TimeoutError(
