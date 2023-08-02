@@ -139,14 +139,19 @@ def test_cluster_without_operator(docker_image):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
 
 
-def test_cluster_crashloopbackoff(kopf_runner, docker_image):
+def test_cluster_crashloopbackoff(kopf_runner, docker_image, ns):
     with kopf_runner:
         with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
             spec = make_cluster_spec(name="crashloopbackoff", n_workers=1)
             spec["spec"]["scheduler"]["spec"]["containers"][0]["args"][
                 0
             ] = "dask-schmeduler"
-            KubeCluster(custom_cluster_spec=spec, resource_timeout=1, idle_timeout=2)
+            KubeCluster(
+                custom_cluster_spec=spec,
+                namespace=ns,
+                resource_timeout=1,
+                idle_timeout=2,
+            )
 
 
 def test_adapt(kopf_runner, docker_image):
