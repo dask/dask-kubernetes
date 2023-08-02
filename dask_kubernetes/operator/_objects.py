@@ -3,6 +3,8 @@ from typing import List
 
 from kr8s.asyncio.objects import APIObject, Pod, Deployment, Service
 
+WAIT_TIMEOUT = 30
+
 
 class DaskCluster(APIObject):
     version = "kubernetes.dask.org/v1"
@@ -115,7 +117,9 @@ class DaskWorkerGroup(APIObject):
         )
 
     async def cluster(self) -> DaskCluster:
-        return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
+        return await DaskCluster.get(
+            self.spec.cluster, namespace=self.namespace, timeout=WAIT_TIMEOUT
+        )
 
 
 class DaskAutoscaler(APIObject):
@@ -127,7 +131,9 @@ class DaskAutoscaler(APIObject):
     namespaced = True
 
     async def cluster(self) -> DaskCluster:
-        return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
+        return await DaskCluster.get(
+            self.spec.cluster, namespace=self.namespace, timeout=WAIT_TIMEOUT
+        )
 
 
 class DaskJob(APIObject):
@@ -139,7 +145,9 @@ class DaskJob(APIObject):
     namespaced = True
 
     async def cluster(self) -> DaskCluster:
-        return await DaskCluster.get(self.name, namespace=self.namespace)
+        return await DaskCluster.get(
+            self.name, namespace=self.namespace, timeout=WAIT_TIMEOUT
+        )
 
     async def pod(self) -> Pod:
         pods = []

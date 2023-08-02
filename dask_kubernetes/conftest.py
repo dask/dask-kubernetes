@@ -18,7 +18,7 @@ check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
 
-for mod in ("httpx", "httpcore"):
+for mod in ("httpx", "httpcore", "httpcore.http11"):
     logging.getLogger().setLevel(logging.WARNING)
 
 
