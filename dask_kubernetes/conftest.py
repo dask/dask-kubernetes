@@ -1,5 +1,6 @@
 import pytest
 
+import logging
 import pathlib
 import os
 import subprocess
@@ -16,6 +17,9 @@ DIR = pathlib.Path(__file__).parent.absolute()
 check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
+
+for mod in ("httpx", "httpcore"):
+    logging.getLogger().setLevel(logging.WARNING)
 
 
 @pytest.fixture()
