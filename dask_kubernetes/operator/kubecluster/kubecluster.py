@@ -395,7 +395,7 @@ class KubeCluster(Cluster):
                     logs[pods.items[0].metadata.name],
                 ) from e
             self._log("Waiting for scheduler service")
-            await wait_for_service(f"{self.name}-scheduler", self.namespace)
+            await wait_for_service(core_api, f"{self.name}-scheduler", self.namespace)
             scheduler_address = await self._get_scheduler_address()
             self._log("Connecting to scheduler")
             await wait_for_scheduler_comm(scheduler_address)
@@ -436,7 +436,7 @@ class KubeCluster(Cluster):
                 self.name, self.namespace, timeout=self._resource_timeout
             )
             self._log("Waiting for scheduler service")
-            await wait_for_service(service_name, self.namespace)
+            await wait_for_service(core_api, service_name, self.namespace)
             scheduler_address = await self._get_scheduler_address()
             self._log("Connecting to scheduler")
             await wait_for_scheduler_comm(scheduler_address)
@@ -1010,11 +1010,24 @@ def make_scheduler_spec(
     }
 
 
-async def wait_for_service(service_name, namespace):
+async def wait_for_service(api, service_name, namespace):
     """Block until service is available."""
-    service = await Service.get(service_name, namespace)
-    while not await service.ready():
-        await asyncio.sleep(0.1)
+    while True:
+        try:
+            service = await api.read_namespaced_service(service_name, namespace)
+
+            # If the service is of type LoadBalancer, also wait until it's ready.
+            if (
+                service.spec.type == "LoadBalancer"
+                and len(service.status.load_balancer.ingress or []) == 0
+            ):
+                pass
+            else:
+                break
+        except Exception:
+            pass
+        finally:
+            await asyncio.sleep(0.1)
 
 
 @atexit.register
