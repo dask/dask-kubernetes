@@ -988,8 +988,11 @@ def make_scheduler_spec(
 
 async def wait_for_service(service_name, namespace):
     """Block until service is available."""
-    service = await Service.get(service_name, namespace)
-    while not await service.ready():
+    while True:
+        with suppress(kr8s.NotFoundError):
+            service = await Service.get(service_name, namespace)
+            if await service.ready():
+                return
         await asyncio.sleep(0.1)
 
 
