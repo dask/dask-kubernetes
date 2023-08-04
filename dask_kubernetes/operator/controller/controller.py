@@ -245,7 +245,9 @@ def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
 
 
 @kopf.on.startup()
-async def startup(settings: kopf.OperatorSettings, **kwargs):
+async def startup(settings: kopf.OperatorSettings, logger, **kwargs):
+    logger.info("Starting Dask Kubernetes Operator")
+
     # Authenticate with k8s
     await ClusterAuth.load_first()
 

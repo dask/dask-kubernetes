@@ -1,12 +1,14 @@
 import pytest
 
+import asyncio
+from contextlib import asynccontextmanager
 import pathlib
 import os
 import subprocess
 import tempfile
 import uuid
 
-from kopf.testing import KopfRunner
+from kopf import operator, configure
 from pytest_kind.cluster import KindCluster
 
 from dask_kubernetes.common.utils import check_dependency
@@ -19,8 +21,23 @@ check_dependency("docker")
 
 
 @pytest.fixture()
-def kopf_runner(k8s_cluster):
-    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+def kopf_runner(k8s_cluster, ns):
+    import dask_kubernetes.operator.controller  # noqa
+
+    @asynccontextmanager
+    async def runner():
+        ready_flag = asyncio.Event()
+        stop_flag = asyncio.Event()
+        configure(verbose=True)  # Configure Kopf logging
+        task = asyncio.create_task(
+            operator(namespaces=[ns], stop_flag=stop_flag, ready_flag=ready_flag)
+        )
+        await ready_flag.wait()
+        yield
+        stop_flag.set()
+        await task
+
+    return runner
 
 
 @pytest.fixture(scope="session")
