@@ -139,6 +139,7 @@ def test_cluster_without_operator(docker_image):
         KubeCluster(name="noop", n_workers=1, image=docker_image, resource_timeout=1)
 
 
+@pytest.mark.flaky(reruns=0)
 def test_cluster_crashloopbackoff(kopf_runner, docker_image):
     with kopf_runner:
         with pytest.raises(SchedulerStartupError, match="Scheduler failed to start"):
