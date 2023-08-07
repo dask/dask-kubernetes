@@ -1,5 +1,6 @@
 import pytest
 
+import logging
 import pathlib
 import os
 import subprocess
@@ -16,6 +17,14 @@ DIR = pathlib.Path(__file__).parent.absolute()
 check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
+
+DISABLE_LOGGERS = ["httpcore.http11"]
+
+
+def pytest_configure():
+    for logger_name in DISABLE_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        logger.disabled = True
 
 
 @pytest.fixture()
