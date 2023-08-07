@@ -18,7 +18,7 @@ check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
 
-DISABLE_LOGGERS = ["httpcore.http11"]
+DISABLE_LOGGERS = ["httpcore", "httpx"]
 
 
 def pytest_configure():
