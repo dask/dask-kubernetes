@@ -694,13 +694,14 @@ class KubeCluster(Cluster):
     async def _close(self, timeout=3600):
         await super()._close()
         if self.shutdown_on_close:
-            cluster = await DaskCluster.get(self.name, namespace=self.namespace)
             try:
+                cluster = await DaskCluster.get(self.name, namespace=self.namespace)
                 await cluster.delete()
             except kr8s.NotFoundError:
                 logger.warning(
                     "Failed to delete DaskCluster, looks like it has already been deleted."
                 )
+                return
             start = time.time()
             while await cluster.exists():
                 if time.time() > start + timeout:

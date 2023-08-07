@@ -19,8 +19,10 @@ check_dependency("docker")
 
 
 @pytest.fixture()
-def kopf_runner(k8s_cluster):
-    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+def kopf_runner(k8s_cluster, ns):
+    yield KopfRunner(
+        ["run", "-m", "dask_kubernetes.operator", "--verbose", "--namespace", ns]
+    )
 
 
 @pytest.fixture(scope="session")
