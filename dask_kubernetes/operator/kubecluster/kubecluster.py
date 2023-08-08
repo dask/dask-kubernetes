@@ -455,7 +455,7 @@ class KubeCluster(Cluster):
     async def _wait_for_controller(self):
         """Wait for the operator to set the status.phase."""
         start = time.time()
-        cluster = await DaskCluster.get(self.name, namespace=self.namespace)
+        cluster = await DaskCluster.get(self.name, namespace=self.namespace, timeout=30)
         while start + self._resource_timeout > time.time():
             if await cluster.ready():
                 return
