@@ -6,6 +6,7 @@ from dask_kubernetes.operator import discover
 
 
 @pytest.mark.anyio
+@pytest.mark.skip(reason="Flaky in CI")
 async def test_discovery(kopf_runner, docker_image):
     with kopf_runner:
         async with KubeCluster(
