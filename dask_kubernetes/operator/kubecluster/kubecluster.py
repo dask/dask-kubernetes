@@ -384,7 +384,7 @@ class KubeCluster(Cluster):
             raise SchedulerStartupError(
                 "Scheduler failed to start.",
                 "Scheduler Pod logs:",
-                scheduler_pod.logs(),
+                await scheduler_pod.logs(),
             ) from e
         self._log("Waiting for scheduler service")
         await wait_for_service(f"{self.name}-scheduler", self.namespace)
