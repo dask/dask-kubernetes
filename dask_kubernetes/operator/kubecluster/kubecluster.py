@@ -384,7 +384,7 @@ class KubeCluster(Cluster):
             raise SchedulerStartupError(
                 "Scheduler failed to start.",
                 "Scheduler Pod logs:",
-                scheduler_pod.logs(),
+                await scheduler_pod.logs(),
             ) from e
         self._log("Waiting for scheduler service")
         await wait_for_service(f"{self.name}-scheduler", self.namespace)
@@ -455,7 +455,7 @@ class KubeCluster(Cluster):
     async def _wait_for_controller(self):
         """Wait for the operator to set the status.phase."""
         start = time.time()
-        cluster = await DaskCluster.get(self.name, namespace=self.namespace)
+        cluster = await DaskCluster.get(self.name, namespace=self.namespace, timeout=30)
         while start + self._resource_timeout > time.time():
             if await cluster.ready():
                 return
@@ -694,13 +694,14 @@ class KubeCluster(Cluster):
     async def _close(self, timeout=3600):
         await super()._close()
         if self.shutdown_on_close:
-            cluster = await DaskCluster.get(self.name, namespace=self.namespace)
             try:
+                cluster = await DaskCluster.get(self.name, namespace=self.namespace)
                 await cluster.delete()
             except kr8s.NotFoundError:
                 logger.warning(
                     "Failed to delete DaskCluster, looks like it has already been deleted."
                 )
+                return
             start = time.time()
             while await cluster.exists():
                 if time.time() > start + timeout:

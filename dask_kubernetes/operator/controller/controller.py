@@ -767,6 +767,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
                 "dask.org/component": "scheduler",
                 "dask.org/cluster-name": spec["cluster"],
             },
+            namespace=namespace,
         )
         if not await scheduler.ready():
             raise ValueError()

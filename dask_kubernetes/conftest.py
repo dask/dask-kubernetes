@@ -1,5 +1,6 @@
 import pytest
 
+import logging
 import pathlib
 import os
 import subprocess
@@ -17,10 +18,20 @@ check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
 
+DISABLE_LOGGERS = ["httpcore", "httpx"]
+
+
+def pytest_configure():
+    for logger_name in DISABLE_LOGGERS:
+        logger = logging.getLogger(logger_name)
+        logger.disabled = True
+
 
 @pytest.fixture()
-def kopf_runner(k8s_cluster):
-    yield KopfRunner(["run", "-m", "dask_kubernetes.operator", "--verbose"])
+def kopf_runner(k8s_cluster, ns):
+    yield KopfRunner(
+        ["run", "-m", "dask_kubernetes.operator", "--verbose", "--namespace", ns]
+    )
 
 
 @pytest.fixture(scope="session")
