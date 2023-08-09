@@ -7,7 +7,6 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
-      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
   push:
     paths:
@@ -16,7 +15,6 @@ on:
       - "ci/**"
       - "dask_kubernetes/operator/**"
       - "dask_kubernetes/common/**"
-      - "dask_kubernetes/aiopykube/**"
       - "dask_kubernetes/*"
 
 concurrency:

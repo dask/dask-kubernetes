@@ -8,11 +8,11 @@ from weakref import finalize
 import kubernetes_asyncio as kubernetes
 from tornado.iostream import StreamClosedError
 
+import kr8s
+from kr8s.asyncio.objects import Pod
 from distributed.core import rpc
 
 from dask_kubernetes.common.utils import check_dependency
-from dask_kubernetes.aiopykube.objects import Pod
-from dask_kubernetes.aiopykube import HTTPClient, KubeConfig
 from dask_kubernetes.exceptions import CrashLoopBackOffError
 
 
@@ -196,36 +196,25 @@ async def get_scheduler_address(
 
 async def wait_for_scheduler(cluster_name, namespace, timeout=None):
     pod_start_time = None
-    api = HTTPClient(KubeConfig.from_env())
     while True:
-        async with kubernetes.client.api_client.ApiClient() as api_client:
-            k8s_api = kubernetes.client.CoreV1Api(api_client)
-            try:
-                [pod] = (
-                    await k8s_api.list_namespaced_pod(
-                        namespace=namespace,
-                        label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={cluster_name}",
-                    )
-                ).items
-            except ValueError:
-                await asyncio.sleep(0.25)
-                continue
-        pod = await Pod.objects(api, namespace=namespace).get_by_name(pod.metadata.name)
-        phase = pod.obj["status"]["phase"]
-        if phase == "Running":
+        try:
+            pod = await Pod.get(
+                label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={cluster_name}",
+                namespace=namespace,
+            )
+        except kr8s.NotFoundError:
+            await asyncio.sleep(0.25)
+            continue
+        if pod.status.phase == "Running":
             if not pod_start_time:
                 pod_start_time = time.time()
-            conditions = {
-                c["type"]: c["status"] for c in pod.obj["status"]["conditions"]
-            }
-            if "Ready" in conditions and conditions["Ready"] == "True":
+            if await pod.ready():
                 return
-            if "containerStatuses" in pod.obj["status"]:
-                for container in pod.obj["status"]["containerStatuses"]:
+            if "containerStatuses" in pod.status:
+                for container in pod.status.containerStatuses:
                     if (
-                        "waiting" in container["state"]
-                        and container["state"]["waiting"]["reason"]
-                        == "CrashLoopBackOff"
+                        "waiting" in container.state
+                        and container.state.waiting.reason == "CrashLoopBackOff"
                         and timeout
                         and pod_start_time + timeout < time.time()
                     ):

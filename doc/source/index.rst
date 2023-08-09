@@ -101,5 +101,4 @@ and have the cluster running. You can then use it to manage scaling and retrieve
 
    testing
    releasing
-   aiopykube
    history
