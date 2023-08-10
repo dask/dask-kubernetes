@@ -162,7 +162,9 @@ class AutoRefreshKubeConfigLoader(KubeConfigLoader):
             self.token_expire_ts <= datetime.datetime.now(tz=tzUTC)
         ):
             await self._refresh_oidc(provider)
-            expires = self.extract_oid_expiration_from_provider(provider=provider)
+            expires = datetime.datetime.fromtimestamp(
+                self.extract_oid_expiration_from_provider(provider=provider)
+            )
 
             await self.create_refresh_task_from_expiration_timestamp(
                 expiration_timestamp=expires
