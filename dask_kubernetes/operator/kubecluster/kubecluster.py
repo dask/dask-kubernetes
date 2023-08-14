@@ -116,6 +116,8 @@ class KubeCluster(Cluster):
         Defaults to ``60`` seconds.
     scheduler_service_type: str (optional)
         Kubernetes service type to use for the scheduler. Defaults to ``ClusterIP``.
+    jupyter: bool (optional)
+        Start Jupyter on the scheduler node.
     custom_cluster_spec: str | dict (optional)
         Path to a YAML manifest or a dictionary representation of a ``DaskCluster`` resource object which will be
         used to create the cluster instead of generating one from the other keyword arguments.
@@ -179,6 +181,7 @@ class KubeCluster(Cluster):
         scheduler_service_type=None,
         custom_cluster_spec=None,
         scheduler_forward_port=None,
+        jupyter=False,
         loop=None,
         asynchronous=False,
         **kwargs,
@@ -225,6 +228,9 @@ class KubeCluster(Cluster):
         )
         self.scheduler_forward_port = dask.config.get(
             "kubernetes.scheduler-forward-port", override_with=scheduler_forward_port
+        )
+        self.jupyter = dask.config.get(
+            "kubernetes.scheduler-jupyter", override_with=jupyter
         )
         self.idle_timeout = dask.config.get(
             "kubernetes.idle-timeout", override_with=idle_timeout
@@ -345,6 +351,7 @@ class KubeCluster(Cluster):
                 image=self.image,
                 scheduler_service_type=self.scheduler_service_type,
                 idle_timeout=self.idle_timeout,
+                jupyter=self.jupyter,
             )
         else:
             data = self._custom_cluster_spec
@@ -420,6 +427,7 @@ class KubeCluster(Cluster):
             self.env = container_spec.env
         else:
             self.env = {}
+        self.jupyter = "--jupyter" in cluster.spec.scheduler.spec.containers[0].args
         service_name = f"{cluster.name}-scheduler"
         self._log("Waiting for scheduler pod")
         await wait_for_scheduler(
@@ -820,6 +828,7 @@ def make_cluster_spec(
     worker_command="dask-worker",
     scheduler_service_type="ClusterIP",
     idle_timeout=0,
+    jupyter=False,
 ):
     """Generate a ``DaskCluster`` kubernetes resource.
 
@@ -841,6 +850,8 @@ def make_cluster_spec(
         Worker command to use when starting the workers
     idle_timeout: int (optional)
         Timeout to cleanup idle cluster
+    jupyter: bool (optional)
+        Start Jupyter on the Dask scheduler
     """
     return {
         "apiVersion": "kubernetes.dask.org/v1",
@@ -861,6 +872,7 @@ def make_cluster_spec(
                 resources=resources,
                 image=image,
                 scheduler_service_type=scheduler_service_type,
+                jupyter=jupyter,
             ),
         },
     }
@@ -919,6 +931,7 @@ def make_scheduler_spec(
     resources=None,
     image="ghcr.io/dask/dask:latest",
     scheduler_service_type="ClusterIP",
+    jupyter=False,
 ):
     # TODO: Take the values provided in the current class constructor
     # and build a DaskWorker compatible dict
@@ -927,6 +940,9 @@ def make_scheduler_spec(
     else:
         # If they gave us a list, assume its a list of dicts and already ready to go
         env = env
+    args = ["dask-scheduler", "--host", "0.0.0.0"]
+    if jupyter:
+        args.append("--jupyter")
 
     return {
         "spec": {
@@ -934,7 +950,7 @@ def make_scheduler_spec(
                 {
                     "name": "scheduler",
                     "image": image,
-                    "args": ["dask-scheduler", "--host", "0.0.0.0"],
+                    "args": args,
                     "env": env,
                     "resources": resources,
                     "ports": [

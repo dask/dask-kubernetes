@@ -21,6 +21,7 @@ kubernetes:
   resource-timeout: 60
   custom-cluster-spec: null
   scheduler-forward-port: null
+  scheduler-jupyter: false
 
   # Classic KubeCluster options
   host: "0.0.0.0"
