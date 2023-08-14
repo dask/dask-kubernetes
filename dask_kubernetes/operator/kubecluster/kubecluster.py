@@ -818,6 +818,12 @@ class KubeCluster(Cluster):
             **kwargs,
         )
 
+    @property
+    def jupyter_link(self):
+        if self.jupyter:
+            return self.dashboard_link.replace("/status", "/jupyter/lab")
+        raise RuntimeError("KubeCluster not started with jupyter enabled")
+
 
 def make_cluster_spec(
     name,

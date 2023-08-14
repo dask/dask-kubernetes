@@ -97,9 +97,7 @@ def port_forward(cluster):
         console.print(f"Scheduler at: [magenta][not bold]{kcluster.scheduler_address}")
         console.print(f"Dashboard at: [cyan][not bold]{kcluster.dashboard_link}")
         if kcluster.jupyter:
-            console.print(
-                f"Jupyter at: [orange3][not bold]{kcluster.dashboard_link.replace('/status', '/jupyter/lab')}"
-            )
+            console.print(f"Jupyter at: [orange3][not bold]{kcluster.jupyter_link}")
         console.print("Press ctrl+c to exit", style="bright_black")
         while True:
             time.sleep(0.1)
