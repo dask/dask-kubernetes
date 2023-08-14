@@ -55,6 +55,13 @@ def gen():
     default=None,
     help="Service type for scheduler (default 'ClusterIP')",
 )
+@click.option(
+    "--jupyter",
+    type=bool,
+    default=False,
+    is_flag=True,
+    help="Start Jupyter on the scheduler (default 'False')",
+)
 def cluster(**kwargs):
     if "resources" in kwargs and kwargs["resources"] is not None:
         kwargs["resources"] = json.loads(kwargs["resources"])
@@ -89,6 +96,8 @@ def port_forward(cluster):
     try:
         console.print(f"Scheduler at: [magenta][not bold]{kcluster.scheduler_address}")
         console.print(f"Dashboard at: [cyan][not bold]{kcluster.dashboard_link}")
+        if kcluster.jupyter:
+            console.print(f"Jupyter at: [orange3][not bold]{kcluster.jupyter_link}")
         console.print("Press ctrl+c to exit", style="bright_black")
         while True:
             time.sleep(0.1)
