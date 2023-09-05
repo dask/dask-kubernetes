@@ -34,7 +34,6 @@ from distributed.utils import (
     format_dashboard_link,
 )
 
-from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.networking import (
     get_scheduler_address,
     wait_for_scheduler,
@@ -86,9 +85,6 @@ class KubeCluster(Cluster):
         The command to use when starting the worker.
         If command consists of multiple words it should be passed as a list of strings.
         Defaults to ``"dask-worker"``.
-    auth: List[ClusterAuth] (optional)
-        Configuration methods to attempt in order.  Defaults to
-        ``[InCluster(), KubeConfig()]``.
     port_forward_cluster_ip: bool (optional)
         If the chart uses ClusterIP type services, forward the
         ports locally. If you are running it locally it should
@@ -172,7 +168,6 @@ class KubeCluster(Cluster):
         resources=None,
         env=None,
         worker_command=None,
-        auth=ClusterAuth.DEFAULT,
         port_forward_cluster_ip=None,
         create_mode=None,
         shutdown_on_close=None,
@@ -207,7 +202,6 @@ class KubeCluster(Cluster):
         self.worker_command = dask.config.get(
             "kubernetes.worker-command", override_with=worker_command
         )
-        self.auth = auth
         self.port_forward_cluster_ip = dask.config.get(
             "kubernetes.port-forward-cluster-ip", override_with=port_forward_cluster_ip
         )
@@ -301,7 +295,6 @@ class KubeCluster(Cluster):
             )
             if not self.quiet:
                 show_rich_output_task = asyncio.create_task(self._show_rich_output())
-            await ClusterAuth.load_first(self.auth)
             cluster = await DaskCluster(self.name, namespace=self.namespace)
             cluster_exists = await cluster.exists()
 
