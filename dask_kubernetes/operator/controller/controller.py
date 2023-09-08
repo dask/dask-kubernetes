@@ -17,8 +17,7 @@ from dask_kubernetes.operator._objects import (
     DaskWorkerGroup,
     DaskJob,
 )
-from dask_kubernetes.common.auth import ClusterAuth
-from dask_kubernetes.common.networking import get_scheduler_address
+from dask_kubernetes.operator.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
 from distributed.protocol.pickle import dumps
 import dask.config
@@ -246,9 +245,6 @@ def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
 
 @kopf.on.startup()
 async def startup(settings: kopf.OperatorSettings, **kwargs):
-    # Authenticate with k8s
-    await ClusterAuth.load_first()
-
     # Set server and client timeouts to reconnect from time to time.
     # In rare occasions the connection might go idle we will no longer receive any events.
     # These timeouts should help in those cases.
