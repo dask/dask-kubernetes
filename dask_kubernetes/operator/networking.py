@@ -2,17 +2,14 @@ import asyncio
 from contextlib import suppress
 import random
 import socket
-import subprocess
 import time
-from weakref import finalize
-import kubernetes_asyncio as kubernetes
+import threading
 from tornado.iostream import StreamClosedError
 
 import kr8s
-from kr8s.asyncio.objects import Pod
+from kr8s.asyncio.objects import Pod, Service
 from distributed.core import rpc
 
-from dask_kubernetes.common.utils import check_dependency
 from dask_kubernetes.exceptions import CrashLoopBackOffError
 
 
@@ -44,7 +41,6 @@ async def get_internal_address_for_scheduler_service(
 
 
 async def get_external_address_for_scheduler_service(
-    core_api,
     service,
     port_forward_cluster_ip=None,
     service_name_resolution_retries=20,
@@ -58,8 +54,8 @@ async def get_external_address_for_scheduler_service(
         host = lb.hostname or lb.ip
     elif service.spec.type == "NodePort":
         port = _get_port(service, port_name, is_node_port=True)
-        nodes = await core_api.list_node()
-        host = nodes.items[0].status.addresses[0].address
+        nodes = await kr8s.asyncio.get("nodes")
+        host = nodes[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
         port = _get_port(service, port_name)
         if not port_forward_cluster_ip:
@@ -126,30 +122,36 @@ def _random_free_port(low, high, retries=20):
 
 
 async def port_forward_service(service_name, namespace, remote_port, local_port=None):
-    check_dependency("kubectl")
     if not local_port:
         local_port = _random_free_port(49152, 65535)  # IANA suggested range
     elif _port_in_use(local_port):
         raise ConnectionError("Specified Port already in use.")
-    kproc = subprocess.Popen(
-        [
-            "kubectl",
-            "port-forward",
-            "--address",
-            "0.0.0.0",
-            "--namespace",
-            f"{namespace}",
-            f"service/{service_name}",
-            f"{local_port}:{remote_port}",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    pf = threading.Thread(
+        name=f"DaskKubernetesPortForward ({namespace}/{service_name} {local_port}->{remote_port})",
+        target=run_port_forward,
+        args=(
+            service_name,
+            namespace,
+            remote_port,
+            local_port,
+        ),
+        daemon=True,
     )
-    finalize(kproc, kproc.kill)
+    pf.start()
 
     if await is_comm_open("localhost", local_port, retries=2000):
         return local_port
-    raise ConnectionError("kubectl port forward failed")
+    raise ConnectionError("port forward failed")
+
+
+def run_port_forward(service_name, namespace, remote_port, local_port):
+    async def _run():
+        svc = await Service.get(service_name, namespace=namespace)
+        async with svc.portforward(remote_port, local_port):
+            while True:
+                await asyncio.sleep(0.1)
+
+    asyncio.run(_run())
 
 
 async def is_comm_open(ip, port, retries=200):
@@ -177,25 +179,22 @@ async def get_scheduler_address(
     local_port=None,
     allow_external=True,
 ):
-    async with kubernetes.client.api_client.ApiClient() as api_client:
-        api = kubernetes.client.CoreV1Api(api_client)
-        service = await api.read_namespaced_service(service_name, namespace)
-        if allow_external:
-            address = await get_external_address_for_scheduler_service(
-                api,
-                service,
-                port_forward_cluster_ip=port_forward_cluster_ip,
-                port_name=port_name,
-                local_port=local_port,
-            )
-        else:
-            address = await get_internal_address_for_scheduler_service(
-                service,
-                port_forward_cluster_ip=port_forward_cluster_ip,
-                port_name=port_name,
-                local_port=local_port,
-            )
-        return address
+    service = await Service.get(service_name, namespace=namespace)
+    if allow_external:
+        address = await get_external_address_for_scheduler_service(
+            service,
+            port_forward_cluster_ip=port_forward_cluster_ip,
+            port_name=port_name,
+            local_port=local_port,
+        )
+    else:
+        address = await get_internal_address_for_scheduler_service(
+            service,
+            port_forward_cluster_ip=port_forward_cluster_ip,
+            port_name=port_name,
+            local_port=local_port,
+        )
+    return address
 
 
 async def wait_for_scheduler(cluster_name, namespace, timeout=None):

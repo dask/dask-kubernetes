@@ -17,7 +17,7 @@ from dask_kubernetes.operator._objects import (
     DaskWorkerGroup,
     DaskJob,
 )
-from dask_kubernetes.common.networking import get_scheduler_address
+from dask_kubernetes.operator.networking import get_scheduler_address
 from distributed.core import rpc, clean_exception
 from distributed.protocol.pickle import dumps
 import dask.config

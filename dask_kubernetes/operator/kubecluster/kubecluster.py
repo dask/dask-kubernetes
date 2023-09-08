@@ -34,12 +34,11 @@ from distributed.utils import (
     format_dashboard_link,
 )
 
-from dask_kubernetes.common.networking import (
+from dask_kubernetes.operator.networking import (
     get_scheduler_address,
     wait_for_scheduler,
     wait_for_scheduler_comm,
 )
-from dask_kubernetes.common.utils import get_current_namespace
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 from dask_kubernetes.operator._objects import (
     DaskCluster,
@@ -182,9 +181,8 @@ class KubeCluster(Cluster):
         **kwargs,
     ):
         name = dask.config.get("kubernetes.name", override_with=name)
-        self.namespace = (
-            dask.config.get("kubernetes.namespace", override_with=namespace)
-            or get_current_namespace()
+        self.namespace = dask.config.get(
+            "kubernetes.namespace", override_with=namespace
         )
         self.image = dask.config.get("kubernetes.image", override_with=image)
         self.n_workers = dask.config.get(
@@ -289,6 +287,9 @@ class KubeCluster(Cluster):
         return format_dashboard_link(host, self.forwarded_dashboard_port)
 
     async def _start(self):
+        if not self.namespace:
+            api = await kr8s.asyncio.api()
+            self.namespace = api.namespace
         try:
             watch_component_status_task = asyncio.create_task(
                 self._watch_component_status()
