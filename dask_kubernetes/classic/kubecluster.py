@@ -452,6 +452,13 @@ class KubeCluster(SpecCluster):
         apply_default_affinity="preferred",
         **kwargs
     ):
+        warnings.warn(
+            "The classic KubeCluster is going away. "
+            "Please migrate to the new operator based implementation "
+            "https://kubernetes.dask.org/en/latest/kubecluster_migrating.html. ",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if isinstance(pod_template, str):
             with open(pod_template) as f:
                 pod_template = dask.config.expand_environment_variables(
@@ -561,7 +568,6 @@ class KubeCluster(SpecCluster):
         return pod_template
 
     async def _start(self):
-
         self.pod_template = self._get_pod_template(self.pod_template, pod_type="worker")
         self.scheduler_pod_template = self._get_pod_template(
             self.scheduler_pod_template, pod_type="scheduler"
