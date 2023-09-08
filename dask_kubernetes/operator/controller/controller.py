@@ -410,8 +410,9 @@ async def retire_workers(
             return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
-    logger.debug(
-        f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
+    logger.warning(
+        f"Scaling {worker_group_name} failed via the HTTP API and the Dask RPC, falling back to LIFO scaling. "
+        "This can result in lost data, see https://kubernetes.dask.org/en/latest/operator_troubleshooting.html."
     )
     workers = await kr8s.asyncio.get(
         "pods",
