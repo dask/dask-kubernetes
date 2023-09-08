@@ -414,7 +414,7 @@ async def retire_workers(
             return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
-    logger.debug(
+    logger.warning(
         f"Scaling {worker_group_name} failed via the Dask RPC, falling back to LIFO scaling"
     )
     workers = await kr8s.asyncio.get(
