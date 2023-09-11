@@ -92,6 +92,13 @@ class HelmCluster(Cluster):
         name=None,
         **kwargs,
     ):
+        warnings.warn(
+            "HelmCluster is going away. "
+            "Please migrate to the new operator based implementation "
+            "https://kubernetes.dask.org/en/latest/kubecluster_migrating.html. ",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.release_name = release_name
         self.namespace = namespace or get_current_namespace()
         if name is None:
