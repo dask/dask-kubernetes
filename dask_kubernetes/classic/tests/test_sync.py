@@ -1,12 +1,12 @@
 import os
 from time import sleep, time
-import yaml
 
 import dask
 import pytest
+import yaml
 from dask.distributed import Client, wait
-from distributed.utils_test import captured_logger
 from dask.utils import tmpfile
+from distributed.utils_test import captured_logger
 
 from dask_kubernetes.classic import KubeCluster, make_pod_spec
 from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
@@ -275,10 +275,10 @@ def test_pod_template_with_custom_container_name(docker_image):
 
 
 def test_bad_args():
-    with pytest.raises(FileNotFoundError) as info:
+    with pytest.raises(FileNotFoundError):
         KubeCluster("myfile.yaml")
 
-    with pytest.raises((ValueError, TypeError, AttributeError)) as info:
+    with pytest.raises((ValueError, TypeError, AttributeError)):
         KubeCluster({"kind": "Pod"})
 
 

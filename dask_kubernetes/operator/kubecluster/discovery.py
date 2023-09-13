@@ -1,9 +1,9 @@
-from typing import Callable, AsyncIterator, Tuple
+from typing import AsyncIterator, Callable, Tuple
 
 import kr8s
 
-from dask_kubernetes.operator.kubecluster import KubeCluster
 from dask_kubernetes.operator._objects import DaskCluster  # noqa
+from dask_kubernetes.operator.kubecluster import KubeCluster
 
 
 async def discover() -> AsyncIterator[Tuple[str, Callable]]:

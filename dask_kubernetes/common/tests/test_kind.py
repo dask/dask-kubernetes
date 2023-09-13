@@ -1,7 +1,7 @@
-import pytest
 from subprocess import check_output
 
 import kubernetes_asyncio as kubernetes
+import pytest
 
 from dask_kubernetes.common.auth import ClusterAuth
 from dask_kubernetes.common.utils import get_current_namespace

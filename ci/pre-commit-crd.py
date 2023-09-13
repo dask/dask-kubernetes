@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import os
 import pathlib
-import tempfile
+import shutil
 import subprocess
 import sys
-import shutil
+import tempfile
 
 ROOT_DIR = pathlib.Path(__file__).parent.parent.absolute()
 

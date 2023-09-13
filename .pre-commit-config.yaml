@@ -1,15 +1,15 @@
 repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.0.287
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
   - repo: https://github.com/psf/black
     rev: 22.3.0
     hooks:
       - id: black
         language_version: python3
         exclude: versioneer.py
-  - repo: https://github.com/pycqa/flake8
-    rev: 3.9.2
-    hooks:
-      - id: flake8
-        language_version: python3
   - repo: https://github.com/rapidsai/frigate/
     rev: v0.4.0 #  pre-commit autoupdate  - to keep the version up to date
     hooks:

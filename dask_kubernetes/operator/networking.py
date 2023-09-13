@@ -1,14 +1,14 @@
 import asyncio
-from contextlib import suppress
 import random
 import socket
-import time
 import threading
-from tornado.iostream import StreamClosedError
+import time
+from contextlib import suppress
 
 import kr8s
-from kr8s.asyncio.objects import Pod, Service
 from distributed.core import rpc
+from kr8s.asyncio.objects import Pod, Service
+from tornado.iostream import StreamClosedError
 
 from dask_kubernetes.exceptions import CrashLoopBackOffError
 

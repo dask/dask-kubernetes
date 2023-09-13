@@ -3,29 +3,28 @@ import base64
 import getpass
 import os
 import random
-from time import time
-import yaml
 import sys
-
-import kubernetes_asyncio as kubernetes
-import pytest
+from time import time
 
 import dask
+import kubernetes_asyncio as kubernetes
+import pytest
+import yaml
 from dask.distributed import Client, wait
-import dask_kubernetes
-from dask_kubernetes import (
-    KubeCluster,
-    make_pod_spec,
-    clean_pod_template,
-    ClusterAuth,
-    KubeConfig,
-    KubeAuth,
-)
 from dask.utils import tmpfile
 from distributed.utils_test import captured_logger
 
-from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
+import dask_kubernetes
+from dask_kubernetes import (
+    ClusterAuth,
+    KubeAuth,
+    KubeCluster,
+    KubeConfig,
+    clean_pod_template,
+    make_pod_spec,
+)
 from dask_kubernetes.common.utils import get_current_namespace
+from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME
 
 TEST_DIR = os.path.abspath(os.path.join(__file__, ".."))
 CONFIG_DEMO = os.path.join(TEST_DIR, "config-demo.yaml")

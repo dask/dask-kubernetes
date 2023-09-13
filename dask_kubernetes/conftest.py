@@ -1,12 +1,11 @@
-import pytest
-
 import logging
-import pathlib
 import os
+import pathlib
 import subprocess
 import tempfile
 import uuid
 
+import pytest
 from kopf.testing import KopfRunner
 from pytest_kind.cluster import KindCluster
 

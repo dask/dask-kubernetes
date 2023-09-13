@@ -1,11 +1,11 @@
 """
 Convenience functions for creating pod templates.
 """
-from collections import namedtuple
 import copy
-from kubernetes import client
 import json
+from collections import namedtuple
 
+from kubernetes import client
 from kubernetes.client.configuration import Configuration
 
 from dask_kubernetes.constants import KUBECLUSTER_CONTAINER_NAME

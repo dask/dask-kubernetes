@@ -1,26 +1,26 @@
 import asyncio
-from collections import defaultdict
 import time
+from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
 from uuid import uuid4
 
 import aiohttp
+import dask.config
 import kopf
 import kr8s
-from kr8s.asyncio.objects import Pod, Deployment, Service
+from distributed.core import clean_exception, rpc
+from distributed.protocol.pickle import dumps
 from importlib_metadata import entry_points
+from kr8s.asyncio.objects import Deployment, Pod, Service
 
 from dask_kubernetes.operator._objects import (
-    DaskCluster,
     DaskAutoscaler,
-    DaskWorkerGroup,
+    DaskCluster,
     DaskJob,
+    DaskWorkerGroup,
 )
 from dask_kubernetes.operator.networking import get_scheduler_address
-from distributed.core import rpc, clean_exception
-from distributed.protocol.pickle import dumps
-import dask.config
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -840,7 +840,7 @@ async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 logger=logger,
             )
-        except Exception as e:
+        except Exception:
             logger.warn("Unable to connect to scheduler, skipping autoshutdown check.")
             return
         if idle_since and time.time() > idle_since + spec["idleTimeout"]:

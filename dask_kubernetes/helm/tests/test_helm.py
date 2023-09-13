@@ -1,16 +1,15 @@
-import pytest
-
-import subprocess
 import os.path
+import subprocess
 
 import dask.config
-from distributed import Client
-from distributed.core import Status
+import pytest
 from dask_ctl.discovery import (
-    list_discovery_methods,
     discover_cluster_names,
     discover_clusters,
+    list_discovery_methods,
 )
+from distributed import Client
+from distributed.core import Status
 
 ###############
 # Fixtures
@@ -131,8 +130,9 @@ def sync_cluster(k8s_cluster, release, test_namespace):
 
 
 def test_import():
-    from dask_kubernetes import HelmCluster
     from distributed.deploy import Cluster
+
+    from dask_kubernetes import HelmCluster
 
     assert issubclass(HelmCluster, Cluster)
 

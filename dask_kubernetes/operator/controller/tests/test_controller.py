@@ -5,17 +5,17 @@ import pathlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
+import dask.config
 import pytest
 import yaml
 from dask.distributed import Client
-import dask.config
+from kr8s.asyncio.objects import Deployment, Pod, Service
 
-from kr8s.asyncio.objects import Pod, Deployment, Service
+from dask_kubernetes.operator._objects import DaskCluster, DaskJob, DaskWorkerGroup
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
 )
-from dask_kubernetes.operator._objects import DaskCluster, DaskWorkerGroup, DaskJob
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
@@ -105,7 +105,7 @@ def test_operator_plugins(kopf_runner):
 @pytest.mark.timeout(180)
 @pytest.mark.anyio
 async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
@@ -249,7 +249,7 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
@@ -296,7 +296,7 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
 async def test_scalesimplecluster_from_cluster_spec(
     k8s_cluster, kopf_runner, gen_cluster
 ):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
@@ -341,7 +341,7 @@ async def test_scalesimplecluster_from_cluster_spec(
 
 @pytest.mark.anyio
 async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
             worker_pod_name = "simple-default-worker"
@@ -380,7 +380,7 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
 @pytest.mark.anyio
 @pytest.mark.skip(reason="Flaky in CI")
 async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
             # Get the default worker group
@@ -411,7 +411,7 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
 async def test_simplecluster_batched_worker_deployments(
     k8s_cluster, kopf_runner, gen_cluster
 ):
-    with kopf_runner as runner:
+    with kopf_runner:
         with dask.config.set(
             {
                 "kubernetes.controller.worker-allocation.batch-size": 1,
@@ -624,7 +624,7 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 
 @pytest.mark.anyio
 async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
 
@@ -648,7 +648,7 @@ async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
 
@@ -678,7 +678,7 @@ async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster):
 @pytest.mark.anyio
 @pytest.mark.skip(reason="Flaky in CI")
 async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
-    with kopf_runner as runner:
+    with kopf_runner:
         async with gen_job("simplejob.yaml") as (job_name, ns):
             job = await DaskJob.get(job_name, namespace=ns)
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
+
 from typing import List
 
-from kr8s.asyncio.objects import APIObject, Pod, Deployment, Service
+from kr8s.asyncio.objects import APIObject, Deployment, Pod, Service
 
 
 class DaskCluster(APIObject):
