@@ -8,31 +8,31 @@ import uuid
 import warnings
 
 import aiohttp
-import yaml
 import dask
 import dask.distributed
 import distributed.security
-from distributed.deploy import SpecCluster, ProcessInterface
-from distributed.utils import format_dashboard_link, Log, Logs
 import kubernetes_asyncio as kubernetes
+import yaml
+from distributed.deploy import ProcessInterface, SpecCluster
+from distributed.utils import Log, Logs, format_dashboard_link
 from kubernetes_asyncio.client.rest import ApiException
 
-from ..common.objects import (
-    make_pod_from_dict,
-    make_service_from_dict,
-    make_pdb_from_dict,
-    clean_pod_template,
-    clean_service_template,
-    clean_pdb_template,
-)
 from ..common.auth import ClusterAuth
-from ..common.utils import (
-    get_current_namespace,
-    escape,
-)
 from ..common.networking import (
     get_external_address_for_scheduler_service,
     get_scheduler_address,
+)
+from ..common.objects import (
+    clean_pdb_template,
+    clean_pod_template,
+    clean_service_template,
+    make_pdb_from_dict,
+    make_pod_from_dict,
+    make_service_from_dict,
+)
+from ..common.utils import (
+    escape,
+    get_current_namespace,
 )
 
 logger = logging.getLogger(__name__)

@@ -1,10 +1,11 @@
-import click
-import yaml
 import json
 import time
+
+import click
+import yaml
 from rich.console import Console
 
-from dask_kubernetes.operator import make_cluster_spec, KubeCluster
+from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
 console = Console()
 
@@ -86,7 +87,7 @@ def cluster(**kwargs):
 @main.command(help="Port-forward the scheduler of a DaskCluster resource")
 @click.argument("cluster")
 def port_forward(cluster):
-    with console.status(f"Connecting to cluster {cluster}") as status:
+    with console.status(f"Connecting to cluster {cluster}"):
         try:
             kcluster = KubeCluster.from_name(
                 cluster, shutdown_on_close=False, quiet=True

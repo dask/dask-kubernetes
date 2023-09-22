@@ -1,0 +1,56 @@
+[tool.ruff]
+# Enable the pycodestyle (`E`) and Pyflakes (`F`) rules by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E", "F", "W", "I"]
+
+# Allow autofix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "venv",
+  "__init__.py",
+  "versioneer.py",
+  "distributed/_concurrent_futures_thread.py",
+]
+
+per-file-ignores = {}
+
+ignore = [
+  "E4", # Import formatting
+  "E721", # Comparing types instead of isinstance
+  "E731", # Assigning lambda expression
+  "E741", # Ambiguous variable names
+  "F811", # redefinition of unused 'loop' from line 10
+  "F841", # local variable is assigned to but never used
+]
+
+line-length = 120
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.8
+target-version = "py38"

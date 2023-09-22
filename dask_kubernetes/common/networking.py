@@ -1,16 +1,16 @@
 import asyncio
-from contextlib import suppress
 import random
 import socket
 import subprocess
 import time
+from contextlib import suppress
 from weakref import finalize
-import kubernetes_asyncio as kubernetes
-from tornado.iostream import StreamClosedError
 
 import kr8s
-from kr8s.asyncio.objects import Pod
+import kubernetes_asyncio as kubernetes
 from distributed.core import rpc
+from kr8s.asyncio.objects import Pod
+from tornado.iostream import StreamClosedError
 
 from dask_kubernetes.common.utils import check_dependency
 from dask_kubernetes.exceptions import CrashLoopBackOffError
