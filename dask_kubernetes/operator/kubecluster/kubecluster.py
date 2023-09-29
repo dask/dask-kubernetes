@@ -60,8 +60,10 @@ class KubeCluster(Cluster):
 
     Parameters
     ----------
-    name: str (required)
-        Name given the Dask cluster.
+    name: str
+        Name given the Dask cluster. Required except when custom_cluster_spec is
+        passed, in which case it's ignored in favor of
+        custom_cluster_spec["metadata"]["name"].
     namespace: str (optional)
         Namespace in which to launch the workers.
         Defaults to current namespace if available or "default"
