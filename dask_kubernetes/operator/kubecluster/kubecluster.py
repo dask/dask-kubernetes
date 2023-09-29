@@ -223,7 +223,7 @@ class KubeCluster(Cluster):
             "kubernetes.idle-timeout", override_with=idle_timeout
         )
 
-        if self._custom_cluster_spec:
+        if self._custom_cluster_spec is not None:
             if isinstance(self._custom_cluster_spec, str):
                 with open(self._custom_cluster_spec) as f:
                     self._custom_cluster_spec = yaml.safe_load(f.read())
@@ -232,21 +232,22 @@ class KubeCluster(Cluster):
         if isinstance(self.worker_command, str):
             self.worker_command = self.worker_command.split(" ")
 
-        try:
-            # Validate `resources` param is a dictionary whose
-            # keys must either be 'limits' or 'requests'
-            assert isinstance(
-                self.resources, dict
-            ), f"resources must be dict type, found {type(resources)}"
-            for field in self.resources:
-                if field in ("limits", "requests"):
-                    assert isinstance(
-                        self.resources[field], dict
-                    ), f"key of '{field}' must be dict type"
-                else:
-                    raise ValueError(f"resources has unknown field '{field}'")
-        except AssertionError as e:
-            raise TypeError from e
+        if self.resources is not None:
+            try:
+                # Validate `resources` param is a dictionary whose
+                # keys must either be 'limits' or 'requests'
+                assert isinstance(
+                    self.resources, dict
+                ), f"resources must be dict type, found {type(resources)}"
+                for field in self.resources:
+                    if field in ("limits", "requests"):
+                        assert isinstance(
+                            self.resources[field], dict
+                        ), f"key of '{field}' must be dict type"
+                    else:
+                        raise ValueError(f"resources has unknown field '{field}'")
+            except AssertionError as e:
+                raise TypeError from e
 
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
