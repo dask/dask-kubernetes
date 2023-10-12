@@ -383,7 +383,7 @@ class KubeCluster(Cluster):
             raise SchedulerStartupError(
                 "Scheduler failed to start.",
                 "Scheduler Pod logs:",
-                await scheduler_pod.logs(),
+                "\n".join([line async for line in scheduler_pod.logs()]),
             ) from e
         self._log("Waiting for scheduler service")
         await wait_for_service(f"{self.name}-scheduler", self.namespace)
@@ -579,7 +579,7 @@ class KubeCluster(Cluster):
                         raise ValueError(
                             f"Cannot get logs for pod with status {pod.status.phase}.",
                         )
-                    log = Log(await pod.logs())
+                    log = Log("\n".join([line async for line in pod.logs()]))
                 except ValueError:
                     log = Log(f"Cannot find logs. Pod is {pod.status.phase}.")
             logs[pod.name] = log
