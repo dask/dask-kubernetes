@@ -168,7 +168,7 @@ class KubeCluster(Cluster):
         create_mode: Optional[CreateMode] = None,
         shutdown_on_close: Optional[bool] = None,
         idle_timeout: Optional[int] = None,
-        resource_timeout: Optional[int] = None,
+        resource_timeout: int = 60,
         scheduler_service_type: Optional[str] = None,
         custom_cluster_spec: Optional[str | dict] = None,
         scheduler_forward_port: Optional[int] = None,
