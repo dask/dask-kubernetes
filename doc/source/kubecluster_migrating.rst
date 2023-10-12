@@ -21,7 +21,7 @@ Here are some reasons why we decided to make this change:
 - Simpler Python API
 - More powerful YAML API
   - Create, scale and delete clusters with ``kubectl``
-- Detatch and reattactch from running clusters
+- Detach and reattach from running clusters
 - New resource types like ``DaskJob``
 - Multiple worker groups
 - Autoscaling handled by the controller and not the cluster manager
