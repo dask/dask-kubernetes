@@ -28,7 +28,7 @@ securityContext:  # Security context for the operator container
   runAsNonRoot: true
   runAsUser: 1000
   allowPrivilegeEscalation: false
-  # readOnlyRootFilesystem: true
+  readOnlyRootFilesystem: true
 
 resources: {}  # Resources for the operator pod
   # We usually recommend not to specify default resources and to leave this as a conscious

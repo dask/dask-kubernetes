@@ -28,6 +28,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `securityContext.runAsNonRoot` |  | `true` |
 | `securityContext.runAsUser` |  | `1000` |
 | `securityContext.allowPrivilegeEscalation` |  | `false` |
+| `securityContext.readOnlyRootFilesystem` |  | `true` |
 | `resources` | Resources for the operator pod | `{}` |
 | `volumes` | Volumes for the operator pod | `[]` |
 | `volumeMounts` | Volume mounts for the operator container | `[]` |
