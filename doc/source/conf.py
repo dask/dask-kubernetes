@@ -20,7 +20,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath(".."))
+try:
+    from dask_kubernetes import __version__
+except ImportError:
+    sys.path.insert(0, os.path.abspath("../.."))
+    from dask_kubernetes import __version__
 
 
 # -- General configuration ------------------------------------------------
@@ -68,7 +72,6 @@ author = "Dask Kubernetes Developers"
 # built documents.
 #
 # The short X.Y version.
-from dask_kubernetes import __version__
 
 version = __version__
 # The full version, including alpha/beta/rc tags.
@@ -112,7 +115,7 @@ html_theme = "dask_sphinx_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.
