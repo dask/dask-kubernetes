@@ -115,6 +115,9 @@ class KubeCluster(Cluster):
         used to create the cluster instead of generating one from the other keyword arguments.
     scheduler_forward_port: int (optional)
         The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
+    quiet: bool
+        If enabled, suppress rich console output.
+        Defaults to ``False``.
 
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
@@ -175,6 +178,7 @@ class KubeCluster(Cluster):
         jupyter: bool = False,
         loop: Optional[IOLoop] = None,
         asynchronous: bool = False,
+        quiet: bool = False,
         **kwargs,
     ):
         name = dask.config.get("kubernetes.name", override_with=name)
@@ -224,6 +228,7 @@ class KubeCluster(Cluster):
         self.idle_timeout = dask.config.get(
             "kubernetes.idle-timeout", override_with=idle_timeout
         )
+        self.quiet = quiet
 
         if self._custom_cluster_spec is not None:
             if isinstance(self._custom_cluster_spec, str):
