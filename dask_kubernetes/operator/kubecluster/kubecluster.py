@@ -116,7 +116,7 @@ class KubeCluster(Cluster):
     scheduler_forward_port: int (optional)
         The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
     quiet: bool
-        If enabled, suppress rich console output.
+        If enabled, suppress all printed output.
         Defaults to ``False``.
 
     **kwargs: dict
@@ -228,7 +228,6 @@ class KubeCluster(Cluster):
         self.idle_timeout = dask.config.get(
             "kubernetes.idle-timeout", override_with=idle_timeout
         )
-        self.quiet = quiet
 
         if self._custom_cluster_spec is not None:
             if isinstance(self._custom_cluster_spec, str):
@@ -263,7 +262,9 @@ class KubeCluster(Cluster):
         self._rich_spinner = Spinner("dots", speed=0.5)
         self._startup_component_status: dict = {}
 
-        super().__init__(name=name, loop=loop, asynchronous=asynchronous, **kwargs)
+        super().__init__(
+            name=name, loop=loop, asynchronous=asynchronous, quiet=quiet, **kwargs
+        )
 
         # If https://github.com/dask/distributed/pull/7941 is merged we can
         # simplify the next 8 lines to ``if not self.called_from_running_loop:``
