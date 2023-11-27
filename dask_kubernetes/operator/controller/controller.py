@@ -2,6 +2,7 @@ import asyncio
 import time
 from collections import defaultdict
 from contextlib import suppress
+from copy import deepcopy
 from datetime import datetime
 from uuid import uuid4
 
@@ -208,7 +209,7 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
     ]
     for i in range(len(pod_spec["spec"]["containers"])):
         if "env" in pod_spec["spec"]["containers"][i]:
-            existing_env_vars = deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"]
+            existing_env_vars = pod_spec["spec"]["template"]["spec"]["containers"][i]["env"]
             all_env_vars = _consolidate_env_vars(existing_env_vars, env)
             pod_spec["spec"]["containers"][i]["env"] = all_env_vars
         else:
@@ -594,7 +595,7 @@ async def daskworkergroup_replica_update(
                     namespace=namespace,
                     cluster_name=cluster_name,
                     uuid=uuid4().hex[:10],
-                    pod_spec=worker_spec["spec"],
+                    pod_spec=deepcopy(worker_spec["spec"]),
                     annotations=annotations,
                     labels=labels,
                 )
