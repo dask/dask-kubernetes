@@ -203,6 +203,7 @@ async def wait_for_scheduler(cluster_name, namespace, timeout=None):
         try:
             pod = await Pod.get(
                 label_selector=f"dask.org/component=scheduler,dask.org/cluster-name={cluster_name}",
+                field_selector="status.phase=Running",
                 namespace=namespace,
             )
         except kr8s.NotFoundError:
