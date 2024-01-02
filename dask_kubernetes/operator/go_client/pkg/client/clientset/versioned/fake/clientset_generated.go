@@ -3,9 +3,9 @@
 package fake
 
 import (
-	clientset "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned"
-	kubernetesv1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
-	fakekubernetesv1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1/fake"
+	clientset "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned"
+	kubernetesv1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
+	fakekubernetesv1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

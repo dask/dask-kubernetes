@@ -5,8 +5,8 @@ package v1
 import (
 	"net/http"
 
-	v1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
-	"github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/scheme"
+	v1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	"github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
 )
 

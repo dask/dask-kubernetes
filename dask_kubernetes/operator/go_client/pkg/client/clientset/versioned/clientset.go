@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
-	kubernetesv1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
+	kubernetesv1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/clientset/versioned/typed/kubernetes.dask.org/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
