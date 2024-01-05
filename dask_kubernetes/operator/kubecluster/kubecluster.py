@@ -115,6 +115,9 @@ class KubeCluster(Cluster):
         used to create the cluster instead of generating one from the other keyword arguments.
     scheduler_forward_port: int (optional)
         The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
+    quiet: bool
+        If enabled, suppress all printed output.
+        Defaults to ``False``.
 
     **kwargs: dict
         Additional keyword arguments to pass to LocalCluster
@@ -175,6 +178,7 @@ class KubeCluster(Cluster):
         jupyter: bool = False,
         loop: Optional[IOLoop] = None,
         asynchronous: bool = False,
+        quiet: bool = False,
         **kwargs,
     ):
         name = dask.config.get("kubernetes.name", override_with=name)
@@ -258,7 +262,9 @@ class KubeCluster(Cluster):
         self._rich_spinner = Spinner("dots", speed=0.5)
         self._startup_component_status: dict = {}
 
-        super().__init__(name=name, loop=loop, asynchronous=asynchronous, **kwargs)
+        super().__init__(
+            name=name, loop=loop, asynchronous=asynchronous, quiet=quiet, **kwargs
+        )
 
         # If https://github.com/dask/distributed/pull/7941 is merged we can
         # simplify the next 8 lines to ``if not self.called_from_running_loop:``

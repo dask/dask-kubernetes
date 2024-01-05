@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Lint Helm Chart
         run: helm lint dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
-      - name: Download Pluto
+      - name: Install Pluto
         uses: FairwindsOps/pluto/github-action@v5.11.1
       - name: Check for deprecated APIs
         run: helm template --include-crds dask-operator dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator | pluto detect -
