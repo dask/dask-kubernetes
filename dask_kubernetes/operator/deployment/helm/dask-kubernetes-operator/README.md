@@ -35,6 +35,7 @@ The following table lists the configurable parameters of the Dask-kubernetes-ope
 | `nodeSelector` | Node selector | `{}` |
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity | `{}` |
+| `priorityClassName` | Priority class | `null` |
 | `kopfArgs` | Command line flags to pass to kopf on start up | `["--all-namespaces"]` |
 | `metrics.scheduler.enabled` | Enable scheduler metrics. Pip package [prometheus-client](https://pypi.org/project/prometheus-client/) should be present on scheduler. | `false` |
 | `metrics.scheduler.serviceMonitor.enabled` | Enable scheduler servicemonitor. | `false` |
