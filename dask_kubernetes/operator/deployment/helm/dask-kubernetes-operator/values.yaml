@@ -52,6 +52,8 @@ tolerations: []  # Tolerations
 
 affinity: {}  # Affinity
 
+priorityClassName: null  # Priority class
+
 kopfArgs: # Command line flags to pass to kopf on start up
   - --all-namespaces
 
