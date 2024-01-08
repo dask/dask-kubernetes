@@ -3,7 +3,7 @@
 package v1
 
 import (
-	internalinterfaces "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/informers/externalversions/internalinterfaces"
+	internalinterfaces "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to all the informers in this group version.

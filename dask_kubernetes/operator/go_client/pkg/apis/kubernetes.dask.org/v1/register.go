@@ -1,7 +1,7 @@
 package v1
 
 import (
-	daskoperator "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/apis"
+	daskoperator "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
