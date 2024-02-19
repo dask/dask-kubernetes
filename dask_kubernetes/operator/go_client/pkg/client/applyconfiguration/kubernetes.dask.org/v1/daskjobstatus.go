@@ -3,7 +3,7 @@
 package v1
 
 import (
-	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
