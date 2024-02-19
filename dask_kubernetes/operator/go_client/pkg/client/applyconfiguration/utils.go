@@ -3,8 +3,8 @@
 package applyconfiguration
 
 import (
-	v1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
-	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/v2023/dask_kubernetes/operator/go_client/pkg/client/applyconfiguration/kubernetes.dask.org/v1"
+	v1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1"
+	kubernetesdaskorgv1 "github.com/dask/dask-kubernetes/v2024/dask_kubernetes/operator/go_client/pkg/client/applyconfiguration/kubernetes.dask.org/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 )
 
