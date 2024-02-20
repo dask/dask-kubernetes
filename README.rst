@@ -2,8 +2,17 @@ Dask Kubernetes
 ===============
 
 
-.. image:: https://github.com/dask/dask-kubernetes/workflows/CI/badge.svg
-   :target: https://github.com/dask/dask-kubernetes/actions?query=workflow%3ACI
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/lint.yaml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/lint.yaml
+   :alt: Linting GitHub Actions CI Status
+
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/operator.yaml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/operator.yaml
+   :alt: Operator Tests GitHub Actions CI Status
+
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml
+   :alt: Package build GitHub Actions CI Status
 
 .. image:: https://img.shields.io/readthedocs/dask-kubernetes?color=%232980B9&logo=read-the-docs&logoColor=white
    :target: https://kubernetes.dask.org/
@@ -21,11 +30,11 @@ Dask Kubernetes
    :target: https://anaconda.org/conda-forge/dask-kubernetes
    :alt: Conda Forge
 
-.. image:: https://img.shields.io/badge/python%20support-3.9%7C3.10-blue
+.. image:: https://img.shields.io/badge/python%20support-3.9%7C3.10%7C3.11%7C3.12-blue
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Python Support
 
-.. image:: https://img.shields.io/badge/Kubernetes%20support-1.24%7C1.25%7C1.26%7C1.27-blue
+.. image:: https://img.shields.io/badge/Kubernetes%20support-1.26%7C1.27%7C1.28%7C1.29-blue
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Kubernetes Support
 

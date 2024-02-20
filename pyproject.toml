@@ -39,7 +39,7 @@ exclude = [
 per-file-ignores = {}
 
 ignore = [
-  "E4", # Import formatting
+  "E4",   # Import formatting
   "E721", # Comparing types instead of isinstance
   "E731", # Assigning lambda expression
   "E741", # Ambiguous variable names
@@ -53,4 +53,4 @@ line-length = 120
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 # Assume Python 3.8
-target-version = "py38"
+target-version = "py39"

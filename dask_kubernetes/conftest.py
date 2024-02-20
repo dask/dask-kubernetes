@@ -2,6 +2,7 @@ import logging
 import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import uuid
 
@@ -36,7 +37,19 @@ def kopf_runner(k8s_cluster, ns):
 @pytest.fixture(scope="session")
 def docker_image():
     image_name = "dask-kubernetes:dev"
-    subprocess.run(["docker", "build", "-t", image_name, "./ci/"], check=True)
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    subprocess.run(
+        [
+            "docker",
+            "build",
+            "-t",
+            image_name,
+            "--build-arg",
+            f"PYTHON={python_version}",
+            "./ci/",
+        ],
+        check=True,
+    )
     return image_name
 
 

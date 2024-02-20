@@ -9,11 +9,11 @@ Dask Kubernetes
    :target: https://anaconda.org/conda-forge/dask-kubernetes
    :alt: Conda Forge
 
-.. image:: https://img.shields.io/badge/python%20support-3.9%7C3.10-blue
+.. image:: https://img.shields.io/badge/python%20support-3.9%7C3.10%7C3.11%7C3.12-blue
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Python Support
 
-.. image:: https://img.shields.io/badge/Kubernetes%20support-1.24%7C1.25%7C1.26%7C1.27-blue
+.. image:: https://img.shields.io/badge/Kubernetes%20support-1.26%7C1.27%7C1.28%7C1.29-blue
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Kubernetes Support
 
