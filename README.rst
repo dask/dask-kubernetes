@@ -10,8 +10,8 @@ Dask Kubernetes
    :target: https://github.com/dask/dask-kubernetes/actions/workflows/operator.yaml
    :alt: Operator Tests GitHub Actions CI Status
 
-.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/release.yaml/badge.svg
-   :target: https://github.com/dask/dask-kubernetes/actions/workflows/release.yaml
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml
    :alt: Package build GitHub Actions CI Status
 
 .. image:: https://img.shields.io/readthedocs/dask-kubernetes?color=%232980B9&logo=read-the-docs&logoColor=white
