@@ -2,8 +2,17 @@ Dask Kubernetes
 ===============
 
 
-.. image:: https://github.com/dask/dask-kubernetes/workflows/CI/badge.svg
-   :target: https://github.com/dask/dask-kubernetes/actions?query=workflow%3ACI
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/lint.yaml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/lint.yaml
+   :alt: Linting GitHub Actions CI Status
+
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/operator.yaml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/operator.yaml
+   :alt: Operator Tests GitHub Actions CI Status
+
+.. image:: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml/badge.svg
+   :target: https://github.com/dask/dask-kubernetes/actions/workflows/release.yml
+   :alt: Package build GitHub Actions CI Status
 
 .. image:: https://img.shields.io/readthedocs/dask-kubernetes?color=%232980B9&logo=read-the-docs&logoColor=white
    :target: https://kubernetes.dask.org/
