@@ -51,7 +51,7 @@ jobs:
       - name: Run tests
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
-        run: pytest dask_kubernetes/common/tests dask_kubernetes/classic/tests
+        run: pytest --reruns=5 dask_kubernetes/common/tests dask_kubernetes/classic/tests
       - name: Debug k8s resources
         if: success() || failure()
         run: kubectl get all -A

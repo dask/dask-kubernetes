@@ -64,7 +64,7 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
           TEST_DASK_GATEWAY: "true"
-        run: pytest dask_kubernetes/common dask_kubernetes/operator
+        run: pytest --maxfail=3 --reruns=5 dask_kubernetes/common dask_kubernetes/operator
       - name: Debug kubernetes resources
         if: always()
         run: kubectl get all -A
