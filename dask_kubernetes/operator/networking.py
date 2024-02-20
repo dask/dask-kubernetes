@@ -79,7 +79,7 @@ async def get_external_address_for_scheduler_service(
 def _get_port(service, port_name, is_node_port=False):
     """NodePort is a special case when we have to use node_port instead of node"""
     [port] = [
-        port.port if not is_node_port else port.node_port
+        port.port if not is_node_port else port.nodePort
         for port in service.spec.ports
         if port.name == service.metadata.name or port.name == port_name
     ]
