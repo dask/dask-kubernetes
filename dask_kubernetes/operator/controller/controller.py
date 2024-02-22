@@ -159,9 +159,9 @@ def build_worker_deployment_spec(
     ]
     for i in range(len(deployment_spec["spec"]["template"]["spec"]["containers"])):
         if "env" in deployment_spec["spec"]["template"]["spec"]["containers"][i]:
-            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"].extend(
-                env
-            )
+            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"][
+                :0
+            ] = env
         else:
             deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"] = env
     return deployment_spec
@@ -197,7 +197,7 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
     ]
     for i in range(len(pod_spec["spec"]["containers"])):
         if "env" in pod_spec["spec"]["containers"][i]:
-            pod_spec["spec"]["containers"][i]["env"].extend(env)
+            pod_spec["spec"]["containers"][i]["env"][:0] = env
         else:
             pod_spec["spec"]["containers"][i]["env"] = env
     return pod_spec
