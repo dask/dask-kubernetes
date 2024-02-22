@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -79,14 +80,15 @@ def build_scheduler_deployment_spec(
         "labels": labels,
         "annotations": annotations,
     }
-    spec = {}
-    spec["replicas"] = 1
-    spec["selector"] = {
-        "matchLabels": labels,
-    }
-    spec["template"] = {
-        "metadata": metadata,
-        "spec": pod_spec,
+    spec = {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": labels,
+        },
+        "template": {
+            "metadata": metadata,
+            "spec": pod_spec,
+        },
     }
     return {
         "apiVersion": "apps/v1",
@@ -132,14 +134,15 @@ def build_worker_deployment_spec(
         "labels": labels,
         "annotations": annotations,
     }
-    spec = {}
-    spec["replicas"] = 1  # make_worker_spec returns dict with a replicas key?
-    spec["selector"] = {
-        "matchLabels": labels,
-    }
-    spec["template"] = {
-        "metadata": metadata,
-        "spec": pod_spec,
+    spec = {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": labels,
+        },
+        "template": {
+            "metadata": metadata,
+            "spec": copy.deepcopy(pod_spec),
+        },
     }
     deployment_spec = {
         "apiVersion": "apps/v1",
@@ -157,13 +160,11 @@ def build_worker_deployment_spec(
             "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
-    for i in range(len(deployment_spec["spec"]["template"]["spec"]["containers"])):
-        if "env" in deployment_spec["spec"]["template"]["spec"]["containers"][i]:
-            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"].extend(
-                env
-            )
+    for container in deployment_spec["spec"]["template"]["spec"]["containers"]:
+        if "env" in container:
+            container["env"].extend(env)
         else:
-            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"] = env
+            container["env"] = env
     return deployment_spec
 
 
@@ -187,7 +188,7 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
             "labels": labels,
             "annotations": annotations,
         },
-        "spec": spec,
+        "spec": copy.deepcopy(spec),
     }
     env = [
         {
@@ -195,11 +196,11 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
             "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
         },
     ]
-    for i in range(len(pod_spec["spec"]["containers"])):
-        if "env" in pod_spec["spec"]["containers"][i]:
-            pod_spec["spec"]["containers"][i]["env"].extend(env)
+    for container in pod_spec["spec"]["containers"]:
+        if "env" in container:
+            container["env"].extend(env)
         else:
-            pod_spec["spec"]["containers"][i]["env"] = env
+            container["env"] = env
     return pod_spec
 
 
