@@ -289,7 +289,7 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     logger.info(f"DaskCluster {name} created in {namespace}.")
 
     if not _validate_cluster_name(name):
-        patch.status["phase"] = "Failed"
+        patch.status["phase"] = "Error"
         raise kopf.PermanentError(
             f"The DaskCluster {name} is invalid: a lowercase RFC 1123 subdomain must "
             "consist of lower case alphanumeric characters, '-' or '.', and must start "
@@ -353,12 +353,6 @@ async def daskcluster_create_components(
     logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
 
     patch.status["phase"] = "Pending"
-
-
-@kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Failed")
-async def daskcluster_delete(spec, name, namespace, logger, patch, meta, **kwargs):
-    cluster = await DaskCluster.get(name, namespace=namespace)
-    await cluster.delete()
 
 
 @kopf.on.field("service", field="status", labels={"dask.org/component": "scheduler"})
