@@ -1,5 +1,4 @@
 import asyncio
-import re
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -15,6 +14,9 @@ from distributed.protocol.pickle import dumps
 from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
+from dask_kubernetes.common.objects import validate_cluster_name
+from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
+from dask_kubernetes.exceptions import ValidationError
 from dask_kubernetes.operator._objects import (
     DaskAutoscaler,
     DaskCluster,
@@ -32,19 +34,6 @@ _LABEL_NAMESPACES_TO_IGNORE = ()
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
-KUBERNETES_MAX_RESOURCE_NAME_LENGTH = 63
-SCHEDULER_NAME_TEMPLATE = "{cluster_name}-scheduler"
-MAX_CLUSTER_NAME_LEN = KUBERNETES_MAX_RESOURCE_NAME_LENGTH - len(
-    SCHEDULER_NAME_TEMPLATE.format(cluster_name="")
-)
-VALID_CLUSTER_NAME = re.compile(
-    rf"^(?=.{{,{MAX_CLUSTER_NAME_LEN}}}$)[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
-)
-
-
-def _validate_cluster_name(cluster_name: str) -> bool:
-    return bool(VALID_CLUSTER_NAME.match(cluster_name))
-
 
 # Load operator plugins from other packages
 PLUGINS = []
@@ -287,15 +276,11 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     This allows us to track that the operator is running.
     """
     logger.info(f"DaskCluster {name} created in {namespace}.")
-
-    if not _validate_cluster_name(name):
+    try:
+        validate_cluster_name(name)
+    except ValidationError as validation_exc:
         patch.status["phase"] = "Error"
-        raise kopf.PermanentError(
-            f"The DaskCluster {name} is invalid: a lowercase RFC 1123 subdomain must "
-            "consist of lower case alphanumeric characters, '-' or '.', and must start "
-            "and end with an alphanumeric character. DaskCluster name must also be under "
-            f"{MAX_CLUSTER_NAME_LEN} characters."
-        )
+        raise kopf.PermanentError(validation_exc.message)
 
     patch.status["phase"] = "Created"
 
