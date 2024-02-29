@@ -636,6 +636,14 @@ async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
             wg = worker_groups[0]
             assert isinstance(wg, DaskWorkerGroup)
 
+            # Test for non-replicated environment variables; Fix for https://github.com/dask/dask-kubernetes/issues/841
+            for deployment in await wg.deployments():
+                env_vars = deployment.spec["template"]["spec"]["containers"]["env"]
+                env_var_names = [env_var["name"] for env_var in env_vars]
+                assert len(env_var_names) == len(set(env_var_names))
+                assert "DASK_WORKER_NAME" in env_var_names
+                assert "DASK_SCHEDULER_ADDRESS" in env_var_names
+
             scheduler_pod = await cluster.scheduler_pod()
             assert isinstance(scheduler_pod, Pod)
 
