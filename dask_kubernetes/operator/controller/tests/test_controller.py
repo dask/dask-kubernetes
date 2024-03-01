@@ -11,6 +11,7 @@ import yaml
 from dask.distributed import Client
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
+from dask_kubernetes.constants import MAX_CLUSTER_NAME_LEN
 from dask_kubernetes.operator._objects import DaskCluster, DaskJob, DaskWorkerGroup
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
@@ -22,17 +23,32 @@ DIR = pathlib.Path(__file__).parent.absolute()
 
 _EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
 _EXPECTED_LABELS = {"test-label": "label-value"}
+DEFAULT_CLUSTER_NAME = "simple"
 
 
 @pytest.fixture()
-def gen_cluster(k8s_cluster, ns):
+def gen_cluster_manifest(tmp_path):
+    def factory(cluster_name=DEFAULT_CLUSTER_NAME):
+        original_manifest_path = os.path.join(DIR, "resources", "simplecluster.yaml")
+        with open(original_manifest_path, "r") as original_manifest_file:
+            manifest = yaml.safe_load(original_manifest_file)
+
+        manifest["metadata"]["name"] = cluster_name
+        new_manifest_path = tmp_path / "cluster.yaml"
+        new_manifest_path.write_text(yaml.safe_dump(manifest))
+        return tmp_path
+
+    return factory
+
+
+@pytest.fixture()
+def gen_cluster(k8s_cluster, ns, gen_cluster_manifest):
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
     @asynccontextmanager
-    async def cm():
-        cluster_path = os.path.join(DIR, "resources", "simplecluster.yaml")
-        cluster_name = "simple"
+    async def cm(cluster_name=DEFAULT_CLUSTER_NAME):
 
+        cluster_path = gen_cluster_manifest(cluster_name)
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-n", ns, "-f", cluster_path)
         while cluster_name not in k8s_cluster.kubectl(
@@ -695,3 +711,42 @@ async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
 
             cluster = await job.cluster()
             assert isinstance(cluster, DaskCluster)
+
+
+async def _get_cluster_status(k8s_cluster, ns, cluster_name):
+    """
+    Will loop infinitely in search of non-falsey cluster status.
+    Make sure there is a timeout on any test which calls this.
+    """
+    while True:
+        cluster_status = k8s_cluster.kubectl(
+            "get",
+            "-n",
+            ns,
+            "daskcluster.kubernetes.dask.org",
+            cluster_name,
+            "-o",
+            "jsonpath='{.status.phase}'",
+        ).strip("'")
+        if cluster_status:
+            return cluster_status
+        await asyncio.sleep(0.1)
+
+
+@pytest.mark.timeout(180)
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "cluster_name,expected_status",
+    [
+        ("valid-name", "Created"),
+        ((MAX_CLUSTER_NAME_LEN + 1) * "a", "Error"),
+        ("invalid.chars.in.name", "Error"),
+    ],
+)
+async def test_create_cluster_validates_name(
+    cluster_name, expected_status, k8s_cluster, kopf_runner, gen_cluster
+):
+    with kopf_runner:
+        async with gen_cluster(cluster_name=cluster_name) as (_, ns):
+            actual_status = await _get_cluster_status(k8s_cluster, ns, cluster_name)
+            assert expected_status == actual_status

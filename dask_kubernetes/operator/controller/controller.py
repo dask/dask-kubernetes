@@ -15,6 +15,9 @@ from distributed.protocol.pickle import dumps
 from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
+from dask_kubernetes.common.objects import validate_cluster_name
+from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
+from dask_kubernetes.exceptions import ValidationError
 from dask_kubernetes.operator._objects import (
     DaskAutoscaler,
     DaskCluster,
@@ -76,7 +79,7 @@ def build_scheduler_deployment_spec(
         }
     )
     metadata = {
-        "name": f"{cluster_name}-scheduler",
+        "name": SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
         "labels": labels,
         "annotations": annotations,
     }
@@ -109,7 +112,7 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
-            "name": f"{cluster_name}-scheduler",
+            "name": SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
             "labels": labels,
             "annotations": annotations,
         },
@@ -274,6 +277,12 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     This allows us to track that the operator is running.
     """
     logger.info(f"DaskCluster {name} created in {namespace}.")
+    try:
+        validate_cluster_name(name)
+    except ValidationError as validation_exc:
+        patch.status["phase"] = "Error"
+        raise kopf.PermanentError(validation_exc.message)
+
     patch.status["phase"] = "Created"
 
 
@@ -600,7 +609,7 @@ async def daskworkergroup_replica_update(
         if workers_needed < 0:
             worker_ids = await retire_workers(
                 n_workers=-workers_needed,
-                scheduler_service_name=f"{cluster_name}-scheduler",
+                scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(cluster_name),
                 worker_group_name=name,
                 namespace=namespace,
                 logger=logger,
