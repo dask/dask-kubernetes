@@ -609,7 +609,9 @@ async def daskworkergroup_replica_update(
         if workers_needed < 0:
             worker_ids = await retire_workers(
                 n_workers=-workers_needed,
-                scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(cluster_name),
+                scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(
+                    cluster_name=cluster_name
+                ),
                 worker_group_name=name,
                 namespace=namespace,
                 logger=logger,
