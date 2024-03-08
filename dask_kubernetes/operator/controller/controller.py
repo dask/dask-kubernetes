@@ -153,21 +153,25 @@ def build_worker_deployment_spec(
         "metadata": metadata,
         "spec": spec,
     }
-    env = [
-        {
-            "name": "DASK_WORKER_NAME",
-            "value": worker_name,
-        },
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
+    worker_env = {
+        "name": "DASK_WORKER_NAME",
+        "value": worker_name,
+    }
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
     for container in deployment_spec["spec"]["template"]["spec"]["containers"]:
-        if "env" in container:
-            container["env"].extend(env)
-        else:
-            container["env"] = env
+        if "env" not in container:
+            container["env"] = [worker_env, scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_WORKER_NAME" not in container_env_names:
+            container["env"].append(worker_env)
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return deployment_spec
 
 
