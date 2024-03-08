@@ -154,8 +154,8 @@ def build_worker_deployment_spec(
         "spec": spec,
     }
     worker_env = {
-            "name": "DASK_WORKER_NAME",
-            "value": worker_name,
+        "name": "DASK_WORKER_NAME",
+        "value": worker_name,
     }
     scheduler_env = {
         "name": "DASK_SCHEDULER_ADDRESS",
