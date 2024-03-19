@@ -5,6 +5,7 @@ from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
 from uuid import uuid4
+import re
 
 import aiohttp
 import dask.config
@@ -25,6 +26,10 @@ from dask_kubernetes.operator._objects import (
     DaskWorkerGroup,
 )
 from dask_kubernetes.operator.networking import get_scheduler_address
+import logging
+
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('aiohttp').setLevel(logging.WARNING)
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -35,6 +40,26 @@ _LABEL_NAMESPACES_TO_IGNORE = ()
 KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
+
+ACTIVE_STATES = [
+    "cancelled",
+    "constrained",
+    "error",
+    "executing",
+    "fetch",
+    "flight",
+    "forgotten",
+    "long-running",
+    "memory",
+    "missing",
+    "ready",
+    "rescheduled",
+    "resumed",
+    "waiting",
+]
+DONE_STATES = ["released"]
+
+
 
 # Load operator plugins from other packages
 PLUGINS = []
@@ -376,34 +401,51 @@ async def daskworkergroup_create(body, namespace, logger, **kwargs):
     )
 
 
-async def retire_workers(
-    n_workers, scheduler_service_name, worker_group_name, namespace, logger
+async def get_workers_to_close(
+    n_workers, scheduler_service_name, namespace, logger
 ):
-    # Try gracefully retiring via the HTTP API
-    dashboard_address = await get_scheduler_address(
+    comm_address = await get_scheduler_address(
         scheduler_service_name,
         namespace,
-        port_name="http-dashboard",
         allow_external=False,
     )
-    async with aiohttp.ClientSession() as session:
-        url = f"{dashboard_address}/api/v1/retire_workers"
-        params = {"n": n_workers}
-        async with session.post(url, json=params) as resp:
-            if resp.status <= 300:
-                retired_workers = await resp.json()
-                logger.info("Retired workers %s", retired_workers)
-                return [retired_workers[w]["name"] for w in retired_workers.keys()]
-            logger.debug(
-                "Received %d response from scheduler API with body %s",
-                resp.status,
-                await resp.text(),
-            )
+    async with rpc(comm_address) as scheduler_comm:
+        workers_to_close = await scheduler_comm.workers_to_close(
+            n=n_workers,
+            attribute="name",
+        )
+        return workers_to_close
+
+
+
+async def retire_workers(
+    workers_to_close, scheduler_service_name, worker_group_name, namespace, logger
+):
+    # Try gracefully retiring via the HTTP API
+    # dashboard_address = await get_scheduler_address(
+    #     scheduler_service_name,
+    #     namespace,
+    #     port_name="http-dashboard",
+    #     allow_external=False,
+    # )
+    # async with aiohttp.ClientSession() as session:
+    #     url = f"{dashboard_address}/api/v1/retire_workers"
+    #     params = {"n": n_workers}
+    #     async with session.post(url, json=params) as resp:
+    #         if resp.status <= 300:
+    #             retired_workers = await resp.json()
+    #             logger.info("Retired workers %s", retired_workers)
+    #             return [retired_workers[w]["name"] for w in retired_workers.keys()]
+    #         logger.debug(
+    #             "Received %d response from scheduler API with body %s",
+    #             resp.status,
+    #             await resp.text(),
+    #         )
 
     # Otherwise try gracefully retiring via the RPC
-    logger.debug(
-        f"Scaling {worker_group_name} failed via the HTTP API, falling back to the Dask RPC"
-    )
+    # logger.debug(
+    #     f"Scaling {worker_group_name} failed via the HTTP API, falling back to the Dask RPC"
+    # )
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
     with suppress(Exception):
         comm_address = await get_scheduler_address(
@@ -412,11 +454,12 @@ async def retire_workers(
             allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
-            workers_to_close = await scheduler_comm.workers_to_close(
-                n=n_workers,
-                attribute="name",
-            )
-            await scheduler_comm.retire_workers(names=workers_to_close)
+            # workers_to_close = await scheduler_comm.workers_to_close(
+            #     n=n_workers,
+            #     attribute="name",
+            # )
+
+            await scheduler_comm.retire_workers(names=workers_to_close, remove=True)
             return workers_to_close
 
     # Finally fall back to last-in-first-out scaling
@@ -544,10 +587,25 @@ async def daskcluster_default_worker_group_replica_update(
         await wg.scale(new)
 
 
+def parse_dask_worker_tasks(input_str):
+    task_states = {s: 0.0 for s in ACTIVE_STATES + DONE_STATES}
+
+    pattern = re.compile(r'^dask_worker_tasks{state="(\w+)"} (\d+\.+\d+)$')
+
+    for line in input_str.splitlines():
+        match = pattern.search(line)
+        if match:
+            state, value = match.groups()
+            if state in task_states:
+                task_states[state] = float(value)
+
+    return task_states
+
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
 async def daskworkergroup_replica_update(
     name, namespace, meta, spec, new, body, logger, **kwargs
 ):
+    logger.info("replica update")
     cluster_name = spec["cluster"]
     wg = await DaskWorkerGroup(body, namespace=namespace)
     try:
@@ -585,6 +643,7 @@ async def daskworkergroup_replica_update(
             dask.config.get("kubernetes.controller.worker-allocation.delay") or 0
         )
         if workers_needed > 0:
+            logger.info(f"Starting to scale worker group {name} up to {desired_workers} workers...")
             for _ in range(batch_size):
                 data = build_worker_deployment_spec(
                     worker_group_name=name,
@@ -605,21 +664,57 @@ async def daskworkergroup_replica_update(
                 f"waiting for {batch_delay} seconds before continuing.",
                 delay=batch_delay,
             )
-        logger.info(f"Scaled worker group {name} up to {desired_workers} workers.")
         if workers_needed < 0:
-            worker_ids = await retire_workers(
+            logger.info(f"Attempting to downscale {name} by -{workers_needed*-1} workers.")
+            worker_ids = await get_workers_to_close(
                 n_workers=-workers_needed,
                 scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(
                     cluster_name=cluster_name
                 ),
-                worker_group_name=name,
                 namespace=namespace,
                 logger=logger,
             )
+
             logger.info(f"Workers to close: {worker_ids}")
             for wid in worker_ids:
+                logger.info(f"getting deployment for {wid}")
                 worker_deployment = await Deployment(wid, namespace=namespace)
-                await worker_deployment.delete()
+                logger.info(f"got deployment for {wid}: {worker_deployment}")
+                worker_ready = await worker_deployment.ready() # somehow required?
+                logger.info(f"read state: {worker_ready}")
+                if not worker_ready:
+                    logger.info(f"----> deleting not ready worker {wid}")
+                    await worker_deployment.delete()
+                pods = await worker_deployment.pods()
+                pods = list(filter(lambda x: x.name.startswith(wid), pods)) # 
+                logger.info(pods)
+                logger.info(f"pods {pods}")
+                assert(len(pods)) == 1
+                if len(pods) >= 1:
+                    pod = pods[0]
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"http://{pod.status['podIP']}:8787/metrics") as response:
+                            logger.info(f"response status: {response.status}")
+                            metric_text = await response.text()
+                            task_states = parse_dask_worker_tasks(metric_text)
+                            logger.info(f"task states: {task_states}")
+                            if any(task_states[s] > 0.0 for s in ACTIVE_STATES):
+                                logger.info(f"@@@ prevent worker shutdown! @@@")
+                                raise kopf.TemporaryError(f"Worker '{wid}'still busy: {task_states}", delay=5)
+
+
+                    logger.info(f"attempting to gracefully retire workers")
+                    await retire_workers(workers_to_close=[wid], scheduler_service_name=f"{cluster_name}-scheduler", worker_group_name=name,
+                                         namespace=namespace, logger=logger)
+                    logger.info(f"@@@ f'deleting worker: {wid} @@@")
+                    await worker_deployment.delete()
+                else:
+                    await retire_workers(workers_to_close=[wid], scheduler_service_name=f"{cluster_name}-scheduler", worker_group_name=name,
+                                         namespace=namespace)
+                    logger.info(f"@@@ f'deleting worker {wid} (without check) @@@")
+                    await worker_deployment.delete()
+
+                # await worker_deployment.delete()
             logger.info(
                 f"Scaled worker group {name} down to {desired_workers} workers."
             )
@@ -825,7 +920,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     if desired_workers != current_replicas:
         await worker_group.scale(desired_workers)
 
-        cooldown_until = time.time() + 15
+        cooldown_until = time.time() + 6 # COOLDOWN modified from 15
 
         await autoscaler.annotate(
             {DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: str(cooldown_until)}
