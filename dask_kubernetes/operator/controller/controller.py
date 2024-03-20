@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import time
+from enum import Enum
 from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
@@ -41,14 +42,11 @@ KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
 
-ACTIVE_STATES = [
-    "cancelled",
+ACTIVE_STATES = (
     "constrained",
-    "error",
     "executing",
     "fetch",
     "flight",
-    "forgotten",
     "long-running",
     "memory",
     "missing",
@@ -56,9 +54,18 @@ ACTIVE_STATES = [
     "rescheduled",
     "resumed",
     "waiting",
-]
-DONE_STATES = ["released"]
+)
+IDLE_STATES = (
+    "released",
+    "error",
+    "cancelled",
+    "forgotton"
+)
 
+class WorkerState(Enum):
+    IDLE = 1
+    BUSY = 2
+    UNCERTAIN = 3
 
 
 # Load operator plugins from other packages
@@ -273,7 +280,7 @@ def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
 
 
 @kopf.on.startup()
-async def startup(settings: kopf.OperatorSettings, **kwargs):
+async def startup(settings: kopf.OperatorSettings, logger, **kwargs):
     # Set server and client timeouts to reconnect from time to time.
     # In rare occasions the connection might go idle we will no longer receive any events.
     # These timeouts should help in those cases.
@@ -286,6 +293,17 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
     # The default timeout is 300s which is usually to long
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
     settings.networking.request_timeout = 10
+
+    # val = dask.config.get("kubernetes.controller.worker-allocation.batch-size")
+    show_config = lambda config: logger.info(f"{config}: {dask.config.get(config, None)}")
+
+    logger.info("- configuration -")
+    show_config("kubernetes.controller.autoscaler.method")
+    show_config("kubernetes.controller.autoscaler.cooldown")
+    show_config("kubernetes.controller.autoscaler.retry-delay")
+    show_config("kubernetes.controller.worker.dashboard-port")
+    logger.info("---")
+
 
 
 # There may be useful things for us to expose via the liveness probe
@@ -421,7 +439,7 @@ async def get_workers_to_close(
 async def retire_workers(
     workers_to_close, scheduler_service_name, worker_group_name, namespace, logger
 ):
-    # Try gracefully retiring via the HTTP API
+    # # Try gracefully retiring via the HTTP API
     # dashboard_address = await get_scheduler_address(
     #     scheduler_service_name,
     #     namespace,
@@ -442,7 +460,7 @@ async def retire_workers(
     #             await resp.text(),
     #         )
 
-    # Otherwise try gracefully retiring via the RPC
+    # # Otherwise try gracefully retiring via the RPC
     # logger.debug(
     #     f"Scaling {worker_group_name} failed via the HTTP API, falling back to the Dask RPC"
     # )
@@ -472,7 +490,7 @@ async def retire_workers(
         namespace=namespace,
         label_selector={"dask.org/workergroup-name": worker_group_name},
     )
-    return [w.name for w in workers[:-n_workers]]
+    return [w.name for w in workers[:-len(workers_to_close)]]
 
 
 async def check_scheduler_idle(scheduler_service_name, namespace, logger):
@@ -587,8 +605,8 @@ async def daskcluster_default_worker_group_replica_update(
         await wg.scale(new)
 
 
-def parse_dask_worker_tasks(input_str):
-    task_states = {s: 0.0 for s in ACTIVE_STATES + DONE_STATES}
+def parse_dask_worker_tasks(input_str, active_states, idle_states):
+    task_states = {s: 0.0 for s in active_states + idle_states}
 
     pattern = re.compile(r'^dask_worker_tasks{state="(\w+)"} (\d+\.+\d+)$')
 
@@ -600,6 +618,53 @@ def parse_dask_worker_tasks(input_str):
                 task_states[state] = float(value)
 
     return task_states
+
+
+async def get_managed_pod(deployment, wid, logger):
+    """Returns the first pod of deployment with a certain worker id."""
+    pods = await deployment.pods()
+
+    # this filtering is currently required because deployment.pods() will return other
+    # pods that are not part of the deployment. potential kr8s bug?
+    pods = list(filter(lambda x: x.name.startswith(wid), pods)) # 
+    if len(pods) > 1:
+        logger.warning(f"Deployment {deployment} has {len(pods)} pods but should have exactly 1.")
+
+    return pods[0]
+
+
+async def determine_worker_state(pod, logger, dashboard_port=8787,
+                                 active_states=ACTIVE_STATES, idle_states=IDLE_STATES):
+    """Determine if the worker is idle, busy or can't be checked."""
+    worker_state = WorkerState.UNCERTAIN
+    metrics_url = f"http://{pod.status['podIP']}:{dashboard_port}/metrics"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(metrics_url) as response:
+                if response.status == 200:
+                    metrics_text = await response.text()
+                    task_states = parse_dask_worker_tasks(
+                        metrics_text,
+                        active_states=active_states,
+                        idle_states=idle_states
+                    )
+                    protected_tasks = [(s, task_states[s]) for s in active_states if task_states[s] > 0.0]
+                    if protected_tasks:
+                        logger.info(f"pod {pod} is busy.")
+                        logger.info(f"protected tasks: {protected_tasks}")
+                        worker_state = WorkerState.BUSY
+                    else:
+                        worker_state = WorkerState.IDLE
+                else:
+                    logger.warning(f"Metrics request to pod {pod} failed (http_status={response.status}).")
+                    worker_state = WorkerState.UNCERTAIN
+    except aiohttp.ClientError as e:
+        logger.warning(f"Could not query: '{metrics_url}'. Do workers expose /metrics at this URL?")
+        logger.warning(f"aiohttp.ClientError: {e}")
+        worker_state = WorkerState.UNCERTAIN
+    
+    return worker_state
+
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
 async def daskworkergroup_replica_update(
@@ -665,7 +730,9 @@ async def daskworkergroup_replica_update(
                 delay=batch_delay,
             )
         if workers_needed < 0:
-            logger.info(f"Attempting to downscale {name} by -{workers_needed*-1} workers.")
+            workers_not_needed = workers_needed * -1
+
+            logger.info(f"Attempting to downscale {name} by -{workers_not_needed} workers.")
             worker_ids = await get_workers_to_close(
                 n_workers=-workers_needed,
                 scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(
@@ -676,48 +743,88 @@ async def daskworkergroup_replica_update(
             )
 
             logger.info(f"Workers to close: {worker_ids}")
-            for wid in worker_ids:
-                logger.info(f"getting deployment for {wid}")
-                worker_deployment = await Deployment(wid, namespace=namespace)
-                logger.info(f"got deployment for {wid}: {worker_deployment}")
-                worker_ready = await worker_deployment.ready() # somehow required?
-                logger.info(f"read state: {worker_ready}")
-                if not worker_ready:
-                    logger.info(f"----> deleting not ready worker {wid}")
+
+            if dask.config.get("kubernetes.controller.autoscaler.method", "default") != "careful":
+                await retire_workers(
+                    workers_to_close=worker_ids,
+                    scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
+                    worker_group_name=name,
+                    namespace=namespace, logger=logger
+                )
+                for wid in worker_ids:
+                    worker_deployment = await Deployment(wid, namespace=namespace)
                     await worker_deployment.delete()
-                pods = await worker_deployment.pods()
-                pods = list(filter(lambda x: x.name.startswith(wid), pods)) # 
-                logger.info(pods)
-                logger.info(f"pods {pods}")
-                assert(len(pods)) == 1
-                if len(pods) >= 1:
-                    pod = pods[0]
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(f"http://{pod.status['podIP']}:8787/metrics") as response:
-                            logger.info(f"response status: {response.status}")
-                            metric_text = await response.text()
-                            task_states = parse_dask_worker_tasks(metric_text)
-                            logger.info(f"task states: {task_states}")
-                            if any(task_states[s] > 0.0 for s in ACTIVE_STATES):
-                                logger.info(f"@@@ prevent worker shutdown! @@@")
-                                raise kopf.TemporaryError(f"Worker '{wid}'still busy: {task_states}", delay=5)
+                logger.info(
+                    f"Scaled worker group {name} down to {desired_workers} workers."
+                )
+            else:
+                deployments = [await Deployment(wid, namespace=namespace) for wid in worker_ids]
+
+                # if we don't wait for ready deployment.pods() will fail with:
+                # return Box(self.raw["spec"]) KeyError: 'spec' kr8s bug?
+                # readiness = await asyncio.gather(*(d.ready() for d in deployments))
+                readiness = [await d.ready() for d in deployments]
+
+                ready_deployments, not_ready_deployments = [], []
+                for deployment, ready, wid in zip(deployments, readiness, worker_ids):
+                    (ready_deployments if ready else not_ready_deployments).append((deployment, wid))
+
+                idle_deployments, busy_deployments, uncertain_deployments = [], [], []
+                dashboard_port = dask.config.get("kubernetes.controller.worker.dashboard-port", 8787)
+                for deployment, wid in ready_deployments:
+                    pod = await get_managed_pod(deployment=deployment, wid=wid, logger=logger)
+                    worker_state = await determine_worker_state(pod=pod, dashboard_port=dashboard_port, logger=logger)
+
+                    if worker_state == WorkerState.IDLE:
+                        idle_deployments.append((deployment, wid))
+                    elif worker_state == WorkerState.BUSY:
+                        busy_deployments.append((deployment, wid))
+                    elif worker_state == WorkerState.UNCERTAIN:
+                        uncertain_deployments.append((deployment, wid))
+                    else:
+                        logger.error(f"Unknown worker state {worker_state:r}")
+                        raise kopf.PermanentError(f"Unknown worker state {worker_state:r}")
+
+                retired_worker_count = 0
+                if idle_deployments:
+                    workers_to_retire = [wid for _, wid in idle_deployments]
+                    logger.info(f"Gracefully retire workers: {workers_to_retire}")
+                    await retire_workers(
+                        workers_to_close=workers_to_retire,
+                        scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
+                        worker_group_name=name,
+                        namespace=namespace,
+                        logger=logger
+                    )
+                    for deployment, _ in idle_deployments:
+                        await deployment.delete()
+                    retired_worker_count += len(workers_to_retire)
+
+                if not_ready_deployments:
+                    for deployment, _ in not_ready_deployments:
+                        await worker_deployment.delete()
+                        retired_worker_count += 1
 
 
-                    logger.info(f"attempting to gracefully retire workers")
-                    await retire_workers(workers_to_close=[wid], scheduler_service_name=f"{cluster_name}-scheduler", worker_group_name=name,
-                                         namespace=namespace, logger=logger)
-                    logger.info(f"@@@ f'deleting worker: {wid} @@@")
-                    await worker_deployment.delete()
+                if busy_deployments:
+                    busy_workers = [wid for _, wid in busy_deployments]
+                    logger.info(f"Refusing to retire busy workers: {busy_workers}")
+
+                if uncertain_deployments:
+                    uncertain_workers = [wid for _, wid in uncertain_deployments]
+                    logger.info(f"Refusing to retire workers that could not be queried: {uncertain_workers}")
+
+                if retired_worker_count != workers_not_needed:
+                    logging.info(f"Could only retire {retired_worker_count} of {workers_not_needed} workers.")
+                    logging.info(f"(busy={len(busy_deployments)}, uncertain={len(uncertain_deployments)})")
+                    retry_delay = dask.config.get("kubernetes.controller.autoscaler.retry-delay", 6)
+                    raise kopf.TemporaryError(f"Retired ({retired_worker_count}/{workers_not_needed}) workers"
+                                              f" busy={len(busy_deployments)}, uncertain={len(uncertain_deployments)})",
+                                              delay=retry_delay)
                 else:
-                    await retire_workers(workers_to_close=[wid], scheduler_service_name=f"{cluster_name}-scheduler", worker_group_name=name,
-                                         namespace=namespace)
-                    logger.info(f"@@@ f'deleting worker {wid} (without check) @@@")
-                    await worker_deployment.delete()
-
-                # await worker_deployment.delete()
-            logger.info(
-                f"Scaled worker group {name} down to {desired_workers} workers."
-            )
+                    logger.info(
+                        f"Successfully scaled worker group {name} down to {desired_workers} workers."
+                    )
 
 
 @kopf.on.delete("daskworkergroup.kubernetes.dask.org", optional=True)
@@ -920,7 +1027,8 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
     if desired_workers != current_replicas:
         await worker_group.scale(desired_workers)
 
-        cooldown_until = time.time() + 6 # COOLDOWN modified from 15
+        cooldown = dask.config.get("kubernetes.controller.autoscaler.cooldown", 15)
+        cooldown_until = time.time() + cooldown
 
         await autoscaler.annotate(
             {DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: str(cooldown_until)}
