@@ -1,5 +1,4 @@
 import asyncio
-import anyio
 import copy
 import time
 from collections import defaultdict
@@ -8,6 +7,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import aiohttp
+import anyio
 import dask.config
 import kopf
 import kr8s
