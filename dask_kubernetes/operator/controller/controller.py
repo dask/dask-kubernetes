@@ -620,10 +620,10 @@ async def daskworkergroup_replica_update(
                     break
                 deployment = recent_workers[idx]
                 if not (
-                        deployment.raw["status"].get("observedGeneration", 0)
-                        >= deployment.raw["metadata"]["generation"]
-                        and deployment.raw["status"].get("readyReplicas", 0)
-                        == deployment.replicas
+                    deployment.raw["status"].get("observedGeneration", 0)
+                    >= deployment.raw["metadata"]["generation"]
+                    and deployment.raw["status"].get("readyReplicas", 0)
+                    == deployment.replicas
                 ):
                     unready_deployments.append(deployment)
 
