@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import logging
 import re
 import time
 from collections import defaultdict
@@ -474,11 +473,6 @@ async def retire_workers(
             allow_external=False,
         )
         async with rpc(comm_address) as scheduler_comm:
-            # workers_to_close = await scheduler_comm.workers_to_close(
-            #     n=n_workers,
-            #     attribute="name",
-            # )
-
             await scheduler_comm.retire_workers(names=workers_to_close, remove=True)
             return workers_to_close
 
@@ -867,10 +861,10 @@ async def daskworkergroup_replica_update(
                     )
 
                 if retired_worker_count != workers_not_needed:
-                    logging.info(
+                    logger.info(
                         f"Could only retire {retired_worker_count} of {workers_not_needed} workers."
                     )
-                    logging.info(
+                    logger.info(
                         f"(busy={len(busy_deployments)}, uncertain={len(uncertain_deployments)})"
                     )
                     retry_delay = dask.config.get(
