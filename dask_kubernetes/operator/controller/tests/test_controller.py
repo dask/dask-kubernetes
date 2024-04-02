@@ -20,7 +20,6 @@ from dask_kubernetes.operator.controller import (
 
 DIR = pathlib.Path(__file__).parent.absolute()
 
-
 _EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
 _EXPECTED_LABELS = {"test-label": "label-value"}
 DEFAULT_CLUSTER_NAME = "simple"
@@ -47,7 +46,6 @@ def gen_cluster(k8s_cluster, ns, gen_cluster_manifest):
 
     @asynccontextmanager
     async def cm(cluster_name=DEFAULT_CLUSTER_NAME):
-
         cluster_path = gen_cluster_manifest(cluster_name)
         # Create cluster resource
         k8s_cluster.kubectl("apply", "-n", ns, "-f", cluster_path)
@@ -701,14 +699,21 @@ async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.anyio
-async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster, gen_worker_group):
+async def test_object_dask_worker_group(
+    k8s_cluster, kopf_runner, gen_cluster, gen_worker_group
+):
     with kopf_runner:
         async with (
             gen_cluster() as (cluster_name, ns),
-            gen_worker_group("simpleworkergroup.yaml") as (additional_workergroup_name, _),
+            gen_worker_group("simpleworkergroup.yaml") as (
+                additional_workergroup_name,
+                _,
+            ),
         ):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
-            additional_workergroup = await DaskWorkerGroup.get(additional_workergroup_name, namespace=ns)
+            additional_workergroup = await DaskWorkerGroup.get(
+                additional_workergroup_name, namespace=ns
+            )
 
             worker_groups = []
             while not worker_groups:
@@ -736,7 +741,9 @@ async def test_object_dask_worker_group(k8s_cluster, kopf_runner, gen_cluster, g
 
                 for deployment in deployments:
                     assert deployment.labels["dask.org/cluster-name"] == cluster.name
-                    for env in deployment.spec["template"]["spec"]["containers"][0]["env"]:
+                    for env in deployment.spec["template"]["spec"]["containers"][0][
+                        "env"
+                    ]:
                         if env["name"] == "DASK_WORKER_NAME":
                             if wg.name == additional_workergroup_name:
                                 assert env["value"] == "test-worker"
