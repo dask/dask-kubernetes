@@ -5,7 +5,7 @@ metadata:
 spec:
   cluster: simple
   worker:
-    replicas: 2
+    replicas: 1
     spec:
       containers:
         - name: worker
@@ -23,3 +23,5 @@ spec:
           env:
             - name: WORKER_ENV
               value: hello-world # We dont test the value, just the name
+            - name: DASK_WORKER_NAME
+              value: test-worker
