@@ -197,17 +197,19 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
         },
         "spec": copy.deepcopy(spec),
     }
-    env = [
-        {
+    scheduler_env = {
             "name": "DASK_SCHEDULER_ADDRESS",
             "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
+    }
     for container in pod_spec["spec"]["containers"]:
-        if "env" in container:
-            container["env"].extend(env)
-        else:
-            container["env"] = env
+        if "env" not in container:
+            container["env"] = [scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return pod_spec
 
 
