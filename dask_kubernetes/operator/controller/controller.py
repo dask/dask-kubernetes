@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -14,6 +15,9 @@ from distributed.protocol.pickle import dumps
 from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
+from dask_kubernetes.common.objects import validate_cluster_name
+from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
+from dask_kubernetes.exceptions import ValidationError
 from dask_kubernetes.operator._objects import (
     DaskAutoscaler,
     DaskCluster,
@@ -75,18 +79,19 @@ def build_scheduler_deployment_spec(
         }
     )
     metadata = {
-        "name": f"{cluster_name}-scheduler",
+        "name": SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
         "labels": labels,
         "annotations": annotations,
     }
-    spec = {}
-    spec["replicas"] = 1
-    spec["selector"] = {
-        "matchLabels": labels,
-    }
-    spec["template"] = {
-        "metadata": metadata,
-        "spec": pod_spec,
+    spec = {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": labels,
+        },
+        "template": {
+            "metadata": metadata,
+            "spec": pod_spec,
+        },
     }
     return {
         "apiVersion": "apps/v1",
@@ -107,7 +112,7 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
-            "name": f"{cluster_name}-scheduler",
+            "name": SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
             "labels": labels,
             "annotations": annotations,
         },
@@ -132,14 +137,15 @@ def build_worker_deployment_spec(
         "labels": labels,
         "annotations": annotations,
     }
-    spec = {}
-    spec["replicas"] = 1  # make_worker_spec returns dict with a replicas key?
-    spec["selector"] = {
-        "matchLabels": labels,
-    }
-    spec["template"] = {
-        "metadata": metadata,
-        "spec": pod_spec,
+    spec = {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": labels,
+        },
+        "template": {
+            "metadata": metadata,
+            "spec": copy.deepcopy(pod_spec),
+        },
     }
     deployment_spec = {
         "apiVersion": "apps/v1",
@@ -147,23 +153,25 @@ def build_worker_deployment_spec(
         "metadata": metadata,
         "spec": spec,
     }
-    env = [
-        {
-            "name": "DASK_WORKER_NAME",
-            "value": worker_name,
-        },
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
-    for i in range(len(deployment_spec["spec"]["template"]["spec"]["containers"])):
-        if "env" in deployment_spec["spec"]["template"]["spec"]["containers"][i]:
-            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"].extend(
-                env
-            )
-        else:
-            deployment_spec["spec"]["template"]["spec"]["containers"][i]["env"] = env
+    worker_env = {
+        "name": "DASK_WORKER_NAME",
+        "value": worker_name,
+    }
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
+    for container in deployment_spec["spec"]["template"]["spec"]["containers"]:
+        if "env" not in container:
+            container["env"] = [worker_env, scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_WORKER_NAME" not in container_env_names:
+            container["env"].append(worker_env)
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return deployment_spec
 
 
@@ -187,19 +195,21 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
             "labels": labels,
             "annotations": annotations,
         },
-        "spec": spec,
+        "spec": copy.deepcopy(spec),
     }
-    env = [
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
-    for i in range(len(pod_spec["spec"]["containers"])):
-        if "env" in pod_spec["spec"]["containers"][i]:
-            pod_spec["spec"]["containers"][i]["env"].extend(env)
-        else:
-            pod_spec["spec"]["containers"][i]["env"] = env
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
+    for container in pod_spec["spec"]["containers"]:
+        if "env" not in container:
+            container["env"] = [scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return pod_spec
 
 
@@ -273,6 +283,12 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
     This allows us to track that the operator is running.
     """
     logger.info(f"DaskCluster {name} created in {namespace}.")
+    try:
+        validate_cluster_name(name)
+    except ValidationError as validation_exc:
+        patch.status["phase"] = "Error"
+        raise kopf.PermanentError(validation_exc.message)
+
     patch.status["phase"] = "Created"
 
 
@@ -599,7 +615,9 @@ async def daskworkergroup_replica_update(
         if workers_needed < 0:
             worker_ids = await retire_workers(
                 n_workers=-workers_needed,
-                scheduler_service_name=f"{cluster_name}-scheduler",
+                scheduler_service_name=SCHEDULER_NAME_TEMPLATE.format(
+                    cluster_name=cluster_name
+                ),
                 worker_group_name=name,
                 namespace=namespace,
                 logger=logger,

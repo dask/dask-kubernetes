@@ -29,6 +29,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from tornado.ioloop import IOLoop
 
+from dask_kubernetes.common.objects import validate_cluster_name
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 from dask_kubernetes.operator._objects import (
     DaskAutoscaler,
@@ -258,6 +259,7 @@ class KubeCluster(Cluster):
         name = name.format(
             user=getpass.getuser(), uuid=str(uuid.uuid4())[:10], **os.environ
         )
+        validate_cluster_name(name)
         self._instances.add(self)
         self._rich_spinner = Spinner("dots", speed=0.5)
         self._startup_component_status: dict = {}
