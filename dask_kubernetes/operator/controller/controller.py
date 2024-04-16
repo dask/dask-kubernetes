@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
+from importlib.metadata import entry_points
 from uuid import uuid4
 
 import aiohttp
@@ -12,7 +13,6 @@ import kopf
 import kr8s
 from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
-from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
 from dask_kubernetes.common.objects import validate_cluster_name
