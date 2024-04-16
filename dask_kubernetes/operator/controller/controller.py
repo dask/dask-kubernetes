@@ -4,13 +4,13 @@ import time
 from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
-from importlib.metadata import entry_points
 from uuid import uuid4
 
 import aiohttp
 import dask.config
 import kopf
 import kr8s
+import pkg_resources
 from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
 from kr8s.asyncio.objects import Deployment, Pod, Service
@@ -38,7 +38,7 @@ DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
 PLUGINS = []
-for ep in entry_points(group="dask_operator_plugin"):
+for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
