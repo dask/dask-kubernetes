@@ -71,7 +71,7 @@ class DaskCluster(APIObject):
         return services[0]
 
     async def ready(self) -> bool:
-        await self._refresh()
+        await self.async_refresh()
         return (
             "status" in self.raw
             and "phase" in self.status
