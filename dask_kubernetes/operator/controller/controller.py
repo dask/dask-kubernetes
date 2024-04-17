@@ -10,9 +10,9 @@ import aiohttp
 import dask.config
 import kopf
 import kr8s
+import pkg_resources
 from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
-from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
 from dask_kubernetes.common.objects import validate_cluster_name
@@ -38,7 +38,7 @@ DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
 PLUGINS = []
-for ep in entry_points(group="dask_operator_plugin"):
+for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
@@ -197,17 +197,19 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
         },
         "spec": copy.deepcopy(spec),
     }
-    env = [
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
     for container in pod_spec["spec"]["containers"]:
-        if "env" in container:
-            container["env"].extend(env)
-        else:
-            container["env"] = env
+        if "env" not in container:
+            container["env"] = [scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return pod_spec
 
 
