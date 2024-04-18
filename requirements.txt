@@ -1,4 +1,4 @@
-dask>=2022.08.1
+dask>=2022.08.2
 distributed>=2022.08.1
 kubernetes>=12.0.1
 kubernetes-asyncio>=12.0.1
