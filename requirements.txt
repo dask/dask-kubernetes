@@ -5,4 +5,4 @@ kubernetes-asyncio>=12.0.1
 kopf>=1.35.3
 pykube-ng>=22.9.0
 rich>=12.5.1
-kr8s @ git+https://github.com/kr8s-org/kr8s.git@595f74456e5c88f77ca8d48a712605e2ba2c2b78
+kr8s @ git+https://github.com/kr8s-org/kr8s.git@223cbe897da378adc8ce5adaf4e3c7a486354941
