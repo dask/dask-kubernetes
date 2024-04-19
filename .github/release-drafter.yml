@@ -1,0 +1,29 @@
+# These will be overridden by the publish workflow and set to the new tag
+name-template: 'Next Release'
+tag-template: 'next'
+
+# Optionally configure your categories and other templates
+exclude-labels:
+  - dependencies
+categories:
+  - title: 'Enhancements'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: 'Bug Fixes'
+    labels:
+      - 'bug'
+  - title: 'Documentation'
+    label: 'documentation'
+  - title: 'Project Hygiene'
+    labels:
+      - hygiene
+      - ci
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&' # You can add # and @ to disable mentions, and add ` to disable code blocks.
+
+template: |
+  ## Changes
+
+  $CHANGES  
