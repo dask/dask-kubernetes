@@ -851,7 +851,8 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
-    if spec["idleTimeout"]:
+    idle_timeout = spec.get("idleTimeout", 0)
+    if idle_timeout:
         try:
             idle_since = await check_scheduler_idle(
                 scheduler_service_name=f"{name}-scheduler",
@@ -861,6 +862,6 @@ async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
         except Exception:
             logger.warn("Unable to connect to scheduler, skipping autoshutdown check.")
             return
-        if idle_since and time.time() > idle_since + spec["idleTimeout"]:
+        if idle_since and time.time() > idle_since + idle_timeout:
             cluster = await DaskCluster.get(name, namespace=namespace)
             await cluster.delete()
