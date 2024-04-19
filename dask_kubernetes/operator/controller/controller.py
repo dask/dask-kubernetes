@@ -1,19 +1,22 @@
+from __future__ import annotations
+
 import asyncio
 import copy
 import time
 from collections import defaultdict
 from contextlib import suppress
 from datetime import datetime
+from typing import TYPE_CHECKING, Any, Awaitable, Final, cast
 from uuid import uuid4
 
 import aiohttp
 import dask.config
 import kopf
-import kr8s
+import kr8s  # type: ignore[import-untyped]
 import pkg_resources
 from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
-from kr8s.asyncio.objects import Deployment, Pod, Service
+from kr8s.asyncio.objects import Deployment, Pod, Service  # type: ignore[import-untyped]
 
 from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
 from dask_kubernetes.exceptions import ValidationError
@@ -26,18 +29,23 @@ from dask_kubernetes.operator._objects import (
 from dask_kubernetes.operator.networking import get_scheduler_address
 from dask_kubernetes.operator.validation import validate_cluster_name
 
-_ANNOTATION_NAMESPACES_TO_IGNORE = (
+if TYPE_CHECKING:
+    from distributed import Scheduler
+
+_ANNOTATION_NAMESPACES_TO_IGNORE: Final[tuple[str, ...]] = (
     "kopf.zalando.org",
     "kubectl.kubernetes.io",
 )
-_LABEL_NAMESPACES_TO_IGNORE = ()
+_LABEL_NAMESPACES_TO_IGNORE: Final[tuple[str, ...]] = ()
 
-KUBERNETES_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+KUBERNETES_DATETIME_FORMAT: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
 
-DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
+DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: Final[
+    str
+] = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
-PLUGINS = []
+PLUGINS: list[Any] = []
 for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
@@ -47,7 +55,7 @@ class SchedulerCommError(Exception):
     """Raised when unable to communicate with a scheduler."""
 
 
-def _get_annotations(meta):
+def _get_annotations(meta: kopf.Meta) -> dict[str, str]:
     return {
         annotation_key: annotation_value
         for annotation_key, annotation_value in meta.annotations.items()
@@ -58,7 +66,7 @@ def _get_annotations(meta):
     }
 
 
-def _get_labels(meta):
+def _get_labels(meta: kopf.Meta) -> dict[str, str]:
     return {
         label_key: label_value
         for label_key, label_value in meta.labels.items()
@@ -69,15 +77,16 @@ def _get_labels(meta):
 
 
 def build_scheduler_deployment_spec(
-    cluster_name, namespace, pod_spec, annotations, labels
-):
-    labels.update(
-        **{
-            "dask.org/cluster-name": cluster_name,
-            "dask.org/component": "scheduler",
-            "sidecar.istio.io/inject": "false",
-        }
-    )
+    cluster_name: str,
+    pod_spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
+    labels = dict(labels) | {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "scheduler",
+        "sidecar.istio.io/inject": "false",
+    }
     metadata = {
         "name": SCHEDULER_NAME_TEMPLATE.format(cluster_name=cluster_name),
         "labels": labels,
@@ -101,13 +110,16 @@ def build_scheduler_deployment_spec(
     }
 
 
-def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
-    labels.update(
-        **{
-            "dask.org/cluster-name": cluster_name,
-            "dask.org/component": "scheduler",
-        }
-    )
+def build_scheduler_service_spec(
+    cluster_name: str,
+    spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
+    labels = dict(labels) | {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "scheduler",
+    }
     return {
         "apiVersion": "v1",
         "kind": "Service",
@@ -121,37 +133,40 @@ def build_scheduler_service_spec(cluster_name, spec, annotations, labels):
 
 
 def build_worker_deployment_spec(
-    worker_group_name, namespace, cluster_name, uuid, pod_spec, annotations, labels
-):
-    labels.update(
-        **{
-            "dask.org/cluster-name": cluster_name,
-            "dask.org/workergroup-name": worker_group_name,
-            "dask.org/component": "worker",
-            "sidecar.istio.io/inject": "false",
-        }
-    )
+    worker_group_name: str,
+    namespace: str,
+    cluster_name: str,
+    uuid: str,
+    pod_spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
+    labels = dict(labels) | {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/workergroup-name": worker_group_name,
+        "dask.org/component": "worker",
+        "sidecar.istio.io/inject": "false",
+    }
     worker_name = f"{worker_group_name}-worker-{uuid}"
     metadata = {
         "name": worker_name,
         "labels": labels,
         "annotations": annotations,
     }
-    spec = {
-        "replicas": 1,
-        "selector": {
-            "matchLabels": labels,
-        },
-        "template": {
-            "metadata": metadata,
-            "spec": copy.deepcopy(pod_spec),
-        },
-    }
-    deployment_spec = {
+    deployment_spec: dict[str, Any] = {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
         "metadata": metadata,
-        "spec": spec,
+        "spec": {
+            "replicas": 1,
+            "selector": {
+                "matchLabels": labels,
+            },
+            "template": {
+                "metadata": metadata,
+                "spec": copy.deepcopy(pod_spec),
+            },
+        },
     }
     worker_env = {
         "name": "DASK_WORKER_NAME",
@@ -175,19 +190,24 @@ def build_worker_deployment_spec(
     return deployment_spec
 
 
-def get_job_runner_pod_name(job_name):
+def get_job_runner_pod_name(job_name: str) -> str:
     return f"{job_name}-runner"
 
 
-def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, labels):
-    labels.update(
-        **{
-            "dask.org/cluster-name": cluster_name,
-            "dask.org/component": "job-runner",
-            "sidecar.istio.io/inject": "false",
-        }
-    )
-    pod_spec = {
+def build_job_pod_spec(
+    job_name: str,
+    cluster_name: str,
+    namespace: str,
+    spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
+    labels = dict(labels) | {
+        "dask.org/cluster-name": cluster_name,
+        "dask.org/component": "job-runner",
+        "sidecar.istio.io/inject": "false",
+    }
+    pod_spec: dict[str, Any] = {
         "apiVersion": "v1",
         "kind": "Pod",
         "metadata": {
@@ -213,19 +233,22 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
     return pod_spec
 
 
-def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
-    labels.update(
-        **{
-            "dask.org/cluster-name": cluster_name,
-            "dask.org/component": "workergroup",
-        }
-    )
+def build_default_worker_group_spec(
+    cluster_name: str,
+    spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskWorkerGroup",
         "metadata": {
             "name": f"{cluster_name}-default",
-            "labels": labels,
+            "labels": dict(labels)
+            | {
+                "dask.org/cluster-name": cluster_name,
+                "dask.org/component": "workergroup",
+            },
             "annotations": annotations,
         },
         "spec": {
@@ -235,18 +258,22 @@ def build_default_worker_group_spec(cluster_name, spec, annotations, labels):
     }
 
 
-def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
-    labels.update(
-        **{
-            "dask.org/cluster-name": name,
-        }
-    )
+def build_cluster_spec(
+    name: str,
+    worker_spec: kopf.Spec,
+    scheduler_spec: kopf.Spec,
+    annotations: kopf.Annotations,
+    labels: kopf.Labels,
+) -> dict[str, Any]:
     return {
         "apiVersion": "kubernetes.dask.org/v1",
         "kind": "DaskCluster",
         "metadata": {
             "name": name,
-            "labels": labels,
+            "labels": dict(labels)
+            | {
+                "dask.org/cluster-name": name,
+            },
             "annotations": annotations,
         },
         "spec": {"worker": worker_spec, "scheduler": scheduler_spec},
@@ -254,7 +281,7 @@ def build_cluster_spec(name, worker_spec, scheduler_spec, annotations, labels):
 
 
 @kopf.on.startup()
-async def startup(settings: kopf.OperatorSettings, **kwargs):
+async def startup(settings: kopf.OperatorSettings, **__: Any) -> None:
     # Set server and client timeouts to reconnect from time to time.
     # In rare occasions the connection might go idle we will no longer receive any events.
     # These timeouts should help in those cases.
@@ -272,16 +299,24 @@ async def startup(settings: kopf.OperatorSettings, **kwargs):
 # There may be useful things for us to expose via the liveness probe
 # https://kopf.readthedocs.io/en/stable/probing/#probe-handlers
 @kopf.on.probe(id="now")
-def get_current_timestamp(**kwargs):
+def get_current_timestamp(**__: Any) -> str:
     return datetime.utcnow().isoformat()
 
 
 @kopf.on.create("daskcluster.kubernetes.dask.org")
-async def daskcluster_create(name, namespace, logger, patch, **kwargs):
+async def daskcluster_create(
+    name: str | None,
+    namespace: str | None,
+    patch: kopf.Patch,
+    logger: kopf.Logger,
+    **__: Any,
+) -> None:
     """When DaskCluster resource is created set the status.phase.
 
     This allows us to track that the operator is running.
     """
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     logger.info(f"DaskCluster {name} created in {namespace}.")
     try:
         validate_cluster_name(name)
@@ -294,9 +329,17 @@ async def daskcluster_create(name, namespace, logger, patch, **kwargs):
 
 @kopf.on.field("daskcluster.kubernetes.dask.org", field="status.phase", new="Created")
 async def daskcluster_create_components(
-    spec, name, namespace, logger, patch, meta, **kwargs
-):
+    spec: kopf.Spec,
+    name: str | None,
+    namespace: str | None,
+    logger: kopf.Logger,
+    patch: kopf.Patch,
+    meta: kopf.Meta,
+    **__: Any,
+) -> None:
     """When the DaskCluster status.phase goes into Created create the cluster components."""
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     logger.info("Creating Dask cluster components.")
 
     # Create scheduler deployment
@@ -309,7 +352,7 @@ async def daskcluster_create_components(
         if "labels" in scheduler_spec["metadata"]:
             labels.update(**scheduler_spec["metadata"]["labels"])
     data = build_scheduler_deployment_spec(
-        name, namespace, scheduler_spec.get("spec"), annotations, labels
+        name, scheduler_spec.get("spec"), annotations, labels
     )
     kopf.adopt(data)
     scheduler_deployment = await Deployment(data, namespace=namespace)
@@ -349,8 +392,14 @@ async def daskcluster_create_components(
 
 @kopf.on.field("service", field="status", labels={"dask.org/component": "scheduler"})
 async def handle_scheduler_service_status(
-    spec, labels, status, namespace, logger, **kwargs
-):
+    spec: kopf.Spec,
+    labels: kopf.Labels,
+    status: kopf.Status,
+    namespace: str | None,
+    **__: Any,
+) -> None:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     # If the Service is a LoadBalancer with no ingress endpoints mark the cluster as Pending
     if spec["type"] == "LoadBalancer" and not len(
         status.get("load_balancer", {}).get("ingress", [])
@@ -366,27 +415,40 @@ async def handle_scheduler_service_status(
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
-async def daskworkergroup_create(body, namespace, logger, **kwargs):
+async def daskworkergroup_create(
+    body: kopf.Body, namespace: str | None, logger: kopf.Logger, **kwargs: Any
+) -> None:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     wg = await DaskWorkerGroup(body, namespace=namespace)
     cluster = await wg.cluster()
     await cluster.adopt(wg)
     logger.info(f"Successfully adopted by {cluster.name}")
 
     del kwargs["new"]
-    await daskworkergroup_replica_update(
-        body=body,
-        logger=logger,
-        new=wg.replicas,
-        namespace=namespace,
-        **kwargs,
+    await cast(
+        Awaitable[None],
+        daskworkergroup_replica_update(
+            body=body,
+            logger=logger,
+            new=wg.replicas,
+            namespace=namespace,
+            **kwargs,
+        ),
     )
 
 
 async def retire_workers(
-    n_workers, scheduler_service_name, worker_group_name, namespace, logger
-):
+    n_workers: int,
+    scheduler_service_name: str,
+    worker_group_name: str,
+    namespace: str | None,
+    logger: kopf.Logger,
+) -> list[str]:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     # Try gracefully retiring via the HTTP API
-    dashboard_address = await get_scheduler_address(
+    dashboard_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
         scheduler_service_name,
         namespace,
         port_name="http-dashboard",
@@ -412,18 +474,18 @@ async def retire_workers(
     )
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
     with suppress(Exception):
-        comm_address = await get_scheduler_address(
+        comm_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
             scheduler_service_name,
             namespace,
             allow_external=False,
         )
-        async with rpc(comm_address) as scheduler_comm:
+        async with rpc(comm_address) as scheduler_comm:  # type: ignore[no-untyped-call]
             workers_to_close = await scheduler_comm.workers_to_close(
                 n=n_workers,
                 attribute="name",
             )
             await scheduler_comm.retire_workers(names=workers_to_close)
-            return workers_to_close
+            return cast(list[str], workers_to_close)
 
     # Finally fall back to last-in-first-out scaling
     logger.warning(
@@ -438,9 +500,13 @@ async def retire_workers(
     return [w.name for w in workers[:-n_workers]]
 
 
-async def check_scheduler_idle(scheduler_service_name, namespace, logger):
+async def check_scheduler_idle(
+    scheduler_service_name: str, namespace: str | None, logger: kopf.Logger
+) -> str:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     # Try getting idle time via HTTP API
-    dashboard_address = await get_scheduler_address(
+    dashboard_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
         scheduler_service_name,
         namespace,
         port_name="http-dashboard",
@@ -453,7 +519,7 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
                 idle_since = (await resp.json())["idle_since"]
                 if idle_since:
                     logger.debug("Scheduler idle since: %s", idle_since)
-                return idle_since
+                return cast(str, idle_since)
             logger.debug(
                 "Received %d response from scheduler API with body %s",
                 resp.status,
@@ -466,50 +532,61 @@ async def check_scheduler_idle(scheduler_service_name, namespace, logger):
     )
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
     with suppress(Exception):
-        comm_address = await get_scheduler_address(
+        comm_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
             scheduler_service_name,
             namespace,
             allow_external=False,
         )
-        async with rpc(comm_address) as scheduler_comm:
+        async with rpc(comm_address) as scheduler_comm:  # type: ignore[no-untyped-call]
             idle_since = await scheduler_comm.check_idle()
             if idle_since:
                 logger.debug("Scheduler idle since: %s", idle_since)
-            return idle_since
+            return cast(str, idle_since)
 
     # Finally fall back to code injection via the Dask RPC for distributed<=2023.3.1
     logger.debug(
         f"Checking {scheduler_service_name} idleness failed via the Dask RPC, falling back to run_on_scheduler"
     )
 
-    def idle_since(dask_scheduler=None):
+    def idle_since_func(
+        dask_scheduler: Scheduler
+        | None = None,  # TODO: why is None allowed here? It will crash immediately.
+    ) -> float:
+        if not dask_scheduler:
+            raise TypeError("Dask Scheduler is None.")
         if not dask_scheduler.idle_timeout:
             dask_scheduler.idle_timeout = 300
         dask_scheduler.check_idle()
-        return dask_scheduler.idle_since
+        return cast(float, dask_scheduler.idle_since)
 
-    comm_address = await get_scheduler_address(
+    comm_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
         scheduler_service_name,
         namespace,
         allow_external=False,
     )
-    async with rpc(comm_address) as scheduler_comm:
+    async with rpc(comm_address) as scheduler_comm:  # type: ignore[no-untyped-call]
         response = await scheduler_comm.run_function(
-            function=dumps(idle_since),
+            function=dumps(idle_since_func),  # type: ignore[no-untyped-call]
         )
         if response["status"] == "error":
             typ, exc, tb = clean_exception(**response)
+            if exc is None:
+                raise TypeError("Exception was None.")
             raise exc.with_traceback(tb)
         else:
             idle_since = response["result"]
             if idle_since:
                 logger.debug("Scheduler idle since: %s", idle_since)
-            return idle_since
+            return cast(str, idle_since)
 
 
-async def get_desired_workers(scheduler_service_name, namespace, logger):
+async def get_desired_workers(
+    scheduler_service_name: str, namespace: str | None
+) -> Any:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     # Try gracefully retiring via the HTTP API
-    dashboard_address = await get_scheduler_address(
+    dashboard_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
         scheduler_service_name,
         namespace,
         port_name="http-dashboard",
@@ -525,12 +602,12 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
     # Otherwise try gracefully retiring via the RPC
     # Dask version mismatches between the operator and scheduler may cause this to fail in any number of unexpected ways
     try:
-        comm_address = await get_scheduler_address(
+        comm_address = await get_scheduler_address(  # type: ignore[no-untyped-call]
             scheduler_service_name,
             namespace,
             allow_external=False,
         )
-        async with rpc(comm_address) as scheduler_comm:
+        async with rpc(comm_address) as scheduler_comm:  # type: ignore[no-untyped-call]
             return await scheduler_comm.adaptive_target()
     except Exception as e:
         raise SchedulerCommError(
@@ -538,22 +615,39 @@ async def get_desired_workers(scheduler_service_name, namespace, logger):
         ) from e
 
 
-worker_group_scale_locks = defaultdict(lambda: asyncio.Lock())
+worker_group_scale_locks: dict[str, asyncio.Lock] = defaultdict(lambda: asyncio.Lock())
 
 
 @kopf.on.field("daskcluster.kubernetes.dask.org", field="spec.worker.replicas")
 async def daskcluster_default_worker_group_replica_update(
-    name, namespace, old, new, **kwargs
-):
+    name: str | None,
+    namespace: str | None,
+    old: Any | None,
+    new: Any | None,
+    **__: Any,
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     if old is not None:
+        if not all(isinstance(num, int) for num in (old, new)):
+            raise kopf.PermanentError("Old or new replicas are not int.")
         wg = await DaskWorkerGroup.get(f"{name}-default", namespace=namespace)
         await wg.scale(new)
 
 
 @kopf.on.field("daskworkergroup.kubernetes.dask.org", field="spec.worker.replicas")
 async def daskworkergroup_replica_update(
-    name, namespace, meta, spec, new, body, logger, **kwargs
-):
+    name: str | None,
+    namespace: str | None,
+    meta: kopf.Meta,
+    spec: kopf.Spec,
+    new: Any | None,
+    body: kopf.Body,
+    logger: kopf.Logger,
+    **__: Any,
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     cluster_name = spec["cluster"]
     wg = await DaskWorkerGroup(body, namespace=namespace)
     try:
@@ -572,6 +666,8 @@ async def daskworkergroup_replica_update(
                 label_selector={"dask.org/workergroup-name": name},
             )
         )
+        if not isinstance(new, int):
+            raise kopf.PermanentError("New is not an int.")
         desired_workers = new
         workers_needed = desired_workers - current_workers
         labels = _get_labels(meta)
@@ -632,14 +728,26 @@ async def daskworkergroup_replica_update(
 
 
 @kopf.on.delete("daskworkergroup.kubernetes.dask.org", optional=True)
-async def daskworkergroup_remove(name, namespace, **kwargs):
+async def daskworkergroup_remove(
+    name: str | None, namespace: str | None, **__: Any
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     lock_key = f"{name}/{namespace}"
     if lock_key in worker_group_scale_locks:
         del worker_group_scale_locks[lock_key]
 
 
 @kopf.on.create("daskjob.kubernetes.dask.org")
-async def daskjob_create(name, namespace, logger, patch, **kwargs):
+async def daskjob_create(
+    name: str | None,
+    namespace: str | None,
+    logger: kopf.Logger,
+    patch: kopf.Patch,
+    **__: Any,
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     logger.info(f"A DaskJob has been created called {name} in {namespace}.")
     patch.status["jobStatus"] = "JobCreated"
 
@@ -648,8 +756,16 @@ async def daskjob_create(name, namespace, logger, patch, **kwargs):
     "daskjob.kubernetes.dask.org", field="status.jobStatus", new="JobCreated"
 )
 async def daskjob_create_components(
-    spec, name, namespace, logger, patch, meta, **kwargs
-):
+    spec: kopf.Spec,
+    name: str | None,
+    namespace: str | None,
+    logger: kopf.Logger,
+    patch: kopf.Patch,
+    meta: kopf.Meta,
+    **__: Any,
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     logger.info("Creating Dask job components.")
     cluster_name = f"{name}"
     labels = _get_labels(meta)
@@ -704,7 +820,11 @@ async def daskjob_create_components(
     labels={"dask.org/component": "job-runner"},
     new="Running",
 )
-async def handle_runner_status_change_running(meta, namespace, logger, **kwargs):
+async def handle_runner_status_change_running(
+    meta: kopf.Meta, namespace: str | None, logger: kopf.Logger, **__: Any
+) -> None:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     logger.info("Job now in running")
     name = meta["labels"]["dask.org/cluster-name"]
     job = await DaskJob.get(name, namespace=namespace)
@@ -725,7 +845,11 @@ async def handle_runner_status_change_running(meta, namespace, logger, **kwargs)
     labels={"dask.org/component": "job-runner"},
     new="Succeeded",
 )
-async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
+async def handle_runner_status_change_succeeded(
+    meta: kopf.Meta, namespace: str | None, logger: kopf.Logger, **__: Any
+) -> None:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     logger.info("Job succeeded, deleting Dask cluster.")
     name = meta["labels"]["dask.org/cluster-name"]
     cluster = await DaskCluster.get(name, namespace=namespace)
@@ -748,7 +872,11 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
     labels={"dask.org/component": "job-runner"},
     new="Failed",
 )
-async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwargs):
+async def handle_runner_status_change_failed(
+    meta: kopf.Meta, namespace: str | None, logger: kopf.Logger, **__: Any
+) -> None:
+    if namespace is None:
+        raise kopf.PermanentError("Namespace not given.")
     logger.info("Job failed, deleting Dask cluster.")
     name = meta["labels"]["dask.org/cluster-name"]
     cluster = await DaskCluster.get(name, namespace=namespace)
@@ -766,7 +894,9 @@ async def handle_runner_status_change_succeeded(meta, namespace, logger, **kwarg
 
 
 @kopf.on.create("daskautoscaler.kubernetes.dask.org")
-async def daskautoscaler_create(body, logger, **_):
+async def daskautoscaler_create(
+    body: kopf.Body, logger: kopf.Logger, **__: Any
+) -> None:
     """When an autoscaler is created make it a child of the associated cluster for cascade deletion."""
     autoscaler = await DaskAutoscaler(body)
     cluster = await autoscaler.cluster()
@@ -775,7 +905,15 @@ async def daskautoscaler_create(body, logger, **_):
 
 
 @kopf.timer("daskautoscaler.kubernetes.dask.org", interval=5.0)
-async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
+async def daskautoscaler_adapt(
+    spec: kopf.Spec,
+    name: str | None,
+    namespace: str | None,
+    logger: kopf.Logger,
+    **__: Any,
+) -> None:
+    if name is None or namespace is None:
+        raise kopf.PermanentError("Name or Namespace not given.")
     try:
         scheduler = await Pod.get(
             label_selector={
@@ -785,7 +923,7 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
             namespace=namespace,
         )
         if not await scheduler.ready():
-            raise ValueError()
+            raise ValueError
     except ValueError:
         logger.info("Scheduler not ready, skipping autoscaling")
         return
@@ -812,7 +950,6 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
         desired_workers = await get_desired_workers(
             scheduler_service_name=f"{spec['cluster']}-scheduler",
             namespace=namespace,
-            logger=logger,
         )
     except SchedulerCommError:
         logger.error("Unable to get desired number of workers from scheduler.")
@@ -850,7 +987,13 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
 
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
-async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
+async def daskcluster_autoshutdown(
+    spec: kopf.Spec,
+    name: str | None,
+    namespace: str | None,
+    logger: kopf.Logger,
+    **__: Any,
+) -> None:
     idle_timeout = spec.get("idleTimeout", 0)
     if idle_timeout:
         try:
@@ -859,8 +1002,10 @@ async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
                 namespace=namespace,
                 logger=logger,
             )
-        except Exception:
-            logger.warn("Unable to connect to scheduler, skipping autoshutdown check.")
+        except Exception:  # TODO: Not use broad "Exception" catch here
+            logger.warning(
+                "Unable to connect to scheduler, skipping autoshutdown check."
+            )
             return
         if idle_since and time.time() > idle_since + idle_timeout:
             cluster = await DaskCluster.get(name, namespace=namespace)
