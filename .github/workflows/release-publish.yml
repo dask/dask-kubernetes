@@ -3,7 +3,7 @@ name: Release Publisher
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "*.*.*"
 
 permissions:
   contents: read
