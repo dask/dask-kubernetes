@@ -5,6 +5,8 @@ on: [push, pull_request]
 jobs:
   build-distribution:
     runs-on: "ubuntu-latest"
+    permissions:
+      id-token: write
 
     steps:
       - name: Checkout source
