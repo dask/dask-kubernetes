@@ -40,7 +40,7 @@
 #   Hide                            Hide the subsequent commands from the output
 #   Show                            Show the subsequent commands in the output
 
-Output doc/source/images/operator-install.gif
+Output docs/source/images/operator-install.gif
 
 Set FontSize 36
 Set Width 2400
