@@ -1,21 +1,7 @@
 name: "Operator"
 on:
   pull_request:
-    paths:
-      - ".github/workflows/operator.yaml"
-      - "requirements*"
-      - "ci/**"
-      - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/common/**"
-      - "dask_kubernetes/*"
   push:
-    paths:
-      - ".github/workflows/operator.yaml"
-      - "requirements*"
-      - "ci/**"
-      - "dask_kubernetes/operator/**"
-      - "dask_kubernetes/common/**"
-      - "dask_kubernetes/*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -64,7 +50,7 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes-version }}
           TEST_ISTIO: "true"
           TEST_DASK_GATEWAY: "true"
-        run: pytest --maxfail=3 --reruns=5 dask_kubernetes/common dask_kubernetes/operator
+        run: pytest --maxfail=3 --reruns=5 dask_kubernetes
       - name: Debug kubernetes resources
         if: always()
         run: kubectl get all -A
