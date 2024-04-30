@@ -2,7 +2,7 @@ from importlib import import_module
 from warnings import warn
 
 from . import config
-from . import _version
+
 from .common.auth import (
     AutoRefreshConfiguration,
     AutoRefreshKubeConfigLoader,
@@ -15,7 +15,13 @@ from .common.objects import clean_pod_template, make_pod_from_dict, make_pod_spe
 from .helm import HelmCluster
 
 __all__ = ["HelmCluster", "KubeCluster"]
-__version__ = _version.get_versions()["version"]
+
+try:
+    from ._version import version as __version__  # noqa
+    from ._version import version_tuple as __version_tuple__  # noqa
+except ImportError:
+    __version__ = "0.0.0"
+    __version_tuple__ = (0, 0, 0)
 
 
 def __getattr__(name):

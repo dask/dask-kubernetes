@@ -142,3 +142,6 @@ credentials.csv
 # IDEs
 .idea/
 .vscode/
+
+# Version
+_version.py
