@@ -15,7 +15,6 @@ from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
-from dask_kubernetes.common.objects import validate_cluster_name
 from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
 from dask_kubernetes.exceptions import ValidationError
 from dask_kubernetes.operator._objects import (
@@ -25,6 +24,7 @@ from dask_kubernetes.operator._objects import (
     DaskWorkerGroup,
 )
 from dask_kubernetes.operator.networking import get_scheduler_address
+from dask_kubernetes.operator.validation import validate_cluster_name
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
