@@ -96,3 +96,13 @@ minversion = "6.0"
 addopts = "-v --keep-cluster --durations=10"
 timeout = 60
 timeout_func_only = true
+
+[project.entry-points.dask_cluster_discovery]
+helmcluster = "dask_kubernetes.helm:discover"
+kubecluster = "dask_kubernetes.operator:discover"
+
+[project.entry-points.dask_operator_plugin]
+noop = "dask_kubernetes.operator.controller.plugins.noop"
+
+[project.entry-points.dask_cli]
+kubernetes = "dask_kubernetes.cli:main"
