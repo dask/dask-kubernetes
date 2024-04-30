@@ -1,32 +1,7 @@
-Migrating to the operator
-=========================
+Migrating from classic
+======================
 
-The ``KubeCluster`` class is being replaced with a new version that is built using the Kubernetes Operator pattern.
-We encourage all users of the classic implementation to migrate to the new version as it is generally unmaintained and will be removed in a future release.
-
-Why should you migrate?
------------------------
-
-You may be thinking "why do I have to do this?" and "the old version works just fine" so let's take a moment to unpack why we have rebuilt ``KubeCluster`` and to hopefully convince you that this is a good decision and worth the effort.
-
-The :doc:`original implementation <history>` of ``KubeCluster`` was created shortly after Kubernetes went ``1.0`` and best practice design patterns were still emerging.
-While it has been updated over time it has been more and more difficult to maintain due to the way it was designed.
-
-We decided to completely rebuild ``dask-kubernetes`` with the `operator pattern in mind <https://kubernetes.io/docs/concepts/extend-kubernetes/operator/>`_ which is now an established design pattern for building composable Kubernetes applications.
-
-Here are some reasons why we decided to make this change:
-
-- Top level ``DaskCluster`` resource
-  - Cascade deletion
-- Simpler Python API
-- More powerful YAML API
-  - Create, scale and delete clusters with ``kubectl``
-- Detatch and reattactch from running clusters
-- New resource types like ``DaskJob``
-- Multiple worker groups
-- Autoscaling handled by the controller and not the cluster manager
-
-For more information watch the Dask blog for the Dask Kubernetes Operator announcement blog post.
+The classic ``KubeCluster`` class has been replaced with a new version that is built using the Kubernetes Operator pattern.
 
 
 Installing the operator

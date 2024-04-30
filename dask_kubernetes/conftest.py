@@ -1,6 +1,7 @@
 import logging
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -10,9 +11,16 @@ import pytest
 from kopf.testing import KopfRunner
 from pytest_kind.cluster import KindCluster
 
-from dask_kubernetes.common.utils import check_dependency
-
 DIR = pathlib.Path(__file__).parent.absolute()
+
+
+def check_dependency(dependency):
+    if shutil.which(dependency) is None:
+        raise RuntimeError(
+            f"Missing dependency {dependency}. "
+            f"Please install {dependency} following the instructions for your OS. "
+        )
+
 
 check_dependency("helm")
 check_dependency("kubectl")

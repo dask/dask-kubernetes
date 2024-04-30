@@ -28,7 +28,7 @@ Welcome to the documentation for ``dask-kubernetes``.
    Dask on Kubernetes new users should head to the
    `Dask documentation page on Kubernetes <https://docs.dask.org/en/latest/deploying-kubernetes.html>`_.
 
-The package ``dask-kubernetes`` provides cluster managers for Kubernetes. ``dask-kubernetes`` is one of many options for deploying Dask clusters, see `Deploying Dask <https://docs.dask.org/en/stable/deploying.html#distributed-computing>`_ in the Dask documentation for an overview of additional options.
+The package ``dask-kubernetes`` provides a Dask operator for Kubernetes. ``dask-kubernetes`` is one of many options for deploying Dask clusters, see `Deploying Dask <https://docs.dask.org/en/stable/deploying.html#distributed-computing>`_ in the Dask documentation for an overview of additional options.
 
 KubeCluster
 -----------
@@ -47,20 +47,6 @@ Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
     cluster = KubeCluster(name="my-dask-cluster", image='ghcr.io/dask/dask:latest')
     cluster.scale(10)
 
-HelmCluster
------------
-
-:class:`HelmCluster` is for managing an existing Dask cluster which has been deployed using
-`Helm <https://helm.sh>`_. You must have already installed the `Dask Helm chart <https://helm.dask.org/>`_
-and have the cluster running. You can then use it to manage scaling and retrieve logs.
-
-.. code-block:: python
-
-   from dask_kubernetes import HelmCluster
-
-   cluster = HelmCluster(release_name="myrelease")
-   cluster.scale(10)
-
 .. toctree::
    :maxdepth: 2
    :hidden:
@@ -71,18 +57,11 @@ and have the cluster running. You can then use it to manage scaling and retrieve
 .. toctree::
    :maxdepth: 2
    :hidden:
-   :caption: Cluster Managers
-
-   operator_kubecluster
-   helmcluster
-
-.. toctree::
-   :maxdepth: 2
-   :hidden:
    :caption: Operator
 
    operator
    operator_installation
+   operator_kubecluster
    operator_resources
    operator_extending
    operator_troubleshooting
@@ -92,7 +71,6 @@ and have the cluster running. You can then use it to manage scaling and retrieve
    :hidden:
    :caption: Classic
 
-   kubecluster
    kubecluster_migrating
 
 .. toctree::
