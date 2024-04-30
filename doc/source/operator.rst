@@ -5,7 +5,7 @@ Overview
 What is the operator?
 ---------------------
 
-The Dask Operator is a small service that runs on your Kubernetes cluster and allows you to create and manage your Dask clusters as Kubernetes resources.
+The Dask Operator is a set of custom resources and a controller that runs on your Kubernetes cluster and allows you to create and manage your Dask clusters as Kubernetes resources.
 Creating clusters can either be done via the :doc:`Kubernetes API with kubectl <operator_resources>` or the :doc:`Python API with KubeCluster <operator_kubecluster>`.
 
 To :doc:`install the operator <operator_installation>` you need to apply some custom resource definitions that allow us to describe Dask resources and the operator itself which is a small Python application that

@@ -1,5 +1,5 @@
-Installing
-==========
+Operator
+========
 
 To use the Dask Operator you must install the custom resource definitions, service account, roles, and the operator controller deployment.
 

@@ -1,5 +1,5 @@
-Installing
-==========
+Python Package
+==============
 
 .. currentmodule:: dask_kubernetes
 

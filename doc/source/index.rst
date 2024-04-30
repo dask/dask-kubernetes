@@ -1,5 +1,5 @@
-Dask Kubernetes
-===============
+Dask Kubernetes Operator
+========================
 
 .. image:: https://img.shields.io/pypi/v/dask-kubernetes
    :target: https://pypi.org/project/dask-kubernetes/
@@ -20,11 +20,11 @@ Dask Kubernetes
 
 .. currentmodule:: dask_kubernetes
 
-Welcome to the documentation for ``dask-kubernetes``.
+Welcome to the documentation for the Dask Kubernetes Operator.
 
 .. note::
 
-   If you are looking for general documentation on deploying
+   If you are looking for high-level documentation on deploying
    Dask on Kubernetes new users should head to the
    `Dask documentation page on Kubernetes <https://docs.dask.org/en/latest/deploying-kubernetes.html>`_.
 
@@ -50,9 +50,10 @@ Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
 .. toctree::
    :maxdepth: 2
    :hidden:
-   :caption: Overview
+   :caption: Installing
 
    installing
+   operator_installation
 
 .. toctree::
    :maxdepth: 2
@@ -60,7 +61,6 @@ Kubernetes resources.  It is designed to dynamically launch ad-hoc deployments.
    :caption: Operator
 
    operator
-   operator_installation
    operator_kubecluster
    operator_resources
    operator_extending
