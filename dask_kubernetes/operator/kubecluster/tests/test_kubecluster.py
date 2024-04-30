@@ -7,13 +7,6 @@ from dask_kubernetes.exceptions import SchedulerStartupError, ValidationError
 from dask_kubernetes.operator import KubeCluster, make_cluster_spec
 
 
-def test_experimental_shim():
-    with pytest.deprecated_call():
-        from dask_kubernetes.experimental import KubeCluster as ExperimentalKubeCluster
-
-    assert ExperimentalKubeCluster is KubeCluster
-
-
 def test_kubecluster(kopf_runner, docker_image, ns):
     with kopf_runner:
         with KubeCluster(
@@ -81,11 +74,14 @@ def test_clusters_with_custom_port_forward(kopf_runner, docker_image, ns):
 
 def test_multiple_clusters_simultaneously(kopf_runner, docker_image, ns):
     with kopf_runner:
-        with KubeCluster(
-            name="fizz", image=docker_image, n_workers=1, namespace=ns
-        ) as cluster1, KubeCluster(
-            name="buzz", image=docker_image, n_workers=1, namespace=ns
-        ) as cluster2:
+        with (
+            KubeCluster(
+                name="fizz", image=docker_image, n_workers=1, namespace=ns
+            ) as cluster1,
+            KubeCluster(
+                name="buzz", image=docker_image, n_workers=1, namespace=ns
+            ) as cluster2,
+        ):
             with Client(cluster1) as client1, Client(cluster2) as client2:
                 assert client1.submit(lambda x: x + 1, 10).result() == 11
                 assert client2.submit(lambda x: x + 1, 10).result() == 11
@@ -93,15 +89,18 @@ def test_multiple_clusters_simultaneously(kopf_runner, docker_image, ns):
 
 def test_multiple_clusters_simultaneously_same_loop(kopf_runner, docker_image, ns):
     with kopf_runner:
-        with KubeCluster(
-            name="fizz", image=docker_image, n_workers=1, namespace=ns
-        ) as cluster1, KubeCluster(
-            name="buzz",
-            image=docker_image,
-            loop=cluster1.loop,
-            n_workers=1,
-            namespace=ns,
-        ) as cluster2:
+        with (
+            KubeCluster(
+                name="fizz", image=docker_image, n_workers=1, namespace=ns
+            ) as cluster1,
+            KubeCluster(
+                name="buzz",
+                image=docker_image,
+                loop=cluster1.loop,
+                n_workers=1,
+                namespace=ns,
+            ) as cluster2,
+        ):
             with Client(cluster1) as client1, Client(cluster2) as client2:
                 assert cluster1.loop is cluster2.loop is client1.loop is client2.loop
                 assert client1.submit(lambda x: x + 1, 10).result() == 11
