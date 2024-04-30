@@ -29,7 +29,6 @@ from rich.spinner import Spinner
 from rich.table import Table
 from tornado.ioloop import IOLoop
 
-from dask_kubernetes.common.objects import validate_cluster_name
 from dask_kubernetes.exceptions import CrashLoopBackOffError, SchedulerStartupError
 from dask_kubernetes.operator._objects import (
     DaskAutoscaler,
@@ -41,6 +40,7 @@ from dask_kubernetes.operator.networking import (
     wait_for_scheduler,
     wait_for_scheduler_comm,
 )
+from dask_kubernetes.operator.validation import validate_cluster_name
 
 logger = logging.getLogger(__name__)
 

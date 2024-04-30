@@ -73,7 +73,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-doc/_build/
+docs/_build/
 
 # PyBuilder
 target/
@@ -142,3 +142,6 @@ credentials.csv
 # IDEs
 .idea/
 .vscode/
+
+# Version
+_version.py

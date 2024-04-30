@@ -11,12 +11,11 @@ import anyio
 import dask.config
 import kopf
 import kr8s
+import pkg_resources
 from distributed.core import clean_exception, rpc
 from distributed.protocol.pickle import dumps
-from importlib_metadata import entry_points
 from kr8s.asyncio.objects import Deployment, Pod, Service
 
-from dask_kubernetes.common.objects import validate_cluster_name
 from dask_kubernetes.constants import SCHEDULER_NAME_TEMPLATE
 from dask_kubernetes.exceptions import ValidationError
 from dask_kubernetes.operator._objects import (
@@ -26,6 +25,7 @@ from dask_kubernetes.operator._objects import (
     DaskWorkerGroup,
 )
 from dask_kubernetes.operator.networking import get_scheduler_address
+from dask_kubernetes.operator.validation import validate_cluster_name
 
 _ANNOTATION_NAMESPACES_TO_IGNORE = (
     "kopf.zalando.org",
@@ -39,7 +39,7 @@ DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
 PLUGINS = []
-for ep in entry_points(group="dask_operator_plugin"):
+for ep in pkg_resources.iter_entry_points(group="dask_operator_plugin"):
     with suppress(AttributeError, ImportError):
         PLUGINS.append(ep.load())
 
@@ -154,21 +154,25 @@ def build_worker_deployment_spec(
         "metadata": metadata,
         "spec": spec,
     }
-    env = [
-        {
-            "name": "DASK_WORKER_NAME",
-            "value": worker_name,
-        },
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
+    worker_env = {
+        "name": "DASK_WORKER_NAME",
+        "value": worker_name,
+    }
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
     for container in deployment_spec["spec"]["template"]["spec"]["containers"]:
-        if "env" in container:
-            container["env"].extend(env)
-        else:
-            container["env"] = env
+        if "env" not in container:
+            container["env"] = [worker_env, scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_WORKER_NAME" not in container_env_names:
+            container["env"].append(worker_env)
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return deployment_spec
 
 
@@ -194,17 +198,19 @@ def build_job_pod_spec(job_name, cluster_name, namespace, spec, annotations, lab
         },
         "spec": copy.deepcopy(spec),
     }
-    env = [
-        {
-            "name": "DASK_SCHEDULER_ADDRESS",
-            "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
-        },
-    ]
+    scheduler_env = {
+        "name": "DASK_SCHEDULER_ADDRESS",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+    }
     for container in pod_spec["spec"]["containers"]:
-        if "env" in container:
-            container["env"].extend(env)
-        else:
-            container["env"] = env
+        if "env" not in container:
+            container["env"] = [scheduler_env]
+            continue
+
+        container_env_names = [env_item["name"] for env_item in container["env"]]
+
+        if "DASK_SCHEDULER_ADDRESS" not in container_env_names:
+            container["env"].append(scheduler_env)
     return pod_spec
 
 
@@ -875,7 +881,8 @@ async def daskautoscaler_adapt(spec, name, namespace, logger, **kwargs):
 
 @kopf.timer("daskcluster.kubernetes.dask.org", interval=5.0)
 async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
-    if spec["idleTimeout"]:
+    idle_timeout = spec.get("idleTimeout", 0)
+    if idle_timeout:
         try:
             idle_since = await check_scheduler_idle(
                 scheduler_service_name=f"{name}-scheduler",
@@ -885,6 +892,6 @@ async def daskcluster_autoshutdown(spec, name, namespace, logger, **kwargs):
         except Exception:
             logger.warn("Unable to connect to scheduler, skipping autoshutdown check.")
             return
-        if idle_since and time.time() > idle_since + spec["idleTimeout"]:
+        if idle_since and time.time() > idle_since + idle_timeout:
             cluster = await DaskCluster.get(name, namespace=namespace)
             await cluster.delete()
