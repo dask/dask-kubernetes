@@ -40,9 +40,9 @@ _LABEL_NAMESPACES_TO_IGNORE: Final[tuple[str, ...]] = ()
 
 KUBERNETES_DATETIME_FORMAT: Final[str] = "%Y-%m-%dT%H:%M:%SZ"
 
-DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: Final[str] = (
-    "kubernetes.dask.org/cooldown-until"
-)
+DASK_AUTOSCALER_COOLDOWN_UNTIL_ANNOTATION: Final[
+    str
+] = "kubernetes.dask.org/cooldown-until"
 
 # Load operator plugins from other packages
 PLUGINS: list[Any] = []
