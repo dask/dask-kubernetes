@@ -20,7 +20,7 @@ import dask.config
 import pytest
 import yaml
 from dask.distributed import Client
-from kr8s.asyncio.objects import Deployment, Pod, Service  # type: ignore[import-untyped]
+from kr8s.asyncio.objects import Deployment, Pod, Service
 
 from dask_kubernetes.constants import MAX_CLUSTER_NAME_LEN
 from dask_kubernetes.operator._objects import DaskCluster, DaskJob, DaskWorkerGroup
@@ -31,7 +31,7 @@ from dask_kubernetes.operator.controller import (
 
 if TYPE_CHECKING:
     from kopf.testing import KopfRunner
-    from pytest_kind.cluster import KindCluster  # type: ignore[import-untyped]
+    from pytest_kind.cluster import KindCluster
 
 DIR: Final[pathlib.Path] = pathlib.Path(__file__).parent.absolute()
 
@@ -196,7 +196,7 @@ async def test_simplecluster(
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
-                async with Client(  # type: ignore[no-untyped-call]
+                async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
                     await client.wait_for_workers(2)
@@ -343,7 +343,7 @@ async def test_scalesimplecluster(
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
-                async with Client(  # type: ignore[no-untyped-call]
+                async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
                     k8s_cluster.kubectl(
@@ -392,7 +392,7 @@ async def test_scalesimplecluster_from_cluster_spec(
             with k8s_cluster.port_forward(
                 f"service/{service_name}", 8786, "-n", ns
             ) as port:
-                async with Client(  # type: ignore[no-untyped-call]
+                async with Client(
                     f"tcp://localhost:{port}", asynchronous=True
                 ) as client:
                     k8s_cluster.kubectl(
@@ -525,7 +525,7 @@ async def test_simplecluster_batched_worker_deployments(
                 with k8s_cluster.port_forward(
                     f"service/{service_name}", 8786, "-n", ns
                 ) as port:
-                    async with Client(  # type: ignore[no-untyped-call]
+                    async with Client(
                         f"tcp://localhost:{port}", asynchronous=True
                     ) as client:
                         await client.wait_for_workers(2)
