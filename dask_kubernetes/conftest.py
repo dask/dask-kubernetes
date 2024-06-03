@@ -6,12 +6,13 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from typing import Final, Iterator
 
 import pytest
 from kopf.testing import KopfRunner
 from pytest_kind.cluster import KindCluster
 
-DIR = pathlib.Path(__file__).parent.absolute()
+DIR: Final[pathlib.Path] = pathlib.Path(__file__).parent.absolute()
 
 
 def check_dependency(dependency):
@@ -26,24 +27,24 @@ check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
 
-DISABLE_LOGGERS = ["httpcore", "httpx"]
+DISABLE_LOGGERS: Final[list[str]] = ["httpcore", "httpx"]
 
 
-def pytest_configure():
+def pytest_configure() -> None:
     for logger_name in DISABLE_LOGGERS:
         logger = logging.getLogger(logger_name)
         logger.disabled = True
 
 
 @pytest.fixture()
-def kopf_runner(k8s_cluster, ns):
+def kopf_runner(k8s_cluster: KindCluster, namespace: str) -> KopfRunner:
     yield KopfRunner(
-        ["run", "-m", "dask_kubernetes.operator", "--verbose", "--namespace", ns]
+        ["run", "-m", "dask_kubernetes.operator", "--verbose", "--namespace", namespace]
     )
 
 
 @pytest.fixture(scope="session")
-def docker_image():
+def docker_image() -> str:
     image_name = "dask-kubernetes:dev"
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
     subprocess.run(
@@ -62,7 +63,9 @@ def docker_image():
 
 
 @pytest.fixture(scope="session")
-def k8s_cluster(request, docker_image):
+def k8s_cluster(
+    request: pytest.FixtureRequest, docker_image: str
+) -> Iterator[KindCluster]:
     image = None
     if version := os.environ.get("KUBERNETES_VERSION"):
         image = f"kindest/node:v{version}"
@@ -81,7 +84,7 @@ def k8s_cluster(request, docker_image):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def install_istio(k8s_cluster):
+def install_istio(k8s_cluster: KindCluster) -> None:
     if bool(os.environ.get("TEST_ISTIO", False)):
         check_dependency("istioctl")
         subprocess.run(
@@ -93,7 +96,7 @@ def install_istio(k8s_cluster):
 
 
 @pytest.fixture(autouse=True)
-def ns(k8s_cluster):
+def namespace(k8s_cluster: KindCluster) -> Iterator[str]:
     ns = "dask-k8s-pytest-" + uuid.uuid4().hex[:10]
     k8s_cluster.kubectl("create", "ns", ns)
     yield ns
@@ -101,7 +104,7 @@ def ns(k8s_cluster):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def install_gateway(k8s_cluster):
+def install_gateway(k8s_cluster: KindCluster) -> Iterator[None]:
     if bool(os.environ.get("TEST_DASK_GATEWAY", False)):
         check_dependency("helm")
         # To ensure the operator can coexist with Gateway
@@ -137,11 +140,11 @@ def install_gateway(k8s_cluster):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def customresources(k8s_cluster):
+def customresources(k8s_cluster: KindCluster) -> Iterator[None]:
     temp_dir = tempfile.TemporaryDirectory()
     crd_path = os.path.join(DIR, "operator", "customresources")
 
-    def run_generate(crd_path, patch_path, temp_path):
+    def run_generate(crd_path: str, patch_path: str, temp_path: str) -> None:
         subprocess.run(
             ["k8s-crd-resolver", "-r", "-j", patch_path, crd_path, temp_path],
             check=True,
@@ -162,5 +165,5 @@ def customresources(k8s_cluster):
 
 
 @pytest.fixture
-def anyio_backend():
+def anyio_backend() -> str:
     return "asyncio"

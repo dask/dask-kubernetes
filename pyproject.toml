@@ -97,6 +97,11 @@ addopts = "-v --keep-cluster --durations=10"
 timeout = 60
 timeout_func_only = true
 
+[tool.mypy]
+strict = true
+follow_imports = "silent"
+disable_error_code = ["import-untyped", "no-untyped-call"]
+
 [project.entry-points.dask_cluster_discovery]
 helmcluster = "dask_kubernetes.helm:discover"
 kubecluster = "dask_kubernetes.operator:discover"
