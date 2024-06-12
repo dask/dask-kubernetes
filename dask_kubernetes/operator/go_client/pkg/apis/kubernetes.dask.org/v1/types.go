@@ -124,9 +124,9 @@ type DaskAutoscalerSpec struct {
 	// Name of the cluster to associate this autoscaler with
 	Cluster string `json:"cluster"`
 	// Minimum number of workers
-	Minimum string `json:"minimum"`
+	Minimum int `json:"minimum"`
 	// Maximum number of workers
-	Maximum string `json:"maximum"`
+	Maximum int `json:"maximum"`
 }
 
 // +genclient
