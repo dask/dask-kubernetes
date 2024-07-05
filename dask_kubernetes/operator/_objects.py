@@ -5,7 +5,7 @@ from typing import List
 from kr8s.asyncio.objects import Deployment, Pod, Service, new_class
 
 
-class DaskCluster(new_class("DaskCluster", "kubernetes.dask.org/v1", namespaced=True)):
+class DaskCluster(new_class("DaskCluster", "kubernetes.dask.org/v1")):
     scalable = True
     scalable_spec = "worker.replicas"
 
@@ -69,15 +69,7 @@ class DaskCluster(new_class("DaskCluster", "kubernetes.dask.org/v1", namespaced=
         )
 
 
-class DaskWorkerGroup(
-    new_class("DaskWorkerGroup", "kubernetes.dask.org/v1", namespaced=True)
-):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskworkergroups"
-    kind = "DaskWorkerGroup"
-    plural = "daskworkergroups"
-    singular = "daskworkergroup"
-    namespaced = True
+class DaskWorkerGroup(new_class("DaskWorkerGroup", "kubernetes.dask.org/v1")):
     scalable = True
     scalable_spec = "worker.replicas"
 
@@ -109,28 +101,12 @@ class DaskWorkerGroup(
         return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
-class DaskAutoscaler(
-    new_class("DaskAutoscaler", "kubernetes.dask.org/v1", namespaced=True)
-):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskautoscalers"
-    kind = "DaskAutoscaler"
-    plural = "daskautoscalers"
-    singular = "daskautoscaler"
-    namespaced = True
-
+class DaskAutoscaler(new_class("DaskAutoscaler", "kubernetes.dask.org/v1")):
     async def cluster(self) -> DaskCluster:
         return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
-class DaskJob(new_class("DaskJob", "kubernetes.dask.org/v1", namespaced=True)):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskjobs"
-    kind = "DaskJob"
-    plural = "daskjobs"
-    singular = "daskjob"
-    namespaced = True
-
+class DaskJob(new_class("DaskJob", "kubernetes.dask.org/v1")):
     async def cluster(self) -> DaskCluster:
         return await DaskCluster.get(self.name, namespace=self.namespace)
 
