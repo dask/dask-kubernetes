@@ -34,7 +34,7 @@ Dask Kubernetes
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Python Support
 
-.. image:: https://img.shields.io/badge/Kubernetes%20support-1.26%7C1.27%7C1.28%7C1.29-blue
+.. image:: https://img.shields.io/badge/Kubernetes%20support-1.28%7C1.29%7C1.30-blue
    :target: https://kubernetes.dask.org/en/latest/installing.html#supported-versions
    :alt: Kubernetes Support
 
