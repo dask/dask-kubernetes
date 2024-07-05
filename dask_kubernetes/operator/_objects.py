@@ -2,22 +2,15 @@ from __future__ import annotations
 
 from typing import List
 
-from kr8s.asyncio.objects import APIObject, Deployment, Pod, Service
+from kr8s.asyncio.objects import Deployment, Pod, Service, new_class
 
 
-class DaskCluster(APIObject):
-    version = "kubernetes.dask.org/v1"
-    endpoint = "daskclusters"
-    kind = "DaskCluster"
-    plural = "daskclusters"
-    singular = "daskcluster"
-    namespaced = True
+class DaskCluster(new_class("DaskCluster", "kubernetes.dask.org/v1", namespaced=True)):
     scalable = True
     scalable_spec = "worker.replicas"
 
     async def worker_groups(self) -> List[DaskWorkerGroup]:
-        return await self.api.get(
-            DaskWorkerGroup.endpoint,
+        return await DaskWorkerGroup.list(
             label_selector=f"dask.org/cluster-name={self.name}",
             namespace=self.namespace,
         )
@@ -25,8 +18,7 @@ class DaskCluster(APIObject):
     async def scheduler_pod(self) -> Pod:
         pods = []
         while not pods:
-            pods = await self.api.get(
-                Pod.endpoint,
+            pods = await Pod.list(
                 label_selector=",".join(
                     [
                         f"dask.org/cluster-name={self.name}",
@@ -41,8 +33,7 @@ class DaskCluster(APIObject):
     async def scheduler_deployment(self) -> Deployment:
         deployments = []
         while not deployments:
-            deployments = await self.api.get(
-                Deployment.endpoint,
+            deployments = await Deployment.list(
                 label_selector=",".join(
                     [
                         f"dask.org/cluster-name={self.name}",
@@ -57,8 +48,7 @@ class DaskCluster(APIObject):
     async def scheduler_service(self) -> Service:
         services = []
         while not services:
-            services = await self.api.get(
-                Service.endpoint,
+            services = await Service.list(
                 label_selector=",".join(
                     [
                         f"dask.org/cluster-name={self.name}",
@@ -79,7 +69,9 @@ class DaskCluster(APIObject):
         )
 
 
-class DaskWorkerGroup(APIObject):
+class DaskWorkerGroup(
+    new_class("DaskWorkerGroup", "kubernetes.dask.org/v1", namespaced=True)
+):
     version = "kubernetes.dask.org/v1"
     endpoint = "daskworkergroups"
     kind = "DaskWorkerGroup"
@@ -90,8 +82,7 @@ class DaskWorkerGroup(APIObject):
     scalable_spec = "worker.replicas"
 
     async def pods(self) -> List[Pod]:
-        return await self.api.get(
-            Pod.endpoint,
+        return await Pod.list(
             label_selector=",".join(
                 [
                     f"dask.org/cluster-name={self.spec.cluster}",
@@ -103,8 +94,7 @@ class DaskWorkerGroup(APIObject):
         )
 
     async def deployments(self) -> List[Deployment]:
-        return await self.api.get(
-            Deployment.endpoint,
+        return await Deployment.list(
             label_selector=",".join(
                 [
                     f"dask.org/cluster-name={self.spec.cluster}",
@@ -119,7 +109,9 @@ class DaskWorkerGroup(APIObject):
         return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
-class DaskAutoscaler(APIObject):
+class DaskAutoscaler(
+    new_class("DaskAutoscaler", "kubernetes.dask.org/v1", namespaced=True)
+):
     version = "kubernetes.dask.org/v1"
     endpoint = "daskautoscalers"
     kind = "DaskAutoscaler"
@@ -131,7 +123,7 @@ class DaskAutoscaler(APIObject):
         return await DaskCluster.get(self.spec.cluster, namespace=self.namespace)
 
 
-class DaskJob(APIObject):
+class DaskJob(new_class("DaskJob", "kubernetes.dask.org/v1", namespaced=True)):
     version = "kubernetes.dask.org/v1"
     endpoint = "daskjobs"
     kind = "DaskJob"
@@ -145,8 +137,7 @@ class DaskJob(APIObject):
     async def pod(self) -> Pod:
         pods = []
         while not pods:
-            pods = await self.api.get(
-                Pod.endpoint,
+            pods = await Pod.list(
                 label_selector=",".join(
                     [
                         f"dask.org/cluster-name={self.name}",
