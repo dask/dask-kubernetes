@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Native Kubernetes integration for Dask"
 readme = "README.rst"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 maintainers = [{ name = "Jacob Tomlinson" }]
 keywords = ["dask", "distributed", "kubernetes"]
 dependencies = [
@@ -88,8 +88,7 @@ line-length = 120
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.8
-target-version = "py39"
+target-version = "py310"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
