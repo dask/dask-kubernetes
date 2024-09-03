@@ -156,7 +156,7 @@ A ``DaskAutoscaler`` resource will communicate with the scheduler periodically a
 
     from dask_kubernetes.operator import KubeCluster
     cluster = KubeCluster(name="my-dask-cluster", image='ghcr.io/dask/dask:latest')
-    cluster.scale(10)
+    cluster.adapt(minimum=1, maximum=10)
 
 .. toctree::
    :maxdepth: 2
