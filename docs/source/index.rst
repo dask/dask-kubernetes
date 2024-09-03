@@ -152,6 +152,12 @@ Autoscalers
 
 A ``DaskAutoscaler`` resource will communicate with the scheduler periodically and auto scale the default ``DaskWorkerGroup`` to the desired number of workers.
 
+.. code-block:: python
+
+    from dask_kubernetes.operator import KubeCluster
+    cluster = KubeCluster(name="my-dask-cluster", image='ghcr.io/dask/dask:latest')
+    cluster.adapt(minimum=1, maximum=10)
+
 .. toctree::
    :maxdepth: 2
    :hidden:
