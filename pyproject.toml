@@ -8,14 +8,14 @@ dynamic = ["version"]
 description = "Native Kubernetes integration for Dask"
 readme = "README.rst"
 license = { file = "LICENSE" }
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 maintainers = [{ name = "Jacob Tomlinson" }]
 keywords = ["dask", "distributed", "kubernetes"]
 dependencies = [
     "dask>=2022.08.1",
     "distributed>=2022.08.1",
     "kopf>=1.35.3",
-    "kr8s==0.14.*",
+    "kr8s==0.17.*",
     "kubernetes-asyncio>=12.0.1",
     "kubernetes>=12.0.1",
     "pykube-ng>=22.9.0",
@@ -88,14 +88,18 @@ line-length = 120
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.8
-target-version = "py39"
+target-version = "py310"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-v --keep-cluster --durations=10"
 timeout = 60
 timeout_func_only = true
+
+[tool.mypy]
+strict = true
+follow_imports = "silent"
+disable_error_code = ["import-untyped", "no-untyped-call"]
 
 [project.entry-points.dask_cluster_discovery]
 helmcluster = "dask_kubernetes.helm:discover"
