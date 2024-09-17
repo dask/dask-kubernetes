@@ -401,7 +401,7 @@ async def handle_scheduler_service_status(
     assert namespace
     # If the Service is a LoadBalancer with no ingress endpoints mark the cluster as Pending
     if spec["type"] == "LoadBalancer" and not len(
-        status.get("load_balancer", {}).get("ingress", [])
+        status.get("loadBalancer", {}).get("ingress", [])
     ):
         phase = "Pending"
     # Otherwise mark it as Running
