@@ -50,8 +50,8 @@ async def get_external_address_for_scheduler_service(
     """Take a service object and return the scheduler address."""
     if service.spec.type == "LoadBalancer":
         port = _get_port(service, port_name)
-        lb = service.status.load_balancer.ingress[0]
-        host = lb.hostname or lb.ip
+        lb = service.status.loadBalancer.ingress[0]
+        host = lb.get("hostname", None) or lb.ip
     elif service.spec.type == "NodePort":
         port = _get_port(service, port_name, is_node_port=True)
         nodes = await kr8s.asyncio.get("nodes")
