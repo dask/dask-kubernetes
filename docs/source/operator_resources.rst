@@ -500,7 +500,10 @@ using dask's adaptive mode.
 
 By creating the resource the operator controller will periodically poll the scheduler and request the desired number of workers.
 The scheduler calculates this number by profiling the tasks it is processing and then extrapolating how many workers it would need
-to complete the current graph within 5 seconds.
+to complete the current graph within the target duration.
+By default the target duration is 5 seconds but 
+`it can be adjusted via the "distributed.adaptive.target-duration" in the scheduler config <https://docs.dask.org/en/latest/configuration.html>`_.
+
 
 .. mermaid::
 
