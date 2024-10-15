@@ -1,9 +1,20 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import os.path
 import pathlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncContextManager,
+    AsyncIterator,
+    Callable,
+    Final,
+    Iterator,
+)
 
 import dask.config
 import pytest
@@ -18,16 +29,20 @@ from dask_kubernetes.operator.controller import (
     get_job_runner_pod_name,
 )
 
-DIR = pathlib.Path(__file__).parent.absolute()
+if TYPE_CHECKING:
+    from kopf.testing import KopfRunner
+    from pytest_kind.cluster import KindCluster
 
-_EXPECTED_ANNOTATIONS = {"test-annotation": "annotation-value"}
-_EXPECTED_LABELS = {"test-label": "label-value"}
-DEFAULT_CLUSTER_NAME = "simple"
+DIR: Final[pathlib.Path] = pathlib.Path(__file__).parent.absolute()
+
+_EXPECTED_ANNOTATIONS: Final[dict[str, str]] = {"test-annotation": "annotation-value"}
+_EXPECTED_LABELS: Final[dict[str, str]] = {"test-label": "label-value"}
+DEFAULT_CLUSTER_NAME: Final[str] = "simple"
 
 
 @pytest.fixture()
-def gen_cluster_manifest(tmp_path):
-    def factory(cluster_name=DEFAULT_CLUSTER_NAME):
+def gen_cluster_manifest(tmp_path: pathlib.Path) -> Callable[..., pathlib.Path]:
+    def factory(cluster_name: str = DEFAULT_CLUSTER_NAME) -> pathlib.Path:
         original_manifest_path = os.path.join(DIR, "resources", "simplecluster.yaml")
         with open(original_manifest_path, "r") as original_manifest_file:
             manifest = yaml.safe_load(original_manifest_file)
@@ -41,52 +56,60 @@ def gen_cluster_manifest(tmp_path):
 
 
 @pytest.fixture()
-def gen_cluster(k8s_cluster, ns, gen_cluster_manifest):
+def gen_cluster(
+    k8s_cluster: KindCluster,
+    namespace: str,
+    gen_cluster_manifest: Callable[..., pathlib.Path],
+) -> Iterator[Callable[..., AsyncContextManager[tuple[str, str]]]]:
     """Yields an instantiated context manager for creating/deleting a simple cluster."""
 
     @asynccontextmanager
-    async def cm(cluster_name=DEFAULT_CLUSTER_NAME):
+    async def cm(
+        cluster_name: str = DEFAULT_CLUSTER_NAME,
+    ) -> AsyncIterator[tuple[str, str]]:
         cluster_path = gen_cluster_manifest(cluster_name)
         # Create cluster resource
-        k8s_cluster.kubectl("apply", "-n", ns, "-f", cluster_path)
+        k8s_cluster.kubectl("apply", "-n", namespace, "-f", str(cluster_path))
         while cluster_name not in k8s_cluster.kubectl(
-            "get", "daskclusters.kubernetes.dask.org", "-n", ns
+            "get", "daskclusters.kubernetes.dask.org", "-n", namespace
         ):
             await asyncio.sleep(0.1)
 
         try:
-            yield cluster_name, ns
+            yield cluster_name, namespace
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
-            k8s_cluster.kubectl("delete", "-n", ns, "-f", cluster_path)
+            k8s_cluster.kubectl("delete", "-n", namespace, "-f", str(cluster_path))
 
     yield cm
 
 
 @pytest.fixture()
-def gen_job(k8s_cluster, ns):
+def gen_job(
+    k8s_cluster: KindCluster, namespace: str
+) -> Iterator[Callable[[str], AsyncContextManager[tuple[str, str]]]]:
     """Yields an instantiated context manager for creating/deleting a simple job."""
 
     @asynccontextmanager
-    async def cm(job_file):
+    async def cm(job_file: str) -> AsyncIterator[tuple[str, str]]:
         job_path = os.path.join(DIR, "resources", job_file)
         with open(job_path) as f:
             job_name = yaml.load(f, yaml.Loader)["metadata"]["name"]
 
         # Create cluster resource
-        k8s_cluster.kubectl("apply", "-n", ns, "-f", job_path)
+        k8s_cluster.kubectl("apply", "-n", namespace, "-f", job_path)
         while job_name not in k8s_cluster.kubectl(
-            "get", "daskjobs.kubernetes.dask.org", "-n", ns
+            "get", "daskjobs.kubernetes.dask.org", "-n", namespace
         ):
             await asyncio.sleep(0.1)
 
         try:
-            yield job_name, ns
+            yield job_name, namespace
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
-            k8s_cluster.kubectl("delete", "-n", ns, "-f", job_path)
+            k8s_cluster.kubectl("delete", "-n", namespace, "-f", job_path)
             while job_name in k8s_cluster.kubectl(
-                "get", "daskjobs.kubernetes.dask.org", "-n", ns
+                "get", "daskjobs.kubernetes.dask.org", "-n", namespace
             ):
                 await asyncio.sleep(0.1)
 
@@ -94,42 +117,44 @@ def gen_job(k8s_cluster, ns):
 
 
 @pytest.fixture()
-def gen_worker_group(k8s_cluster, ns):
+def gen_worker_group(
+    k8s_cluster: KindCluster, namespace: str
+) -> Iterator[Callable[[str], AsyncContextManager[tuple[str, str]]]]:
     """Yields an instantiated context manager for creating/deleting a worker group."""
 
     @asynccontextmanager
-    async def cm(worker_group_file):
+    async def cm(worker_group_file: str) -> AsyncIterator[tuple[str, str]]:
         worker_group_path = os.path.join(DIR, "resources", worker_group_file)
         with open(worker_group_path) as f:
             worker_group_name = yaml.load(f, yaml.Loader)["metadata"]["name"]
 
         # Create cluster resource
-        k8s_cluster.kubectl("apply", "-n", ns, "-f", worker_group_path)
+        k8s_cluster.kubectl("apply", "-n", namespace, "-f", worker_group_path)
         while worker_group_name not in k8s_cluster.kubectl(
-            "get", "daskworkergroups.kubernetes.dask.org", "-n", ns
+            "get", "daskworkergroups.kubernetes.dask.org", "-n", namespace
         ):
             await asyncio.sleep(0.1)
 
         try:
-            yield worker_group_name, ns
+            yield worker_group_name, namespace
         finally:
             # Test: remove the wait=True, because I think this is blocking the operator
-            k8s_cluster.kubectl("delete", "-n", ns, "-f", worker_group_path)
+            k8s_cluster.kubectl("delete", "-n", namespace, "-f", worker_group_path)
             while worker_group_name in k8s_cluster.kubectl(
-                "get", "daskworkergroups.kubernetes.dask.org", "-n", ns
+                "get", "daskworkergroups.kubernetes.dask.org", "-n", namespace
             ):
                 await asyncio.sleep(0.1)
 
     yield cm
 
 
-def test_customresources(k8s_cluster):
+def test_customresources(k8s_cluster: KindCluster) -> None:
     assert "daskclusters.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskworkergroups.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
     assert "daskjobs.kubernetes.dask.org" in k8s_cluster.kubectl("get", "crd")
 
 
-def test_operator_runs(kopf_runner):
+def test_operator_runs(kopf_runner: KopfRunner) -> None:
     with kopf_runner as runner:
         pass
 
@@ -137,7 +162,7 @@ def test_operator_runs(kopf_runner):
     assert runner.exception is None
 
 
-def test_operator_plugins(kopf_runner):
+def test_operator_plugins(kopf_runner: KopfRunner) -> None:
     with kopf_runner as runner:
         pass
 
@@ -148,7 +173,11 @@ def test_operator_plugins(kopf_runner):
 
 @pytest.mark.timeout(180)
 @pytest.mark.anyio
-async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
+async def test_simplecluster(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
@@ -292,7 +321,11 @@ async def test_simplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 
 @pytest.mark.anyio
-async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
+async def test_scalesimplecluster(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
@@ -338,8 +371,10 @@ async def test_scalesimplecluster(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 async def test_scalesimplecluster_from_cluster_spec(
-    k8s_cluster, kopf_runner, gen_cluster
-):
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
@@ -384,7 +419,11 @@ async def test_scalesimplecluster_from_cluster_spec(
 
 
 @pytest.mark.anyio
-async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
+async def test_recreate_scheduler_pod(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             scheduler_deployment_name = "simple-scheduler"
@@ -423,7 +462,11 @@ async def test_recreate_scheduler_pod(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 @pytest.mark.skip(reason="Flaky in CI")
-async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
+async def test_recreate_worker_pods(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
@@ -453,8 +496,10 @@ async def test_recreate_worker_pods(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 async def test_simplecluster_batched_worker_deployments(
-    k8s_cluster, kopf_runner, gen_cluster
-):
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         with dask.config.set(
             {
@@ -489,8 +534,8 @@ async def test_simplecluster_batched_worker_deployments(
                         assert (await total) == sum(map(lambda x: x + 1, range(10)))
 
 
-def _get_job_status(k8s_cluster, ns):
-    return json.loads(
+def _get_job_status(k8s_cluster: KindCluster, ns: str) -> dict[str, Any]:
+    return json.loads(  # type: ignore[no-any-return]
         k8s_cluster.kubectl(
             "get",
             "-n",
@@ -502,17 +547,17 @@ def _get_job_status(k8s_cluster, ns):
     )
 
 
-def _assert_job_status_created(job_status):
+def _assert_job_status_created(job_status: dict[str, Any]) -> None:
     assert "jobStatus" in job_status
 
 
-def _assert_job_status_cluster_created(job, job_status):
+def _assert_job_status_cluster_created(job: str, job_status: dict[str, Any]) -> None:
     assert "jobStatus" in job_status
     assert job_status["clusterName"] == job
     assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
 
 
-def _assert_job_status_running(job, job_status):
+def _assert_job_status_running(job: str, job_status: dict[str, Any]) -> None:
     assert "jobStatus" in job_status
     assert job_status["clusterName"] == job
     assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
@@ -520,7 +565,9 @@ def _assert_job_status_running(job, job_status):
     assert datetime.utcnow() > start_time > (datetime.utcnow() - timedelta(seconds=10))
 
 
-def _assert_final_job_status(job, job_status, expected_status):
+def _assert_final_job_status(
+    job: str, job_status: dict[str, Any], expected_status: str
+) -> None:
     assert job_status["jobStatus"] == expected_status
     assert job_status["clusterName"] == job
     assert job_status["jobRunnerPodName"] == get_job_runner_pod_name(job)
@@ -538,7 +585,11 @@ def _assert_final_job_status(job, job_status, expected_status):
 
 
 @pytest.mark.anyio
-async def test_job(k8s_cluster, kopf_runner, gen_job):
+async def test_job(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_job: Callable[[str], AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner as runner:
         async with gen_job("simplejob.yaml") as (job, ns):
             assert job
@@ -609,7 +660,11 @@ async def test_job(k8s_cluster, kopf_runner, gen_job):
 
 
 @pytest.mark.anyio
-async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
+async def test_failed_job(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_job: Callable[[str], AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner as runner:
         async with gen_job("failedjob.yaml") as (job, ns):
             assert job
@@ -667,12 +722,16 @@ async def test_failed_job(k8s_cluster, kopf_runner, gen_job):
 
 
 @pytest.mark.anyio
-async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
+async def test_object_dask_cluster(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster() as (cluster_name, ns):
             cluster = await DaskCluster.get(cluster_name, namespace=ns)
 
-            worker_groups = []
+            worker_groups: list[DaskWorkerGroup] = []
             while not worker_groups:
                 worker_groups = await cluster.worker_groups()
                 await asyncio.sleep(0.1)
@@ -700,8 +759,11 @@ async def test_object_dask_cluster(k8s_cluster, kopf_runner, gen_cluster):
 
 @pytest.mark.anyio
 async def test_object_dask_worker_group(
-    k8s_cluster, kopf_runner, gen_cluster, gen_worker_group
-):
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+    gen_worker_group: Callable[[str], AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with (
             gen_cluster() as (cluster_name, ns),
@@ -715,7 +777,7 @@ async def test_object_dask_worker_group(
                 additional_workergroup_name, namespace=ns
             )
 
-            worker_groups = []
+            worker_groups: list[DaskWorkerGroup] = []
             while not worker_groups:
                 worker_groups = await cluster.worker_groups()
                 await asyncio.sleep(0.1)
@@ -725,13 +787,13 @@ async def test_object_dask_worker_group(
             for wg in worker_groups:
                 assert isinstance(wg, DaskWorkerGroup)
 
-                deployments = []
+                deployments: list[Deployment] = []
                 while not deployments:
                     deployments = await wg.deployments()
                     await asyncio.sleep(0.1)
                 assert all([isinstance(d, Deployment) for d in deployments])
 
-                pods = []
+                pods: list[Pod] = []
                 while not pods:
                     pods = await wg.pods()
                     await asyncio.sleep(0.1)
@@ -756,7 +818,11 @@ async def test_object_dask_worker_group(
 
 @pytest.mark.anyio
 @pytest.mark.skip(reason="Flaky in CI")
-async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
+async def test_object_dask_job(
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_job: Callable[[str], AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_job("simplejob.yaml") as (job_name, ns):
             job = await DaskJob.get(job_name, namespace=ns)
@@ -768,13 +834,15 @@ async def test_object_dask_job(k8s_cluster, kopf_runner, gen_job):
             assert isinstance(cluster, DaskCluster)
 
 
-async def _get_cluster_status(k8s_cluster, ns, cluster_name):
+async def _get_cluster_status(
+    k8s_cluster: KindCluster, ns: str, cluster_name: str
+) -> str:
     """
     Will loop infinitely in search of non-falsey cluster status.
     Make sure there is a timeout on any test which calls this.
     """
     while True:
-        cluster_status = k8s_cluster.kubectl(
+        cluster_status: str = k8s_cluster.kubectl(
             "get",
             "-n",
             ns,
@@ -799,8 +867,12 @@ async def _get_cluster_status(k8s_cluster, ns, cluster_name):
     ],
 )
 async def test_create_cluster_validates_name(
-    cluster_name, expected_status, k8s_cluster, kopf_runner, gen_cluster
-):
+    cluster_name: str,
+    expected_status: str,
+    k8s_cluster: KindCluster,
+    kopf_runner: KopfRunner,
+    gen_cluster: Callable[..., AsyncContextManager[tuple[str, str]]],
+) -> None:
     with kopf_runner:
         async with gen_cluster(cluster_name=cluster_name) as (_, ns):
             actual_status = await _get_cluster_status(k8s_cluster, ns, cluster_name)
