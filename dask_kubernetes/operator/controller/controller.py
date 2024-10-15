@@ -488,7 +488,7 @@ async def retire_workers(
         "This can result in lost data, see https://kubernetes.dask.org/en/latest/operator_troubleshooting.html."
     )
     workers = await kr8s.asyncio.get(
-        "pods",
+        "deployments",
         namespace=namespace,
         label_selector={"dask.org/workergroup-name": worker_group_name},
     )
