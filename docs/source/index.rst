@@ -161,7 +161,7 @@ A ``DaskAutoscaler`` resource will communicate with the scheduler periodically a
 .. toctree::
    :maxdepth: 2
    :hidden:
-   :caption: Getting Syarted
+   :caption: Getting Started
 
    Overview <self>
    installing
