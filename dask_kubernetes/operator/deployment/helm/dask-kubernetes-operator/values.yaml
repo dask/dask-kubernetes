@@ -54,6 +54,9 @@ affinity: {}  # Affinity
 
 priorityClassName: null  # Priority class
 
+livenessProbe:
+  timeoutSeconds: 1
+
 kopfArgs: # Command line flags to pass to kopf on start up
   - --all-namespaces
 
