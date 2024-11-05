@@ -52,6 +52,7 @@ spec:
             httpGet:
               path: /healthz
               port: 8080
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
           volumeMounts:
             {{- toYaml .Values.volumeMounts | nindent 12 }}
       volumes:
