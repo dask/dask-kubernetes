@@ -655,6 +655,7 @@ Full ``DaskCluster`` spec reference.
       scheduler:
         spec: ... # PodSpec, standard k8s pod - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#podspec-v1-core
         service: ... # ServiceSpec, standard k8s service - https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.21/#servicespec-v1-core
+      idleTimeout: 5  # Number of seconds to time out scheduler liveness probe if no activity
 
 Full ``DaskWorkerGroup`` spec reference.
 
