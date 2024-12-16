@@ -3,7 +3,7 @@ sphinx
 sphinx-reredirects
 sphinxcontrib-mermaid
 dask-sphinx-theme>=3.0.0
-sphinx-helm
+sphinx-helm>=0.2.1
 
 # FIXME: This workaround is required until we have sphinx>=5, as enabled by
 #        dask-sphinx-theme no longer pinning sphinx-book-theme==0.2.0. This is
