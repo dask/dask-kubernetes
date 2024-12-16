@@ -147,7 +147,7 @@ If you're using the official Dask images you can install this at runtime.
 Chart Configuration Reference
 """""""""""""""""""""""""""""
 
-.. frigate:: ../../dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
+.. helm:: ../../dask_kubernetes/operator/deployment/helm/dask-kubernetes-operator
 
 Installing with Manifests
 ^^^^^^^^^^^^^^^^^^^^^^^^^
