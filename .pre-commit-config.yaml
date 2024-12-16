@@ -10,10 +10,6 @@ repos:
       - id: black
         language_version: python3
         exclude: versioneer.py
-  - repo: https://github.com/rapidsai/frigate/
-    rev: v0.4.0 #  pre-commit autoupdate  - to keep the version up to date
-    hooks:
-      - id: frigate
   - repo: local
     hooks:
       - id: check-crd-updates

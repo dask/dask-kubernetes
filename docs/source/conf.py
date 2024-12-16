@@ -43,7 +43,7 @@ extensions = [
     "numpydoc",
     "sphinx_reredirects",
     "sphinxcontrib.mermaid",
-    "frigate.sphinx.ext",
+    "sphinx_helm.ext",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
