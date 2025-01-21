@@ -12,9 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Update go package version
+        # We're removing the generated code first, as we've seen that the code 
+        # generation is not always deterministic and might remove files that were there
+        # in the past.
+        # We couldn't pinpoint the root of the non-deterministic generation, but so far
+        # we've only seen minor changes.
         run: |
           PAST_YEAR=$(date -d "last year" '+%Y')
           CURRENT_YEAR=$(date '+%Y')
+          rm -rf dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1/zz_generated.deepcopy.go
+          rm -rf /Users/bstadlbauer/workspace/bstadlbauer/dask-kubernetes/dask_kubernetes/operator/go_client/pkg/client 
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" go.mod
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/hack/regenerate-code.sh
           sed -i "s/v${PAST_YEAR}/v${CURRENT_YEAR}/g" dask_kubernetes/operator/go_client/pkg/apis/kubernetes.dask.org/v1/register.go
