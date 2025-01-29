@@ -492,6 +492,10 @@ async def retire_workers(
         namespace=namespace,
         label_selector={"dask.org/workergroup-name": worker_group_name},
     )
+    return retire_workers_lifo(workers, n_workers)
+
+
+def retire_workers_lifo(workers, n_workers: int) -> list[str]:
     return [w.name for w in workers[-n_workers:]]
 
 
