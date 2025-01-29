@@ -27,6 +27,7 @@ from dask_kubernetes.operator._objects import DaskCluster, DaskJob, DaskWorkerGr
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
+    retire_workers_lifo,
 )
 
 if TYPE_CHECKING:
@@ -877,3 +878,24 @@ async def test_create_cluster_validates_name(
         async with gen_cluster(cluster_name=cluster_name) as (_, ns):
             actual_status = await _get_cluster_status(k8s_cluster, ns, cluster_name)
             assert expected_status == actual_status
+
+
+@pytest.mark.anyio
+async def test_retire_workers_lifo():
+    class Worker:
+        def __init__(self, name):
+            self.name = name
+
+    workers = [
+        Worker(name="worker-1"),
+        Worker(name="worker-2"),
+        Worker(name="worker-3"),
+        Worker(name="worker-4"),
+        Worker(name="worker-5"),
+    ]
+
+    retired_workers = retire_workers_lifo(workers, 2)
+
+    # Verify we got back exactly 2 workers and they are the last ones
+    assert len(retired_workers) == 2
+    assert retired_workers == ["worker-4", "worker-5"]
