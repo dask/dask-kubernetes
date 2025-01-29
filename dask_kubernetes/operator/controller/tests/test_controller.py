@@ -4,14 +4,17 @@ import asyncio
 import json
 import os.path
 import pathlib
+import weakref
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+from logging import Logger
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncContextManager,
     AsyncIterator,
     Callable,
+    ClassVar,
     Final,
     Iterator,
 )
@@ -27,6 +30,7 @@ from dask_kubernetes.operator._objects import DaskCluster, DaskJob, DaskWorkerGr
 from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
+    retire_workers,
 )
 
 if TYPE_CHECKING:
@@ -877,3 +881,90 @@ async def test_create_cluster_validates_name(
         async with gen_cluster(cluster_name=cluster_name) as (_, ns):
             actual_status = await _get_cluster_status(k8s_cluster, ns, cluster_name)
             assert expected_status == actual_status
+
+
+@pytest.mark.anyio
+async def test_retire_workers_lifo_fallback(monkeypatch):
+    """Test that retire_workers returns correct number of workers when using LIFO fallback"""
+
+    # Mock get_scheduler_address
+    async def mock_get_scheduler_address(*args, **kwargs):
+        return "http://mock-scheduler:8787"
+
+    # Mock ClientSession.post to do nothing
+    class MockResponse:
+        status = 500  # Force fallback
+
+        async def text(self):
+            return "error"
+
+        async def json(self):
+            return {}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    class MockClientSession:
+        def post(self, *args, **kwargs):
+            return MockResponse()
+
+        def __init__(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    # Mock rpc scheduler_comm to do nothing
+    class MockSchedulerComm:
+        active: ClassVar[weakref.WeakSet[MockSchedulerComm]] = weakref.WeakSet()
+
+        async def workers_to_close(self, *args, **kwargs):
+            raise Exception("Should fail")
+
+        async def retire_workers(self, *args, **kwargs):
+            raise Exception("Should fail")
+
+        def __init__(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    # Mock kr8s.asyncio.get to return 5 workers
+    class MockWorker:
+        def __init__(self, name):
+            self.name = name
+
+    async def mock_get(*args, **kwargs):
+        return [MockWorker(f"worker-{i}") for i in range(5)]
+
+    # Apply all mocks
+    monkeypatch.setattr(
+        "dask_kubernetes.operator.controller.controller.get_scheduler_address",
+        mock_get_scheduler_address,
+    )
+    monkeypatch.setattr("aiohttp.ClientSession", MockClientSession)
+    monkeypatch.setattr("distributed.core.rpc", MockSchedulerComm())
+    monkeypatch.setattr("kr8s.asyncio.get", mock_get)
+
+    # Test retiring 2 workers
+    retired_workers = await retire_workers(
+        n_workers=2,
+        scheduler_service_name="mock-scheduler",
+        worker_group_name="mock-group",
+        namespace="test-ns",
+        logger=Logger("logger"),
+    )
+
+    # Verify we got back exactly 2 workers and they are the last ones
+    assert len(retired_workers) == 2
+    assert retired_workers == ["worker-3", "worker-4"]
