@@ -75,7 +75,7 @@ class KubeCluster(Cluster):
         Use ``scale`` to change this number in the future
     resources: Dict[str, str]
     env: List[dict] | Dict[str, str]
-        List of environment variables to pass to worker pod.
+        List of environment variables to set on scheduler and workers.
         Can be a list of dicts using the same structure as k8s envs
         or a single dictionary of key/value pairs
     worker_command: List[str] | str
