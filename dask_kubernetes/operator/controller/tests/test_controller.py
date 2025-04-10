@@ -741,7 +741,7 @@ async def test_object_dask_cluster(
             assert isinstance(wg, DaskWorkerGroup)
 
             # Test for non-replicated environment variables; Fix for https://github.com/dask/dask-kubernetes/issues/841
-            for deployment in await wg.deployments():
+            async for deployment in wg.deployments():
                 env_vars = deployment.spec["template"]["spec"]["containers"]["env"]
                 env_var_names = [env_var["name"] for env_var in env_vars]
                 assert len(env_var_names) == len(set(env_var_names))
