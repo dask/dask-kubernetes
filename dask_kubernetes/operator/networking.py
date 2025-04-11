@@ -54,7 +54,7 @@ async def get_external_address_for_scheduler_service(
         host = lb.get("hostname", None) or lb.ip
     elif service.spec.type == "NodePort":
         port = _get_port(service, port_name, is_node_port=True)
-        nodes = await kr8s.asyncio.get("nodes")
+        nodes = [node async for node in kr8s.asyncio.get("nodes")]
         host = nodes[0].status.addresses[0].address
     elif service.spec.type == "ClusterIP":
         port = _get_port(service, port_name)

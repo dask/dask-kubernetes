@@ -574,13 +574,11 @@ class KubeCluster(Cluster):
     async def _get_logs(self):
         logs = Logs()
 
-        pods = await kr8s.asyncio.get(
+        async for pod in kr8s.asyncio.get(
             "pods",
             namespace=self.namespace,
             label_selector=f"dask.org/cluster-name={self.name}",
-        )
-
-        for pod in pods:
+        ):
             if "scheduler" in pod.name or "worker" in pod.name:
                 try:
                     if pod.status.phase != "Running":
