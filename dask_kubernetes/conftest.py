@@ -8,8 +8,10 @@ import tempfile
 import uuid
 from typing import Final, Iterator
 
+import kr8s
 import pytest
 from kopf.testing import KopfRunner
+from packaging.version import Version
 from pytest_kind.cluster import KindCluster
 
 DIR: Final[pathlib.Path] = pathlib.Path(__file__).parent.absolute()
@@ -105,6 +107,7 @@ def namespace(k8s_cluster: KindCluster) -> Iterator[str]:
 
 @pytest.fixture(scope="session", autouse=True)
 def install_gateway(k8s_cluster: KindCluster) -> Iterator[None]:
+    kube_version = Version(kr8s.version().get("gitVersion"))
     if bool(os.environ.get("TEST_DASK_GATEWAY", False)):
         check_dependency("helm")
         # To ensure the operator can coexist with Gateway
@@ -115,6 +118,8 @@ def install_gateway(k8s_cluster: KindCluster) -> Iterator[None]:
                 "dask-gateway",
                 "dask-gateway",
                 "--install",
+                "--version",
+                "2024.1.0" if kube_version < Version("1.30.0") else ">=2024.1.0",
                 "--repo=https://helm.dask.org",
                 "--create-namespace",
                 "--namespace",
