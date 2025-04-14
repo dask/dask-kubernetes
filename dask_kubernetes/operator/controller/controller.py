@@ -487,11 +487,14 @@ async def retire_workers(
         f"Scaling {worker_group_name} failed via the HTTP API and the Dask RPC, falling back to LIFO scaling. "
         "This can result in lost data, see https://kubernetes.dask.org/en/latest/operator_troubleshooting.html."
     )
-    workers = await kr8s.asyncio.get(
-        "deployments",
-        namespace=namespace,
-        label_selector={"dask.org/workergroup-name": worker_group_name},
-    )
+    workers = [
+        deployment
+        async for deployment in kr8s.asyncio.get(
+            "deployments",
+            namespace=namespace,
+            label_selector={"dask.org/workergroup-name": worker_group_name},
+        )
+    ]
     return retire_workers_lifo(workers, n_workers)
 
 
@@ -651,11 +654,14 @@ async def daskworkergroup_replica_update(
     # the number of workers ends in the correct state
     async with worker_group_scale_locks[f"{namespace}/{name}"]:
         current_workers = len(
-            await kr8s.asyncio.get(
-                "deployments",
-                namespace=namespace,
-                label_selector={"dask.org/workergroup-name": name},
-            )
+            [
+                deployment
+                async for deployment in kr8s.asyncio.get(
+                    "deployments",
+                    namespace=namespace,
+                    label_selector={"dask.org/workergroup-name": name},
+                )
+            ]
         )
         assert isinstance(new, int)
         desired_workers = new
