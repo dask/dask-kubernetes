@@ -781,10 +781,11 @@ async def daskjob_create_components(
     )
     kopf.adopt(cluster_spec)
     cluster = await DaskCluster(cluster_spec, namespace=namespace)
-    await cluster.create()
-    logger.info(
-        f"Cluster {cluster_spec['metadata']['name']} for job {name} created in {namespace}."
-    )
+    if not await cluster.exists():
+        await cluster.create()
+        logger.info(
+            f"Cluster {cluster_spec['metadata']['name']} for job {name} created in {namespace}."
+        )
 
     labels = _get_labels(meta)
     annotations = _get_annotations(meta)
@@ -804,7 +805,8 @@ async def daskjob_create_components(
     )
     kopf.adopt(job_pod_spec)
     job_pod = await Pod(job_pod_spec, namespace=namespace)
-    await job_pod.create()
+    if not await job_pod.exists():
+        await job_pod.create()
     patch.status["clusterName"] = cluster_name
     patch.status["jobStatus"] = "ClusterCreated"
     patch.status["jobRunnerPodName"] = get_job_runner_pod_name(name)
