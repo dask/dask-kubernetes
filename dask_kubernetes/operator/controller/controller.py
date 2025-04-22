@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import logging
 import time
 from collections import defaultdict
 from contextlib import suppress
@@ -294,6 +295,15 @@ async def startup(settings: kopf.OperatorSettings, **__: Any) -> None:
     # The default timeout is 300s which is usually to long
     # https://kopf.readthedocs.io/en/latest/configuration/#networking-timeouts
     settings.networking.request_timeout = 10
+
+    # Configure events
+    event_enabled = dask.config.get("kubernetes.controller.events.enabled", True)
+    settings.posting.enabled = event_enabled
+    event_level = dask.config.get("kubernetes.controller.events.level", "INFO")
+    if isinstance(event_level, str) and hasattr(logging, event_level):
+        event_level = getattr(logging, event_level)
+    if isinstance(event_level, int):
+        settings.posting.level = event_level
 
 
 # There may be useful things for us to expose via the liveness probe
