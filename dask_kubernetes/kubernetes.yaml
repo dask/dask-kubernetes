@@ -37,6 +37,10 @@ kubernetes:
     worker-allocation:
       batch-size: null
       delay: null
+    # Configure whether logs should be emitted as Kubernetes events and minimum level to emit
+    events:
+      enabled: true
+      level: INFO
 
   # Timeout to wait for the scheduler service to be up (in seconds)
   # Set it to 0 to wait indefinitely (not recommended)
