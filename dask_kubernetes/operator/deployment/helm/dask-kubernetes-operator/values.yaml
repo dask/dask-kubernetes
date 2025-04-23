@@ -46,6 +46,8 @@ volumes: []  # Volumes for the operator pod
 
 volumeMounts: []  # Volume mounts for the operator container
 
+extraEnv: []  # Extra environment variables for the operator container
+
 nodeSelector: {}  # Node selector
 
 tolerations: []  # Tolerations
