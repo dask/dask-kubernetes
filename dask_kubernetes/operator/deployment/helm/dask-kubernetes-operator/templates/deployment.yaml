@@ -41,6 +41,9 @@ spec:
             - name: DASK_KUBERNETES__CONTROLLER__WORKER_ALLOCATION__DELAY
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           args:
             - --liveness=http://0.0.0.0:8080/healthz
           {{- with .Values.kopfArgs }}
