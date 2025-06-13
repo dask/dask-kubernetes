@@ -157,6 +157,79 @@ If you prefer to install the operator from static manifests with ``kubectl`` and
       $ helm template --include-crds --repo https://helm.dask.org release dask-kubernetes-operator | kubectl apply -f -
 
 
+Working with JupyterHub
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+In order to access the Dask Operator’s dashboard with `JupyterHub <https://z2jh.jupyter.org/en/stable/>`_, some additional configuration is needed.
+
+Configuring JupyterHub Network Policy
+"""""""""""""""""""""""""""""""""""""
+
+The default JupyterHub configuration doesn’t allow communication between notebook pods and the Kubernetes API.  
+Consider that `kubeconfig` is already `configured for your notebook pods <https://kubernetes.dask.org/en/stable/operator_kubecluster.html#role-based-access-control-rbac>`_, and in order to enable the creation of ``DaskCluster`` resources directly from a notebook, you should add the following section to your JupyterHub ``values.yaml``:
+
+.. code-block:: yaml
+
+   singleuser:
+      serviceAccountName: my-serviceaccount
+      networkPolicy:
+        enabled: True
+        ingress: []
+        egress:
+          - ports:
+              - port: 443
+                protocol: TCP
+            to:
+              - namespaceSelector:
+                 matchLabels:
+                   name: kube-system
+        egressAllowRules:
+          cloudMetadataServer: false
+          dnsPortsCloudMetadataServer: true
+          dnsPortsKubeSystemNamespace: true
+          dnsPortsPrivateIPs: true
+          nonPrivateIPs: true
+          privateIPs: true
+
+Then apply your updated configuration:
+
+.. code-block:: console
+
+   $ helm upgrade --cleanup-on-fail --install <your-jupyterhub-name> jupyterhub/jupyterhub --namespace <your-namespace> -f values.yaml
+
+And restart your notebook pod:
+
+.. code-block:: console
+
+   $ kubectl delete po -n <your-namespace> jupyter-<your-user-name>
+
+Creating Dask clusters is now possible directly from your notebook. See `KubeCluster <https://kubernetes.dask.org/en/latest/operator_kubecluster.html>`_ for more details.
+
+Accessing Dask Scheduler Dashboard from JupyterLab
+""""""""""""""""""""""""""""""""""""""""""""""""""
+
+In order for your notebook pod to reach its own Dask Scheduler’s dashboard, you should add the following files to your JupyterHub configuration:
+
+.. code-block:: yaml
+
+   singleuser:
+     extraFiles:
+       # Allow proxy requests to the Dask Scheduler’s dashboard
+       jupyter-server-config:
+         mountPath: /etc/jupyter/jupyter_server_config.py
+         stringData: |
+           c.ServerProxy.host_allowlist = lambda app, host: True
+
+       # Configure the default path to reach Dask Scheduler’s dashboard
+       dask-dashboard-config:
+         mountPath: /home/jovyan/.config/dask/distributed.yaml
+         stringData: |
+           distributed:
+             dashboard:
+               link: "/user/{JUPYTERHUB_USER}/proxy/{host}:{port}/status"
+
+Then, apply your updated configuration and restart your notebook pod as previously described.
+
 Kubeflow
 ^^^^^^^^
 
