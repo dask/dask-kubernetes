@@ -218,6 +218,8 @@ In order for your notebook pod to reach its own Dask Scheduler’s dashboard, yo
        jupyter-server-config:
          mountPath: /etc/jupyter/jupyter_server_config.py
          stringData: |
+           # WARNING: This setting is inherently insecure and should be used with care.
+           # Ideally, restrict this to only allow your Dask Scheduler’s domain instead of allowing everything.
            c.ServerProxy.host_allowlist = lambda app, host: True
 
        # Configure the default path to reach Dask Scheduler’s dashboard
@@ -229,6 +231,13 @@ In order for your notebook pod to reach its own Dask Scheduler’s dashboard, yo
                link: "/user/{JUPYTERHUB_USER}/proxy/{host}:{port}/status"
 
 Then, apply your updated configuration and restart your notebook pod as previously described.
+
+
+
+.. warning::
+
+   Setting `c.ServerProxy.host_allowlist = lambda app, host: True` is inherently insecure and may enable unintended access to other services within your network.
+   Ideally, you should modify this condition to restrict the host to your Dask Scheduler’s domain or service name (for instance, dask-cluster-name.default.svc.cluster.local) instead of allowing everything.
 
 Kubeflow
 ^^^^^^^^
