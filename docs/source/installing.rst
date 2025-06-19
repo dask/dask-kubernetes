@@ -236,8 +236,15 @@ Then, apply your updated configuration and restart your notebook pod as previous
 
 .. warning::
 
-   Setting `c.ServerProxy.host_allowlist = lambda app, host: True` is inherently insecure and may enable unintended access to other services within your network.
-   Ideally, you should modify this condition to restrict the host to your Dask Scheduler’s domain or service name (for instance, dask-cluster-name.default.svc.cluster.local) instead of allowing everything.
+   Setting ``c.ServerProxy.host_allowlist = lambda app, host: True`` is inherently insecure and may enable unintended access to other services within your network.
+   Ideally, you should restrict the host to your Dask Scheduler’s namespace or cluster name and namespace (for instance, "<dask-cluster-name>.<namespace>").
+   However, depending on your configuration, matching by suffix may be sufficient.
+   For example:
+
+   .. code-block:: python
+
+      # Authorize network flows to the Kubernetes namespace in which your Dask cluster will be deployed.
+      c.ServerProxy.host_allowlist = lambda app, host: host.endswith('.your-dask-operator-namespace')
 
 Kubeflow
 ^^^^^^^^
