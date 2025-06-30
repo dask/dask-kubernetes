@@ -489,6 +489,8 @@ async def retire_workers(
                 attribute="name",
             )
             await scheduler_comm.retire_workers(names=workers_to_close)
+            if isinstance(workers_to_close, tuple):
+                workers_to_close = list(workers_to_close)
             assert isinstance(workers_to_close, list)
             return workers_to_close
 
