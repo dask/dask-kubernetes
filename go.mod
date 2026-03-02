@@ -1,4 +1,4 @@
-module github.com/dask/dask-kubernetes/v2025
+module github.com/dask/dask-kubernetes/v2026
 
 go 1.18
 

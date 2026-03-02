@@ -7,7 +7,7 @@ The classic ``KubeCluster`` class has been replaced with a new version that is b
 Installing the operator
 -----------------------
 
-To use the new implementation of ``KubeCluster`` you need to :doc:`install the Dask operator custom resources and controller <operator_installation>`.
+To use the new implementation of ``KubeCluster`` you need to :doc:`install the Dask operator custom resources and controller <installing>`.
 
 The custom resources allow us to describe our Dask cluster components as native Kubernetes resources rather than directly creating ``Pod`` and ``Service`` resources like the classic implementation does.
 

@@ -14,7 +14,7 @@ keywords = ["dask", "distributed", "kubernetes"]
 dependencies = [
     "dask>=2022.08.1",
     "distributed>=2022.08.1",
-    "kopf>=1.35.3",
+    "kopf>=1.38.0",
     "kr8s==0.20.*",
     "kubernetes-asyncio>=12.0.1",
     "kubernetes>=12.0.1",

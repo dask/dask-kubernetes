@@ -93,11 +93,8 @@ Then you need to ensure that your ``pyproject.toml`` registers the plugin as a `
 
 .. code-block:: toml
 
-   ...
-
-   [option.entry_points]
-   dask_operator_plugin =
-      my_controller_plugin = my_controller_plugin.plugin
+   [option.entry-points.dask_operator_plugin]
+   my_controller_plugin = "my_controller_plugin.plugin"
 
 Then you can package this up and push it to your preferred Python package repository.
 
@@ -115,7 +112,7 @@ The controller uses the ``ghcr.io/dask/dask-kubernetes-operator:latest`` contain
 
    RUN pip install my-controller-plugin
 
-Then when you :doc:`install the controller deployment <operator_installation>` either via the manifest or with helm you would specify your custom container image instead.
+Then when you :doc:`install the controller deployment <installing>` either via the manifest or with helm you would specify your custom container image instead.
 
 .. code-block:: bash
 
