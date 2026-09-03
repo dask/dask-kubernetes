@@ -890,7 +890,7 @@ async def test_create_cluster_validates_name(
 @pytest.mark.parametrize(
     "phase,expected_phase",
     [
-        # Components are still being created, the phase must not change yet
+        # Components still being created, phase must not change
         ("Created", None),
         ("Pending", "Running"),
         ("Running", "Running"),
@@ -904,7 +904,7 @@ async def test_scheduler_service_status_leaves_created_cluster_alone(
     cluster.patch = AsyncMock()
     monkeypatch.setattr(DaskCluster, "get", AsyncMock(return_value=cluster))
 
-    # kopf types the decorated handler as a protocol, call it as a plain coroutine
+    # cast past kopf's handler protocol type
     handler = cast(Callable[..., Awaitable[None]], handle_scheduler_service_status)
     await handler(
         spec={"type": "ClusterIP"},

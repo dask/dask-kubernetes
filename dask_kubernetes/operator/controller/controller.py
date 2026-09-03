@@ -349,9 +349,8 @@ async def daskcluster_create_components(
 ) -> None:
     """When the DaskCluster status.phase goes into Created create the cluster components.
 
-    The cluster stays in the Created phase until every component exists. This handler is
-    retried by kopf on failure, but only while status.phase is still "Created", so nothing
-    else may advance the phase before this handler has finished.
+    The phase must stay Created until this handler finishes, since kopf only retries it
+    while status.phase == "Created".
     """
     assert name
     assert namespace
@@ -402,8 +401,7 @@ async def daskcluster_create_components(
         await worker_group.create()
     logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
 
-    # All components exist now, so move the cluster out of the Created phase.
-    # The scheduler service may have become ready while we were still creating things.
+    # The scheduler service may have become ready while components were being created.
     await scheduler_service.refresh()
     patch.status["phase"] = _scheduler_service_phase(
         scheduler_service.spec, scheduler_service.status
@@ -433,11 +431,8 @@ async def handle_scheduler_service_status(
     cluster = await DaskCluster.get(
         labels["dask.org/cluster-name"], namespace=namespace
     )
-    # While the cluster is in the Created phase daskcluster_create_components is still
-    # running (or retrying). Leave the phase alone: that handler is triggered by
-    # status.phase == "Created" and kopf drops its pending retries as soon as the phase
-    # changes, which would leave the cluster without its default worker group.
-    # daskcluster_create_components sets the phase itself once all components exist.
+    # Don't advance the phase while daskcluster_create_components is still running or
+    # retrying; changing it would cancel its retries. It sets the phase itself when done.
     if cluster.raw.get("status", {}).get("phase") == "Created":
         return
     await cluster.patch({"status": {"phase": _scheduler_service_phase(spec, status)}})
