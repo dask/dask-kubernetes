@@ -347,7 +347,12 @@ async def daskcluster_create_components(
     meta: kopf.Meta,
     **__: Any,
 ) -> None:
-    """When the DaskCluster status.phase goes into Created create the cluster components."""
+    """When the DaskCluster status.phase goes into Created create the cluster components.
+
+    The cluster stays in the Created phase until every component exists. This handler is
+    retried by kopf on failure, but only while status.phase is still "Created", so nothing
+    else may advance the phase before this handler has finished.
+    """
     assert name
     assert namespace
     logger.info("Creating Dask cluster components.")
@@ -397,7 +402,23 @@ async def daskcluster_create_components(
         await worker_group.create()
     logger.info(f"Worker group {data['metadata']['name']} created in {namespace}.")
 
-    patch.status["phase"] = "Pending"
+    # All components exist now, so move the cluster out of the Created phase.
+    # The scheduler service may have become ready while we were still creating things.
+    await scheduler_service.refresh()
+    patch.status["phase"] = _scheduler_service_phase(
+        scheduler_service.spec, scheduler_service.status
+    )
+
+
+def _scheduler_service_phase(spec: Any, status: Any) -> str:
+    """Return the DaskCluster phase implied by the scheduler Service state."""
+    # If the Service is a LoadBalancer with no ingress endpoints the cluster is Pending
+    if spec["type"] == "LoadBalancer" and not len(
+        status.get("loadBalancer", {}).get("ingress", [])
+    ):
+        return "Pending"
+    # Otherwise it is Running
+    return "Running"
 
 
 @kopf.on.field("service", field="status", labels={"dask.org/component": "scheduler"})
@@ -409,18 +430,17 @@ async def handle_scheduler_service_status(
     **__: Any,
 ) -> None:
     assert namespace
-    # If the Service is a LoadBalancer with no ingress endpoints mark the cluster as Pending
-    if spec["type"] == "LoadBalancer" and not len(
-        status.get("loadBalancer", {}).get("ingress", [])
-    ):
-        phase = "Pending"
-    # Otherwise mark it as Running
-    else:
-        phase = "Running"
     cluster = await DaskCluster.get(
         labels["dask.org/cluster-name"], namespace=namespace
     )
-    await cluster.patch({"status": {"phase": phase}})
+    # While the cluster is in the Created phase daskcluster_create_components is still
+    # running (or retrying). Leave the phase alone: that handler is triggered by
+    # status.phase == "Created" and kopf drops its pending retries as soon as the phase
+    # changes, which would leave the cluster without its default worker group.
+    # daskcluster_create_components sets the phase itself once all components exist.
+    if cluster.raw.get("status", {}).get("phase") == "Created":
+        return
+    await cluster.patch({"status": {"phase": _scheduler_service_phase(spec, status)}})
 
 
 @kopf.on.create("daskworkergroup.kubernetes.dask.org")
