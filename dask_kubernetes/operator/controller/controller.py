@@ -452,6 +452,7 @@ async def retire_workers(
 ) -> list[str]:
     def trim_port(worker_addr: str) -> str:
         return worker_addr.rsplit(":", maxsplit=1)[0]
+
     def get_owner(k8s_object) -> str:
         return str(k8s_object["metadata"]["ownerReferences"][0]["name"])
 
@@ -472,7 +473,9 @@ async def retire_workers(
     for pod_ip, rs in pod_ips_to_deployments.items():
         rs_object = [
             _rs
-            async for _rs in kr8s.asyncio.get("replicaset", namespace=namespace, field_selector={"metadata.name": rs})
+            async for _rs in kr8s.asyncio.get(
+                "replicaset", namespace=namespace, field_selector={"metadata.name": rs}
+            )
         ][0]
         deployment_name = get_owner(rs_object)
         # Assign deployment name to pod ip in the dict
@@ -495,7 +498,9 @@ async def retire_workers(
                 worker_addresses_to_retire = [
                     trim_port(response[w]["name"]) for w in response.keys()
                 ]
-                return [pod_ips_to_deployments[addr] for addr in worker_addresses_to_retire]
+                return [
+                    pod_ips_to_deployments[addr] for addr in worker_addresses_to_retire
+                ]
             logger.debug(
                 "Received %d response from scheduler API with body %s",
                 resp.status,
@@ -530,10 +535,10 @@ async def retire_workers(
         f"Scaling {worker_group_name} failed via the HTTP API and the Dask RPC, falling back to LIFO scaling. "
         "This can result in lost data, see https://kubernetes.dask.org/en/latest/operator_troubleshooting.html."
     )
-    return retire_workers_lifo(pod_ips_to_deployments.values(), n_workers)
+    return retire_workers_lifo(list(pod_ips_to_deployments.values()), n_workers)
 
 
-def retire_workers_lifo(workers, n_workers: int) -> list[str]:
+def retire_workers_lifo(workers: list[str], n_workers: int) -> list[str]:
     return [w for w in workers[-n_workers:]]
 
 
