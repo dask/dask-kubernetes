@@ -465,7 +465,37 @@ async def retire_workers(
     namespace: str | None,
     logger: kopf.Logger,
 ) -> list[str]:
+    def trim_port(worker_addr: str) -> str:
+        return worker_addr.rsplit(":", maxsplit=1)[0]
+
+    def get_owner(k8s_object) -> str:
+        return str(k8s_object["metadata"]["ownerReferences"][0]["name"])
+
     assert namespace
+    worker_pods = [
+        pod
+        async for pod in kr8s.asyncio.get(
+            "pods",
+            namespace=namespace,
+            label_selector={"dask.org/workergroup-name": worker_group_name},
+        )
+    ]
+    pod_ips_to_deployments = {
+        # Construct with ReplicaSet initially
+        f"tcp://{pod['status']['podIP']}": get_owner(pod)
+        for pod in worker_pods
+    }
+    for pod_ip, rs in pod_ips_to_deployments.items():
+        rs_object = [
+            _rs
+            async for _rs in kr8s.asyncio.get(
+                "replicaset", namespace=namespace, field_selector={"metadata.name": rs}
+            )
+        ][0]
+        deployment_name = get_owner(rs_object)
+        # Assign deployment name to pod ip in the dict
+        pod_ips_to_deployments[pod_ip] = deployment_name
+
     # Try gracefully retiring via the HTTP API
     dashboard_address = await get_scheduler_address(
         scheduler_service_name,
@@ -478,9 +508,14 @@ async def retire_workers(
         params = {"n": n_workers}
         async with session.post(url, json=params) as resp:
             if resp.status <= 300:
-                retired_workers = await resp.json()
-                logger.info("Retired workers %s", retired_workers)
-                return [retired_workers[w]["name"] for w in retired_workers.keys()]
+                response = await resp.json()
+                logger.info("Retired workers %s", response)
+                worker_addresses_to_retire = [
+                    trim_port(response[w]["name"]) for w in response.keys()
+                ]
+                return [
+                    pod_ips_to_deployments[addr] for addr in worker_addresses_to_retire
+                ]
             logger.debug(
                 "Received %d response from scheduler API with body %s",
                 resp.status,
@@ -507,26 +542,19 @@ async def retire_workers(
             if isinstance(workers_to_close, tuple):
                 workers_to_close = list(workers_to_close)
             assert isinstance(workers_to_close, list)
-            return workers_to_close
+            worker_addresses_to_retire = [trim_port(w) for w in workers_to_close]
+            return [pod_ips_to_deployments[addr] for addr in worker_addresses_to_retire]
 
     # Finally fall back to last-in-first-out scaling
     logger.warning(
         f"Scaling {worker_group_name} failed via the HTTP API and the Dask RPC, falling back to LIFO scaling. "
         "This can result in lost data, see https://kubernetes.dask.org/en/latest/operator_troubleshooting.html."
     )
-    workers = [
-        deployment
-        async for deployment in kr8s.asyncio.get(
-            "deployments",
-            namespace=namespace,
-            label_selector={"dask.org/workergroup-name": worker_group_name},
-        )
-    ]
-    return retire_workers_lifo(workers, n_workers)
+    return retire_workers_lifo(list(pod_ips_to_deployments.values()), n_workers)
 
 
-def retire_workers_lifo(workers, n_workers: int) -> list[str]:
-    return [w.name for w in workers[-n_workers:]]
+def retire_workers_lifo(workers: list[str], n_workers: int) -> list[str]:
+    return [w for w in workers[-n_workers:]]
 
 
 async def check_scheduler_idle(

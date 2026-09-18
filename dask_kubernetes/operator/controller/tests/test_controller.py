@@ -921,16 +921,12 @@ async def test_scheduler_service_status_leaves_created_cluster_alone(
 
 @pytest.mark.anyio
 async def test_retire_workers_lifo():
-    class Worker:
-        def __init__(self, name):
-            self.name = name
-
     workers = [
-        Worker(name="worker-1"),
-        Worker(name="worker-2"),
-        Worker(name="worker-3"),
-        Worker(name="worker-4"),
-        Worker(name="worker-5"),
+        "worker-1",
+        "worker-2",
+        "worker-3",
+        "worker-4",
+        "worker-5",
     ]
 
     retired_workers = retire_workers_lifo(workers, 2)
