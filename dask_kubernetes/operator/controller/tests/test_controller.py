@@ -11,10 +11,13 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
+    Awaitable,
     Callable,
     Final,
     Iterator,
+    cast,
 )
+from unittest.mock import AsyncMock, MagicMock
 
 import dask.config
 import pytest
@@ -28,6 +31,9 @@ from dask_kubernetes.operator.controller import (
     KUBERNETES_DATETIME_FORMAT,
     get_job_runner_pod_name,
     retire_workers_lifo,
+)
+from dask_kubernetes.operator.controller.controller import (
+    handle_scheduler_service_status,
 )
 
 if TYPE_CHECKING:
@@ -878,6 +884,39 @@ async def test_create_cluster_validates_name(
         async with gen_cluster(cluster_name=cluster_name) as (_, ns):
             actual_status = await _get_cluster_status(k8s_cluster, ns, cluster_name)
             assert actual_status in expected_status
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "phase,expected_phase",
+    [
+        # Components still being created, phase must not change
+        ("Created", None),
+        ("Pending", "Running"),
+        ("Running", "Running"),
+    ],
+)
+async def test_scheduler_service_status_leaves_created_cluster_alone(
+    monkeypatch: pytest.MonkeyPatch, phase: str, expected_phase: str | None
+) -> None:
+    cluster = MagicMock()
+    cluster.raw = {"status": {"phase": phase}}
+    cluster.patch = AsyncMock()
+    monkeypatch.setattr(DaskCluster, "get", AsyncMock(return_value=cluster))
+
+    # cast past kopf's handler protocol type
+    handler = cast(Callable[..., Awaitable[None]], handle_scheduler_service_status)
+    await handler(
+        spec={"type": "ClusterIP"},
+        labels={"dask.org/cluster-name": DEFAULT_CLUSTER_NAME},
+        status={},
+        namespace="default",
+    )
+
+    if expected_phase is None:
+        cluster.patch.assert_not_awaited()
+    else:
+        cluster.patch.assert_awaited_once_with({"status": {"phase": expected_phase}})
 
 
 @pytest.mark.anyio
