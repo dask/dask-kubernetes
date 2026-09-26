@@ -175,7 +175,7 @@ def build_worker_deployment_spec(
     }
     scheduler_env = {
         "name": "DASK_SCHEDULER_ADDRESS",
-        "value": f"tcp://{cluster_name}-scheduler.{namespace}.svc.cluster.local:8786",
+        "value": f"tcp://{cluster_name}-scheduler.{namespace}:8786",
     }
     for container in deployment_spec["spec"]["template"]["spec"]["containers"]:
         if "env" not in container:
