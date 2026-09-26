@@ -1,3 +1,4 @@
+import dask
 import pytest
 from dask.distributed import Client
 from distributed.utils import TimeoutError
@@ -164,7 +165,6 @@ def test_cluster_crashloopbackoff(kopf_runner, docker_image, namespace):
                 custom_cluster_spec=spec,
                 namespace=namespace,
                 resource_timeout=1,
-                idle_timeout=2,
             )
 
 
@@ -188,12 +188,40 @@ def test_adapt(kopf_runner, docker_image, namespace):
 
 def test_custom_spec(kopf_runner, docker_image, namespace):
     with kopf_runner:
-        spec = make_cluster_spec("customspec", image=docker_image)
-        with KubeCluster(
-            custom_cluster_spec=spec, n_workers=1, namespace=namespace
-        ) as cluster:
+        spec = make_cluster_spec("customspec", image=docker_image, n_workers=1)
+        with KubeCluster(custom_cluster_spec=spec, namespace=namespace) as cluster:
             with Client(cluster) as client:
                 assert client.submit(lambda x: x + 1, 10).result() == 11
+
+
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("image", "example.invalid/dask:latest"),
+        ("n_workers", 0),
+        ("resources", {}),
+        ("env", {}),
+        ("worker_command", []),
+        ("scheduler_service_type", "NodePort"),
+        ("idle_timeout", 30),
+        ("jupyter", True),
+        ("jupyter", False),
+    ],
+)
+def test_custom_spec_rejects_cluster_spec_options(option, value):
+    with pytest.raises(ValueError, match=option):
+        KubeCluster(
+            custom_cluster_spec=make_cluster_spec("customspec"),
+            **{option: value},
+        )
+
+
+def test_configured_custom_spec_rejects_cluster_spec_options():
+    with dask.config.set(
+        {"kubernetes.custom-cluster-spec": make_cluster_spec("customspec")}
+    ):
+        with pytest.raises(ValueError, match="idle_timeout"):
+            KubeCluster(idle_timeout=30)
 
 
 def test_typo_resource_limits(namespace):

@@ -110,10 +110,13 @@ class KubeCluster(Cluster):
     scheduler_service_type: str (optional)
         Kubernetes service type to use for the scheduler. Defaults to ``ClusterIP``.
     jupyter: bool (optional)
-        Start Jupyter on the scheduler node.
+        Start Jupyter on the scheduler node. Defaults to the configured value.
     custom_cluster_spec: str | dict (optional)
         Path to a YAML manifest or a dictionary representation of a ``DaskCluster`` resource object which will be
-        used to create the cluster instead of generating one from the other keyword arguments.
+        used to create the cluster instead of generating one from the other keyword arguments. Cannot be combined
+        with ``image``, ``n_workers``, ``resources``, ``env``, ``worker_command``, ``scheduler_service_type``,
+        ``idle_timeout``, or ``jupyter`` with non-``None`` values.
+        Set those options in the custom specification instead.
     scheduler_forward_port: int (optional)
         The port to use when forwarding the scheduler dashboard. Will utilize a random port by default
     quiet: bool
@@ -176,12 +179,40 @@ class KubeCluster(Cluster):
         scheduler_service_type: Optional[str] = None,
         custom_cluster_spec: Optional[str | dict] = None,
         scheduler_forward_port: Optional[int] = None,
-        jupyter: bool = False,
+        jupyter: Optional[bool] = None,
         loop: Optional[IOLoop] = None,
         asynchronous: bool = False,
         quiet: bool = False,
         **kwargs,
     ):
+        resolved_custom_cluster_spec = dask.config.get(
+            "kubernetes.custom-cluster-spec", override_with=custom_cluster_spec
+        )
+        # Check explicit arguments before resolving their configuration defaults.
+        # False, zero, and empty collections are explicit values too.
+        spec_options = {
+            "image": image,
+            "n_workers": n_workers,
+            "resources": resources,
+            "env": env,
+            "worker_command": worker_command,
+            "scheduler_service_type": scheduler_service_type,
+            "idle_timeout": idle_timeout,
+            "jupyter": jupyter,
+        }
+
+        conflicting_options = [
+            option for option, value in spec_options.items() if value is not None
+        ]
+
+        if resolved_custom_cluster_spec is not None and conflicting_options:
+            options = ", ".join(conflicting_options)
+            raise ValueError(
+                "custom_cluster_spec cannot be used with cluster specification "
+                f"options: {options}. Set these options in custom_cluster_spec, "
+                "or pass them to make_cluster_spec() when creating it."
+            )
+
         name = dask.config.get("kubernetes.name", override_with=name)
         self.namespace = dask.config.get(
             "kubernetes.namespace", override_with=namespace
@@ -214,9 +245,7 @@ class KubeCluster(Cluster):
         self._resource_timeout = dask.config.get(
             "kubernetes.resource-timeout", override_with=resource_timeout
         )
-        self._custom_cluster_spec = dask.config.get(
-            "kubernetes.custom-cluster-spec", override_with=custom_cluster_spec
-        )
+        self._custom_cluster_spec = resolved_custom_cluster_spec
         self.scheduler_service_type = dask.config.get(
             "kubernetes.scheduler-service-type", override_with=scheduler_service_type
         )
