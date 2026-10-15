@@ -10,6 +10,7 @@ from typing import Final, Iterator
 
 import kr8s
 import pytest
+import yaml
 from kopf.testing import KopfRunner
 from packaging.version import Version
 from pytest_kind.cluster import KindCluster
@@ -28,6 +29,18 @@ def check_dependency(dependency):
 check_dependency("helm")
 check_dependency("kubectl")
 check_dependency("docker")
+
+
+def get_github_actions_default_kubernetes_version() -> str | None:
+    try:
+        workflow_file = pathlib.Path(".github/workflows/operator.yaml")
+        if not workflow_file.exists():
+            return None
+        workflow = yaml.safe_load(workflow_file.read_text())
+        return workflow["jobs"]["test"]["strategy"]["matrix"]["kubernetes-version"][0]
+    except Exception:
+        return None
+
 
 DISABLE_LOGGERS: Final[list[str]] = ["httpcore", "httpx"]
 
@@ -70,6 +83,8 @@ def k8s_cluster(
 ) -> Iterator[KindCluster]:
     image = None
     if version := os.environ.get("KUBERNETES_VERSION"):
+        image = f"kindest/node:v{version}"
+    elif version := get_github_actions_default_kubernetes_version():
         image = f"kindest/node:v{version}"
 
     kind_cluster = KindCluster(
