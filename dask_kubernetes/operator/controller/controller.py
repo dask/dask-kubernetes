@@ -875,8 +875,10 @@ async def handle_runner_status_change_succeeded(
     assert namespace
     logger.info("Job succeeded, deleting Dask cluster.")
     name = meta["labels"]["dask.org/cluster-name"]
-    cluster = await DaskCluster.get(name, namespace=namespace)
-    await cluster.delete()
+    # A previous attempt may have deleted the cluster before the status patch failed.
+    with suppress(kr8s.NotFoundError):
+        cluster = await DaskCluster.get(name, namespace=namespace)
+        await cluster.delete()
     job = await DaskJob.get(name, namespace=namespace)
     await job.patch(
         {
@@ -901,8 +903,10 @@ async def handle_runner_status_change_failed(
     assert namespace
     logger.info("Job failed, deleting Dask cluster.")
     name = meta["labels"]["dask.org/cluster-name"]
-    cluster = await DaskCluster.get(name, namespace=namespace)
-    await cluster.delete()
+    # A previous attempt may have deleted the cluster before the status patch failed.
+    with suppress(kr8s.NotFoundError):
+        cluster = await DaskCluster.get(name, namespace=namespace)
+        await cluster.delete()
     job = await DaskJob.get(name, namespace=namespace)
     await job.patch(
         {
